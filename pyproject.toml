@@ -1,0 +1,17 @@
+[project]
+name = "pyron"
+version = "0.0.1"
+description = "Previsão de falhas em equipamentos elétricos por termografia"
+requires-python = ">=3.11"
+dependencies = ["numpy", "pillow", "scipy"]
+
+[project.optional-dependencies]
+ocr = ["rapidocr-onnxruntime"]
+dev = ["pytest", "matplotlib"]
+
+[tool.setuptools]
+packages = ["nucleo"]
+
+[tool.pytest.ini_options]
+testpaths = ["testes"]
+pythonpath = ["."]
