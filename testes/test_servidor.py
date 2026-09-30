@@ -51,6 +51,7 @@ def test_fluxo_completo(cliente) -> None:
     assert b["condicoes"] == {"ambiente_c": 28.0, "carga_pct": None}
 
     assert len(cliente.get("/api/analises").json()) == 1
+    cliente.put("/api/configuracoes", json={"responsaveis": [{"nome": "Maria Souza", "registro": "CREA-PB 123456"}]})
     pdf = cliente.get(f"/api/analises/{a['id']}/laudo.pdf")
     assert pdf.status_code == 200 and pdf.content[:4] == b"%PDF"
     assert cliente.delete(f"/api/analises/{a['id']}").status_code == 200

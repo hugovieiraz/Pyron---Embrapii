@@ -9,10 +9,13 @@ import base64
 import csv
 import io
 import json
+import os
 import re
 import threading
 import time
 import uuid
+import zipfile
+from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 from time import perf_counter
@@ -23,14 +26,18 @@ from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
 
-from app import laudo
+from app import avaliacoes as avaliacoes_mod
+from app import laudo, monitoramento
+from app import treinos as treinos_mod
+from app import videos as videos_mod
 from app.armazenamento import Armazenamento
-from nucleo import analise, detectores, entrada, referencias, render
+from nucleo import analise, detectores, entrada, referencias, render, video
 
-VERSAO = "0.1.0"
+VERSAO = "0.6.0"
 RAIZ = Path(__file__).resolve().parents[1]
 PASTA_APP = Path(__file__).resolve().parent
-PASTA_DADOS = PASTA_APP / "dados_app"
+# PYRON_DADOS (ou app.iniciar --dados) aponta outra pasta: demonstrações e testes sem tocar nas inspeções reais.
+PASTA_DADOS = Path(os.environ.get("PYRON_DADOS") or PASTA_APP / "dados_app")
 PASTA_MODELOS = RAIZ / "modelos"
 PASTA_EXEMPLOS = RAIZ / "dados" / "sciencedb_10185"
 INVENTARIO = RAIZ / "saida" / "e00_inventario" / "inventario.csv"
@@ -55,7 +62,16 @@ NOMES_EXEMPLOS = {
     "Wave Traps": "Bobina de bloqueio",
 }
 
-app = FastAPI(title="Pyron", version=VERSAO)
+@asynccontextmanager
+async def _ciclo_de_vida(_app):
+    """Ao subir, retoma o monitoramento que estava ligado; ao descer, para a thread da pasta vigiada."""
+    if _config()["monitoramento"].get("ativo"):
+        monitor.iniciar()
+    yield
+    monitor.parar()
+
+
+app = FastAPI(title="Pyron", version=VERSAO, lifespan=_ciclo_de_vida)
 armazenamento = Armazenamento(PASTA_DADOS)
 _trava = threading.Lock()
 
@@ -68,10 +84,13 @@ ocr = entrada.OCRPreguicoso()
 CONFIG_PADRAO = {
     "modelo_ativo": "pontos-quentes",
     "empresa": {"nome": "", "subtitulo": ""},
-    "responsavel": {"nome": "", "registro": ""},
-    "tema": "sistema",
+    "responsavel": {"nome": "", "registro": ""},  # formato antigo (um só); migra para "responsaveis"
+    "responsaveis": [],  # [{"id", "nome", "funcao", "registro"}]: o laudo só aceita quem está aqui
+    "responsavel_padrao": None,
+    "tema": "claro",
     "criterios": None,  # None: critério padrão (modelo brasileiro, NBR 15866)
     "componentes": {},  # trocas do usuário na biblioteca de componentes (MTA por classe)
+    "monitoramento": dict(monitoramento.PADRAO),
 }
 
 
@@ -88,7 +107,36 @@ def _config() -> dict:
                 cfg[chave].update(valor)
             else:
                 cfg[chave] = valor
+    antigo = cfg.get("responsavel") or {}
+    if not cfg["responsaveis"] and (antigo.get("nome") or "").strip():  # migração do responsável único
+        cfg["responsaveis"] = [{"id": "r1", "nome": antigo["nome"].strip(), "funcao": "", "registro": (antigo.get("registro") or "").strip()}]
+        cfg["responsavel_padrao"] = "r1"
     return cfg
+
+
+def _responsavel(id_: str | None) -> dict | None:
+    """Responsável técnico cadastrado (o padrão, se ``id_`` vier vazio)."""
+    cfg = _config()
+    lista = cfg["responsaveis"]
+    escolhido = id_ or cfg.get("responsavel_padrao")
+    return next((r for r in lista if r["id"] == escolhido), None)
+
+
+def _validar_responsaveis(lista) -> list[dict]:
+    if not isinstance(lista, list) or len(lista) > 50:
+        raise HTTPException(422, "Lista de responsáveis inválida.")
+    saida, ids = [], set()
+    for i, r in enumerate(lista, start=1):
+        nome = str(r.get("nome", "")).strip()[:120]
+        registro = str(r.get("registro", "")).strip()[:60]
+        if not nome or not registro:
+            raise HTTPException(422, f"Responsável {i}: preencha o nome e o registro profissional.")
+        id_ = str(r.get("id") or "").strip()[:12]
+        if not re.fullmatch(r"[a-z0-9]{1,12}", id_) or id_ in ids:
+            id_ = uuid.uuid4().hex[:8]
+        ids.add(id_)
+        saida.append({"id": id_, "nome": nome, "funcao": str(r.get("funcao", "")).strip()[:80], "registro": registro})
+    return saida
 
 
 def _salvar_config(cfg: dict) -> None:
@@ -166,10 +214,10 @@ def _info_modelo(det: detectores.Detector) -> dict:
 # ---------------------------------------------------------------- análise
 
 
-def _regioes_do_detector(det: detectores.Detector, matriz: np.ndarray) -> list[dict]:
+def _regioes_do_detector(det: detectores.Detector, matriz: np.ndarray, imagem: np.ndarray | None = None) -> list[dict]:
     contagem: dict[str, int] = {}
     regioes = []
-    for d in det.detectar(matriz):
+    for d in det.detectar(matriz, imagem):
         contagem[d.classe] = contagem.get(d.classe, 0) + 1
         regioes.append(
             {
@@ -194,31 +242,36 @@ def _calcular(a: dict, matriz: np.ndarray) -> dict:
     return a
 
 
-def _nova_analise(dados: bytes, nome: str, modelo: str | None) -> dict:
+def _nova_analise(dados: bytes, nome: str, modelo: str | None, fonte: str = "manual", identificacao: dict | None = None,
+                  limites: tuple[float, float] | None = None) -> dict:
     t0 = perf_counter()
     try:
-        img = entrada.carregar(dados, ocr=ocr)
+        img = entrada.carregar(dados, ocr=ocr, limites=limites)
     except ValueError as erro:
         raise HTTPException(422, str(erro)) from erro
     t1 = perf_counter()
     det = _detector(modelo)
     try:
-        regioes = _regioes_do_detector(det, img.temperatura_c)
+        regioes = _regioes_do_detector(det, img.temperatura_c, img.exibida_rgb)
     except ValueError as erro:
         raise HTTPException(422, f"O modelo {det.nome} falhou: {erro}") from erro
     t2 = perf_counter()
     lo, hi = render.faixa_exibicao(img.temperatura_c)
-    resp = _config()["responsavel"]
+    resp = _responsavel(None)
     a = {
         "id": uuid.uuid4().hex,
         "criado_em": datetime.now().isoformat(timespec="seconds"),
         "arquivo": nome,
+        "fonte": fonte,
         "radiometrica": img.radiometrica,
         "origem": img.origem,
         "metadados": img.metadados,
         "modelo": _info_modelo(det),
         "condicoes": {"ambiente_c": None, "carga_pct": None},
-        "identificacao": {k: v for k, v in (("responsavel", resp.get("nome")), ("art", resp.get("registro"))) if v},
+        "identificacao": {
+            **({"responsavel_id": resp["id"]} if resp else {}),
+            **(identificacao or {}),
+        },
         "regioes": regioes,
         "tem_foto": img.foto_visivel is not None,
         "matriz_info": {
@@ -327,8 +380,14 @@ def detectar_de_novo(id_: str, corpo: dict = Body(default={})) -> dict:
     a, m = _carregar(id_)
     det = _detector(corpo.get("modelo"))
     manuais = [r for r in a["regioes"] if r.get("origem") == "manual"]
+    imagem = None
+    if det.precisa_imagem:  # modelo que olha a imagem colorida: reabre o JPEG original guardado
+        original = armazenamento.original(id_)
+        if original is None:
+            raise HTTPException(422, f"O modelo {det.nome} precisa da imagem original, que não está guardada nesta inspeção.")
+        imagem = entrada.carregar(original, ocr=ocr).exibida_rgb
     try:
-        a["regioes"] = manuais + _regioes_do_detector(det, m)
+        a["regioes"] = manuais + _regioes_do_detector(det, m, imagem)
     except ValueError as erro:
         raise HTTPException(422, f"O modelo {det.nome} falhou: {erro}") from erro
     a["modelo"] = _info_modelo(det)
@@ -368,11 +427,41 @@ def miniatura(id_: str) -> Response:
     return Response(buf.getvalue(), media_type="image/png")
 
 
+def _escolher_responsavel(id_: str | None, a: dict | None = None) -> dict:
+    """Só sai laudo com responsável do cadastro: nome e registro nunca são digitados na hora."""
+    escolhido = id_ or ((a or {}).get("identificacao") or {}).get("responsavel_id")
+    resp = _responsavel(escolhido)
+    if resp is None:
+        raise HTTPException(422, "Escolha o responsável técnico. Se ainda não houver, cadastre em Configurações › Empresa e responsáveis.")
+    return resp
+
+
 @app.get("/api/analises/{id_}/laudo.pdf")
-def laudo_pdf(id_: str) -> Response:
+def laudo_pdf(id_: str, responsavel: str | None = None, art: str | None = None) -> Response:
     a, m = _carregar(id_)
-    pdf = laudo.gerar(a, m, armazenamento.foto(id_), VERSAO, empresa=_config()["empresa"])
-    nome = f"laudo_{re.sub(r'[^A-Za-z0-9_-]', '_', Path(a['arquivo']).stem)}_{a['id'][:6]}.pdf"
+    resp = _escolher_responsavel(responsavel, a)
+    art = (art if art is not None else (a.get("identificacao") or {}).get("art")) or ""
+    pdf = laudo.gerar(a, m, armazenamento.foto(id_), VERSAO, empresa=_config()["empresa"], responsavel=resp, art=art[:60], criterios=_criterios())
+    nome = f"relatorio_{re.sub(r'[^A-Za-z0-9_-]', '_', Path(a['arquivo']).stem)}_{a['id'][:6]}.pdf"
+    return Response(pdf, media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="{nome}"'})
+
+
+@app.post("/api/laudos")
+def laudo_varias(corpo: dict = Body(...)) -> Response:
+    """Um relatório com várias inspeções, na ordem escolhida."""
+    ids = corpo.get("ids")
+    if not isinstance(ids, list) or not ids:
+        raise HTTPException(422, "Selecione ao menos uma inspeção.")
+    if len(ids) > 60:
+        raise HTTPException(422, "Selecione no máximo 60 inspeções por relatório.")
+    itens = []
+    for id_ in dict.fromkeys(str(i) for i in ids):
+        a, m = _carregar(id_)
+        itens.append((a, m, armazenamento.foto(id_)))
+    resp = _escolher_responsavel(corpo.get("responsavel"))
+    pdf = laudo.gerar_relatorio(itens, VERSAO, empresa=_config()["empresa"], responsavel=resp,
+                                art=str(corpo.get("art") or "")[:60], criterios=_criterios())
+    nome = f"relatorio_termografico_{datetime.now():%Y%m%d_%H%M}_{len(itens)}_imagens.pdf"
     return Response(pdf, media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="{nome}"'})
 
 
@@ -472,7 +561,8 @@ def configuracoes() -> dict:
     cfg = _config()
     return {
         "empresa": cfg["empresa"],
-        "responsavel": cfg["responsavel"],
+        "responsaveis": cfg["responsaveis"],
+        "responsavel_padrao": cfg.get("responsavel_padrao"),
         "tema": cfg["tema"],
         "criterio": cfg.get("criterios") or analise.CRITERIOS_PADRAO,
         "criterio_padrao": analise.CRITERIOS_PADRAO,
@@ -492,8 +582,17 @@ def salvar_configuracoes(corpo: dict = Body(...)) -> dict:
     cfg = _config()
     if "empresa" in corpo:
         cfg["empresa"] = {k: str(corpo["empresa"].get(k, ""))[:120] for k in ("nome", "subtitulo")}
-    if "responsavel" in corpo:
-        cfg["responsavel"] = {k: str(corpo["responsavel"].get(k, ""))[:120] for k in ("nome", "registro")}
+    if "responsaveis" in corpo:
+        cfg["responsaveis"] = _validar_responsaveis(corpo["responsaveis"])
+        cfg["responsavel"] = {"nome": "", "registro": ""}  # o formato antigo não volta a migrar
+        ids = [r["id"] for r in cfg["responsaveis"]]
+        if cfg.get("responsavel_padrao") not in ids:
+            cfg["responsavel_padrao"] = ids[0] if ids else None
+    if "responsavel_padrao" in corpo:
+        ids = [r["id"] for r in cfg["responsaveis"]]
+        if corpo["responsavel_padrao"] not in ids:
+            raise HTTPException(422, "Responsável padrão não está no cadastro.")
+        cfg["responsavel_padrao"] = corpo["responsavel_padrao"]
     if "tema" in corpo:
         if corpo["tema"] not in ("sistema", "claro", "escuro"):
             raise HTTPException(422, "Tema deve ser sistema, claro ou escuro.")
@@ -515,6 +614,396 @@ def _recalcular_todas() -> None:
             a, m = armazenamento.obter(item["id"]), armazenamento.matriz(item["id"])
             if a is not None and m is not None:
                 armazenamento.salvar(_calcular(a, m))
+
+
+# ---------------------------------------------------------------- rotas: monitoramento e alertas
+
+
+def _analisar_do_monitor(dados: bytes, nome: str, identificacao: dict) -> dict:
+    with _trava:
+        return _nova_analise(dados, nome, None, fonte="monitoramento", identificacao=identificacao)
+
+
+monitor = monitoramento.Monitor(
+    analisar=_analisar_do_monitor,
+    configuracao=lambda: _config()["monitoramento"],
+    salvar_alerta=lambda alerta: armazenamento.salvar_alerta(alerta),
+    alertas_recentes=lambda: armazenamento.alertas(50),
+    pasta_estado=lambda: PASTA_DADOS,
+)
+
+
+def _estado_monitor() -> dict:
+    cfg = _config()["monitoramento"]
+    return {**monitor.estado, "ativo": bool(cfg.get("ativo")), "pasta": cfg.get("pasta", "")}
+
+
+@app.get("/api/status")
+def status() -> dict:
+    """Barra superior: servidor, monitoramento e alertas pendentes, num pedido só."""
+    pendentes = sum(1 for a in armazenamento.alertas() if a["status"] == "pendente")
+    andando = treinos.em_andamento()
+    treino = {k: andando.get(k) for k in ("id", "nome", "etapa", "percentual", "mensagem")} if andando else None
+    return {"versao": VERSAO, "monitoramento": _estado_monitor(), "alertas_pendentes": pendentes, "treino": treino}
+
+
+@app.get("/api/monitoramento")
+def obter_monitoramento() -> dict:
+    return {"config": _config()["monitoramento"], "estado": _estado_monitor(), "disponivel": monitoramento.DISPONIVEL}
+
+
+@app.put("/api/monitoramento")
+def salvar_monitoramento(corpo: dict = Body(...)) -> dict:
+    cfg = _config()
+    anterior = cfg["monitoramento"]
+    try:
+        novo = monitoramento.validar({**anterior, **corpo})
+    except monitoramento.ConfiguracaoInvalida as erro:
+        raise HTTPException(422, str(erro)) from erro
+    ligando = novo["ativo"] and (not anterior.get("ativo") or novo["pasta"] != anterior.get("pasta"))
+    cfg["monitoramento"] = novo
+    _salvar_config(cfg)
+    if ligando:
+        monitor.linha_de_base(novo["pasta"])  # só o que chegar a partir de agora
+    if novo["ativo"]:
+        monitor.iniciar()
+    else:
+        monitor.parar()
+    return obter_monitoramento()
+
+
+@app.post("/api/monitoramento/verificar")
+def verificar_agora() -> dict:
+    if not _config()["monitoramento"].get("pasta"):
+        raise HTTPException(422, "Configure a pasta monitorada primeiro.")
+    novas = monitor.verificar()
+    return {"novas": len(novas), "estado": _estado_monitor()}
+
+
+@app.get("/api/monitoramento/previa")
+def previa_mensagem() -> dict:
+    """Como a mensagem vai chegar no WhatsApp, usando a inspeção mais grave salva."""
+    cfg = _config()["monitoramento"]
+    itens = armazenamento.listar()
+    if not itens:
+        return {"mensagem": None}
+    ordem = list(analise.NIVEIS)
+    pior = max(itens, key=lambda it: (ordem.index(it["resumo"]["severidade"]), it["criado_em"]))
+    a = armazenamento.obter(pior["id"])
+    return {"mensagem": monitoramento.mensagem(a, cfg), "arquivo": a["arquivo"]}
+
+
+@app.get("/api/alertas")
+def listar_alertas() -> dict:
+    itens = armazenamento.alertas()
+    return {"alertas": itens, "pendentes": sum(1 for a in itens if a["status"] == "pendente")}
+
+
+@app.put("/api/alertas/{id_}")
+def atualizar_alerta(id_: str, corpo: dict = Body(...)) -> dict:
+    alerta = armazenamento.alerta(id_)
+    if alerta is None:
+        raise HTTPException(404, "Alerta não encontrado.")
+    if corpo.get("status") not in ("pendente", "enviado", "resolvido"):
+        raise HTTPException(422, "Status deve ser pendente, enviado ou resolvido.")
+    alerta["status"] = corpo["status"]
+    alerta["atualizado_em"] = datetime.now().isoformat(timespec="seconds")
+    armazenamento.salvar_alerta(alerta)
+    return alerta
+
+
+# ---------------------------------------------------------------- rotas: treino de modelos
+
+treinos = treinos_mod.Treinos(RAIZ, pasta_dados=lambda: PASTA_DADOS, pasta_modelos=lambda: PASTA_MODELOS)
+
+
+def _sugestao(relatorio: dict) -> dict:
+    classes = [c["classe"] for c in relatorio["classes"]]
+    nome = "Para-raios" if any("para" in c and "raio" in c for c in classes) else (relatorio["classes"][0]["nome"] if classes else "Modelo")
+    return {"nome": nome, "id": f"{treinos_mod.slug(nome)}-{datetime.now():%Y%m%d-%H%M}", "epocas": 60,
+            "divisao": "sessao"}
+
+
+@app.post("/api/treinos/rotulos")
+def enviar_rotulos(arquivos: list[UploadFile] = File(...)) -> dict:
+    """Recebe o .zip do CVAT ou os .json de anotação (um por parte), guarda em dados/rotulos e devolve o relatório."""
+    from ml import dados as ml_dados  # só numpy/PIL: não carrega o PyTorch
+
+    if len(arquivos) == 1:
+        conteudo, nome = arquivos[0].file.read(), arquivos[0].filename or "rotulos.zip"
+    else:  # vários .json (treino, validação, teste): viram um .zip igual ao que o CVAT exporta
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            for a in arquivos:
+                if not (a.filename or "").lower().endswith(".json"):
+                    raise HTTPException(422, "Envie um .zip ou os arquivos .json de anotação do CVAT.")
+                z.writestr(f"annotations/{Path(a.filename).name}", a.file.read())
+        conteudo, nome = buf.getvalue(), "anotacoes_cvat.zip"
+    if not conteudo:
+        raise HTTPException(422, "O arquivo está vazio.")
+    caminho = treinos.guardar_rotulos(conteudo, nome)
+    try:
+        relatorio = ml_dados.analisar(caminho, treinos.pasta_imagens)
+    except (ValueError, KeyError, json.JSONDecodeError, zipfile.BadZipFile) as erro:
+        caminho.unlink(missing_ok=True)
+        raise HTTPException(422, f"Não consegui ler os rótulos: {erro}. Exporte do CVAT em COCO 1.0.") from erro
+    return {"arquivo": caminho.name, "relatorio": relatorio, "sugestao": _sugestao(relatorio)}
+
+
+@app.get("/api/treinos")
+def listar_treinos() -> dict:
+    return {"treinos": treinos.listar()}
+
+
+@app.get("/api/treinos/ambiente")
+def ambiente_de_treino(forcar: bool = False) -> dict:
+    """O PyTorch carrega neste computador? (O Controle Inteligente de Aplicativos do Windows pode bloquear.)"""
+    return treinos.verificar_ambiente(forcar)
+
+
+@app.post("/api/treinos/pacote")
+def pacote_de_treino(corpo: dict = Body(...)) -> Response:
+    """Pacote para treinar fora (Colab, supercomputador): código, rótulos, imagens e caderno."""
+    try:
+        arquivo = treinos.arquivo_rotulos(str(corpo.get("arquivo", "")))
+        id_ = str(corpo.get("id", "")).strip()
+        if not treinos_mod.ID_VALIDO.fullmatch(id_):
+            raise ValueError("Identificador inválido: use letras minúsculas, números e hífen.")
+        caminho = treinos.montar_pacote(arquivo, id_, str(corpo.get("nome") or "Modelo")[:80], int(corpo.get("epocas", 60)), str(corpo.get("divisao", "sessao")))
+    except FileNotFoundError as erro:
+        raise HTTPException(404, str(erro)) from erro
+    except ValueError as erro:
+        raise HTTPException(422, str(erro)) from erro
+    return Response(caminho.read_bytes(), media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="{caminho.name}"'})
+
+
+@app.post("/api/modelos/instalar")
+def instalar_modelo(arquivo: UploadFile = File(...)) -> dict:
+    """Instala um modelo treinado fora (o .zip da pasta modelos/<id>)."""
+    try:
+        id_ = treinos.instalar_modelo(arquivo.file.read())
+    except ValueError as erro:
+        raise HTTPException(422, str(erro)) from erro
+    return {"id": id_, **modelos()}
+
+
+@app.post("/api/treinos")
+def iniciar_treino(corpo: dict = Body(...)) -> dict:
+    try:
+        arquivo = treinos.arquivo_rotulos(str(corpo.get("arquivo", "")))
+        return treinos.iniciar(arquivo, str(corpo.get("id", "")).strip(), str(corpo.get("nome", "")).strip()[:80] or "Modelo",
+                               int(corpo.get("epocas", 60)), str(corpo.get("divisao", "sessao")))
+    except FileNotFoundError as erro:
+        raise HTTPException(404, str(erro)) from erro
+    except (ValueError, RuntimeError) as erro:
+        raise HTTPException(422, str(erro)) from erro
+
+
+@app.get("/api/treinos/{id_}")
+def obter_treino(id_: str) -> dict:
+    try:
+        return {**treinos.obter(id_), "registro": treinos.registro(id_)}
+    except FileNotFoundError as erro:
+        raise HTTPException(404, str(erro)) from erro
+
+
+@app.post("/api/treinos/{id_}/cancelar")
+def cancelar_treino(id_: str) -> dict:
+    try:
+        return treinos.cancelar(id_)
+    except FileNotFoundError as erro:
+        raise HTTPException(404, str(erro)) from erro
+
+
+@app.get("/api/treinos/{id_}/previsoes.png")
+def previsoes_treino(id_: str) -> Response:
+    if not treinos_mod.ID_VALIDO.fullmatch(id_):
+        raise HTTPException(400, "Identificador inválido.")
+    arquivo = PASTA_MODELOS / id_ / "previsoes_teste.png"
+    if not arquivo.exists():
+        raise HTTPException(404, "Ainda não há imagem de previsões para este modelo.")
+    return Response(arquivo.read_bytes(), media_type="image/png")
+
+
+# ---------------------------------------------------------------- rotas: avaliação de modelos (resultados do Colab)
+
+avaliacoes = avaliacoes_mod.Avaliacoes(lambda: PASTA_DADOS, treinos.instalar_modelo)
+
+
+@app.get("/api/avaliacoes")
+def listar_avaliacoes() -> list[dict]:
+    return avaliacoes.listar()
+
+
+@app.post("/api/avaliacoes")
+async def importar_avaliacao(arquivo: UploadFile = File(...)) -> dict:
+    """Recebe o resultados_comparacao.zip ou o pacote do modelo exportado pelo caderno do Colab."""
+    dados = await arquivo.read()
+    if not dados:
+        raise HTTPException(422, "O arquivo está vazio.")
+    try:
+        return avaliacoes.importar(dados, arquivo.filename or "resultados.zip")
+    except ValueError as erro:
+        raise HTTPException(422, str(erro)) from erro
+
+
+@app.get("/api/avaliacoes/{id_}")
+def obter_avaliacao(id_: str) -> dict:
+    try:
+        d = avaliacoes.obter(id_)
+    except KeyError as erro:
+        raise HTTPException(404, "Avaliação não encontrada.") from erro
+    instalados = {m.id for m in detectores.listar(PASTA_MODELOS)}
+    d["modelo_disponivel"] = d["meta"].get("modelo_instalado") in instalados
+    d["modelo_ativo"] = _config()["modelo_ativo"]
+    return d
+
+
+@app.get("/api/avaliacoes/{id_}/arquivos/{nome}")
+def arquivo_avaliacao(id_: str, nome: str) -> Response:
+    try:
+        caminho = avaliacoes.arquivo(id_, nome)
+    except KeyError as erro:
+        raise HTTPException(404, "Arquivo não encontrado.") from erro
+    tipo = "image/png" if nome.endswith(".png") else "text/csv; charset=utf-8"
+    return Response(caminho.read_bytes(), media_type=tipo)
+
+
+@app.delete("/api/avaliacoes/{id_}")
+def apagar_avaliacao(id_: str) -> dict:
+    try:
+        avaliacoes.apagar(id_)
+    except KeyError as erro:
+        raise HTTPException(404, "Avaliação não encontrada.") from erro
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------- rotas: vídeo (simulação de câmera ao vivo)
+
+
+def _regiao_do_quadro(r: dict) -> dict:
+    m = r.get("medida") or {}
+    item = {k: r.get(k) for k in ("nome", "classe", "caixa", "confianca", "severidade")}
+    item.update(t_max=m.get("t_max"), x_max=m.get("x_max"), y_max=m.get("y_max"))
+    if r.get("componente"):
+        item["componente"] = r["componente"].get("nome")
+    return item
+
+
+def _preparar_video(opcoes: dict):
+    """Detector, critério e termômetro de um vídeo; devolve a função que analisa cada quadro."""
+    det = _detector(opcoes.get("modelo"))
+    termometro = video.Termometro(entrada.OCRPreguicoso(), opcoes.get("limites"))  # OCR próprio: roda em outra thread
+    criterios, componentes = _criterios(), _componentes()
+
+    def analisar(rgb: np.ndarray, tempo_s: float) -> dict:
+        t0 = perf_counter()
+        m = termometro.medir(rgb, tempo_s)
+        t1 = perf_counter()
+        medida = m.temperatura_c is not None
+        matriz = m.temperatura_c if medida else np.full((rgb.shape[0] // 2, rgb.shape[1] // 2), np.nan, np.float32)
+        regioes = []
+        if medida or det.precisa_imagem:
+            try:
+                regioes = _regioes_do_detector(det, matriz, rgb)
+            except ValueError:
+                regioes = []
+        t2 = perf_counter()
+        resumo = None
+        if medida and regioes:
+            regioes, resumo = analise.analisar_regioes(matriz, regioes, criterios=criterios, componentes=componentes)
+        t3 = perf_counter()
+        pq = (resumo or {}).get("ponto_mais_quente")
+        finito = medida and bool(np.isfinite(matriz).any())
+        return {
+            "matriz": [int(matriz.shape[1]), int(matriz.shape[0])],
+            "escala": list(m.escala) if m.escala else None,
+            "fonte_escala": m.fonte,
+            "saturado": m.saturado,
+            "t_max": round(float(np.nanmax(matriz)), 1) if finito else None,
+            "severidade": resumo["severidade"] if resumo else ("normal" if medida else None),
+            "ponto_mais_quente": {"t_max": pq["t_max"], "x": pq["x"], "y": pq["y"], "componente": (pq.get("componente") or {}).get("nome")} if pq else None,
+            "regioes": [_regiao_do_quadro(r) for r in regioes],
+            "etapas_ms": {"temperatura": round((t1 - t0) * 1000), "deteccao": round((t2 - t1) * 1000), "medicao": round((t3 - t2) * 1000)},
+        }
+
+    return analisar, _info_modelo(det)
+
+
+videos = videos_mod.Videos(lambda: PASTA_DADOS, _preparar_video)
+
+
+@app.get("/api/videos")
+def listar_videos() -> list[dict]:
+    return videos.listar()
+
+
+@app.post("/api/videos")
+def enviar_video(
+    arquivo: UploadFile = File(...),
+    modo: str = Form("ao_vivo"),
+    intervalo_s: float = Form(0.5),
+    velocidade: float = Form(1.0),
+    modelo: str = Form(""),
+    t_min: str = Form(""),
+    t_max: str = Form(""),
+) -> dict:
+    try:
+        opcoes = videos_mod.opcoes_validas(modo, intervalo_s, velocidade, modelo or None, t_min, t_max)
+        return videos.criar(arquivo.file, arquivo.filename or "video.mp4", opcoes)
+    except ValueError as erro:
+        raise HTTPException(422, str(erro)) from erro
+
+
+def _video(funcao, *args):
+    try:
+        return funcao(*args)
+    except KeyError as erro:
+        raise HTTPException(404, "Vídeo não encontrado.") from erro
+
+
+@app.get("/api/videos/{id_}")
+def obter_video(id_: str, desde: int = 0) -> dict:
+    return _video(videos.obter, id_, desde)
+
+
+@app.get("/api/videos/{id_}/quadros/{n}.jpg")
+def imagem_quadro(id_: str, n: int) -> Response:
+    caminho, _ = _video(videos.quadro, id_, n)
+    return Response(caminho.read_bytes(), media_type="image/jpeg", headers={"Cache-Control": "max-age=3600"})
+
+
+@app.post("/api/videos/{id_}/cancelar")
+def cancelar_video(id_: str) -> dict:
+    return _video(videos.cancelar, id_)
+
+
+@app.delete("/api/videos/{id_}")
+def apagar_video(id_: str) -> dict:
+    _video(videos.apagar, id_)
+    return {"ok": True}
+
+
+@app.post("/api/videos/{id_}/quadros/{n}/inspecao")
+def quadro_para_inspecao(id_: str, n: int) -> dict:
+    """Guarda um quadro como inspeção comum, com a mesma escala que valeu no vídeo."""
+    caminho, info = _video(videos.quadro, id_, n)
+    e = _video(videos.obter, id_, 10**9)
+    tempo = (info or {}).get("tempo_s") or 0.0
+    nome = f"{Path(e['arquivo']).stem} {int(tempo // 60):02d}m{tempo % 60:04.1f}s.jpg"
+    limites = tuple(info["escala"]) if info and info.get("escala") else None
+    modelo = (e.get("modelo") or {}).get("id")
+    with _trava:
+        return _completa(_nova_analise(caminho.read_bytes(), nome, modelo, fonte="video", limites=limites))
+
+
+@app.get("/api/alertas/{id_}/whatsapp")
+def whatsapp_alerta(id_: str) -> dict:
+    alerta = armazenamento.alerta(id_)
+    if alerta is None:
+        raise HTTPException(404, "Alerta não encontrado.")
+    destinatarios = _config()["monitoramento"].get("destinatarios", [])
+    return {"mensagem": alerta["mensagem"], "links": monitoramento.links_whatsapp(alerta["mensagem"], destinatarios)}
 
 
 # ---------------------------------------------------------------- ciclo de vida (janela do aplicativo)

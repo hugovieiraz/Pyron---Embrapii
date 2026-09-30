@@ -70,9 +70,17 @@ namespace Pyron
             int porta = PortaSalva();
             if (porta > 0 && Responde(porta))
             {
-                Avisar(porta);  // zera o relógio de desligamento enquanto a nova janela carrega
-                AbrirJanela(porta);
-                return 0;
+                string noAr = VersaoNoAr(porta);
+                string doProjeto = VersaoDoProjeto();
+                if (doProjeto == null || noAr == doProjeto)
+                {
+                    Avisar(porta);  // zera o relógio de desligamento enquanto a nova janela carrega
+                    AbrirJanela(porta);
+                    return 0;
+                }
+                // O Pyron foi atualizado, mas um servidor antigo continua na memória: ele sai e o novo sobe.
+                // As janelas abertas reconectam sozinhas ao novo, que volta a usar a mesma porta.
+                EncerrarServidor(porta);
             }
 
             string python = Path.Combine(Projeto, ".venv", "Scripts", "pythonw.exe");
@@ -249,6 +257,55 @@ namespace Pyron
             catch (Exception) { return false; }
         }
 
+        /// <summary>Versão que o servidor no ar informa em /api/saude (null se não souber).</summary>
+        static string VersaoNoAr(int porta)
+        {
+            try
+            {
+                var pedido = (HttpWebRequest)WebRequest.Create(Url(porta) + "api/saude");
+                pedido.Timeout = 800;
+                pedido.Proxy = null;
+                using (var resposta = (HttpWebResponse)pedido.GetResponse())
+                using (var leitor = new StreamReader(resposta.GetResponseStream(), Encoding.UTF8))
+                {
+                    var m = System.Text.RegularExpressions.Regex.Match(leitor.ReadToEnd(), "\"versao\"\\s*:\\s*\"([^\"]+)\"");
+                    return m.Success ? m.Groups[1].Value : null;
+                }
+            }
+            catch (Exception) { return null; }
+        }
+
+        /// <summary>Versão do código na pasta do projeto: a constante VERSAO de app/servidor.py.</summary>
+        static string VersaoDoProjeto()
+        {
+            try
+            {
+                string codigo = File.ReadAllText(Path.Combine(Projeto, "app", "servidor.py"), Encoding.UTF8);
+                var m = System.Text.RegularExpressions.Regex.Match(codigo, "^VERSAO\\s*=\\s*\"([^\"]+)\"", System.Text.RegularExpressions.RegexOptions.Multiline);
+                return m.Success ? m.Groups[1].Value : null;
+            }
+            catch (Exception) { return null; }
+        }
+
+        /// <summary>Pede para o servidor desligar e espera a porta ficar livre (até 15 s).</summary>
+        static void EncerrarServidor(int porta)
+        {
+            try
+            {
+                var pedido = (HttpWebRequest)WebRequest.Create(Url(porta) + "api/encerrar");
+                pedido.Method = "POST";
+                pedido.ContentLength = 0;
+                pedido.Timeout = 1500;
+                pedido.Proxy = null;
+                using (pedido.GetResponse()) { }
+            }
+            catch (Exception) { }
+            var relogio = Stopwatch.StartNew();
+            while (relogio.Elapsed.TotalSeconds < 15 && Responde(porta))
+                Thread.Sleep(300);
+            Thread.Sleep(500);  // a porta leva um instante para ser liberada pelo sistema
+        }
+
         static void Avisar(int porta)
         {
             try
@@ -321,13 +378,15 @@ namespace Pyron
     /// <summary>Tela de abertura: a logo, o que está carregando e uma barra em movimento.</summary>
     class Abertura : Form
     {
-        // Fundo branco: a mão da logo é escura e some sobre fundo escuro.
+        // Cores dos tokens da interface (app/estatico/tokens.css). Fundo branco: a mão da logo é escura.
         static readonly Color Fundo = Color.White;
-        static readonly Color Borda = Color.FromArgb(0xDC, 0xE2, 0xEA);
-        static readonly Color Brasa = Color.FromArgb(0xF0, 0x6A, 0x1A);
-        static readonly Color Texto2 = Color.FromArgb(0x4F, 0x5A, 0x6B);
-        static readonly Color Texto3 = Color.FromArgb(0x8A, 0x95, 0xA6);
-        static readonly Color Trilho = Color.FromArgb(0xE9, 0xED, 0xF3);
+        static readonly Color Borda = Color.FromArgb(0xDF, 0xE3, 0xEE);        // --n-300
+        static readonly Color Acao = Color.FromArgb(0x3F, 0x50, 0xD6);         // --azul-600
+        static readonly Color FaixaTopo = Color.FromArgb(0x33, 0x41, 0xB3);    // --azul-700 (barra lateral)
+        static readonly Color FaixaBase = Color.FromArgb(0x2C, 0x27, 0x87);    // --violeta-900
+        static readonly Color Texto2 = Color.FromArgb(0x4A, 0x52, 0x70);       // --n-700
+        static readonly Color Texto3 = Color.FromArgb(0x5F, 0x68, 0x86);       // --n-600
+        static readonly Color Trilho = Color.FromArgb(0xED, 0xEF, 0xF6);       // --n-200
 
         readonly int porta;
         readonly Process servidor;
@@ -483,6 +542,9 @@ namespace Pyron
 
             using (var borda = new Pen(Borda, 1))
                 g.DrawRectangle(borda, 0, 0, w - 1, h - 1);
+            // Faixa fina no topo, azul com subtom violeta, como a barra lateral do aplicativo.
+            using (var faixa = new LinearGradientBrush(new RectangleF(0, 0, w, 4 * k), FaixaTopo, FaixaBase, LinearGradientMode.Horizontal))
+                g.FillRectangle(faixa, 0, 0, w, 4 * k);
 
             if (logo != null)
             {
@@ -504,7 +566,7 @@ namespace Pyron
                 g.DrawString("NBR 15866 · MTA · ΔT entre fases", menor, corTexto3, 32 * k, 338 * k);
             }
 
-            // Barra indeterminada: um trecho em brasa que corre sobre o trilho.
+            // Barra indeterminada: um trecho azul que corre sobre o trilho.
             float x0 = 48 * k, larguraBarra = w - 96 * k, y = 314 * k, alturaBarra = 3 * k;
             using (var trilho = new SolidBrush(Trilho)) g.FillRectangle(trilho, x0, y, larguraBarra, alturaBarra);
             double t = (DateTime.Now - inicio).TotalSeconds;
@@ -515,7 +577,7 @@ namespace Pyron
             inicioTrecho = Math.Max(inicioTrecho, x0);
             fimTrecho = Math.Min(fimTrecho, x0 + larguraBarra);
             if (fimTrecho > inicioTrecho)
-                using (var brasa = new SolidBrush(Brasa)) g.FillRectangle(brasa, inicioTrecho, y, fimTrecho - inicioTrecho, alturaBarra);
+                using (var acao = new SolidBrush(Acao)) g.FillRectangle(acao, inicioTrecho, y, fimTrecho - inicioTrecho, alturaBarra);
         }
 
         // Arrastar a janela sem borda.

@@ -121,6 +121,92 @@ def test_avaliacao_mede_erro_de_temperatura(pasta_rotulada) -> None:
     assert avaliacao.avaliar(amostras, vazias, classes)["mAP50"] == 0.0
 
 
+def _zip_do_cvat(pasta_rotulada, tmp_path: Path) -> Path:
+    """Como o CVAT exporta um projeto com treino/validação/teste: um .json por parte, com polígonos."""
+    import zipfile
+
+    arq, _ = pasta_rotulada
+    coco = json.loads(arq.read_text(encoding="utf-8"))
+    coco["categories"] = [{"id": 1, "name": "Para-raio inteiro"}, {"id": 2, "name": "Terminal superior"}]
+    for a in coco["annotations"]:
+        if a["category_id"] == 1:  # o corpo vira polígono; o terminal fica em caixa
+            x, y, w, h = a["bbox"]
+            a["segmentation"] = [[x, y, x + w, y, x + w, y + h, x, y + h]]
+        else:
+            a["segmentation"] = []
+    partes = {"train": [1, 2], "val": [3], "test": [4]}
+    destino = tmp_path / "cvat_export.zip"
+    with zipfile.ZipFile(destino, "w") as z:
+        for parte, ids in partes.items():
+            sub = {"categories": coco["categories"], "images": [i for i in coco["images"] if i["id"] in ids],
+                   "annotations": [a for a in coco["annotations"] if a["image_id"] in ids]}
+            z.writestr(f"annotations/instances_{parte}.json", json.dumps(sub))
+    return destino
+
+
+def test_zip_do_cvat_junta_as_partes_e_le_poligonos(pasta_rotulada, tmp_path) -> None:
+    _, imagens = pasta_rotulada
+    zipado = _zip_do_cvat(pasta_rotulada, tmp_path)
+    amostras, classes, nomes = dados.ler_coco(zipado, imagens)
+    assert len(amostras) == 4  # as três partes, não só a primeira
+    assert classes == ["para_raio_inteiro", "terminal_superior"]
+    assert nomes["para_raio_inteiro"] == "Para-raio inteiro"
+    assert {a.subconjunto for a in amostras} == {"treino", "validacao", "teste"}
+    a = amostras[0]
+    assert a.poligonos[0] is not None and a.poligonos[0][0].shape == (4, 2)
+    assert a.poligonos[1] is None  # caixa
+    treino, teste, info = dados.dividir(amostras, modo="cvat")
+    assert [x.nome for x in teste] == ["FLIR1004.jpg"] and len(treino) == 3
+    assert "CVAT" in info["criterio"]
+
+
+def test_relatorio_do_conjunto(pasta_rotulada, tmp_path) -> None:
+    _, imagens = pasta_rotulada
+    r = dados.analisar(_zip_do_cvat(pasta_rotulada, tmp_path), imagens)
+    assert r["imagens_rotuladas"] == 4 and r["imagens_utilizaveis"] == 4
+    assert r["tipos"] == {"caixa": 4, "poligono": 4, "mascara": 0}
+    assert r["subconjuntos"] == {"treino": 2, "validacao": 1, "teste": 1}
+    assert {c["classe"]: c["rotulos"] for c in r["classes"]} == {"para_raio_inteiro": 4, "terminal_superior": 4}
+    assert any("menos de 20 rótulos" in a for a in r["avisos"])
+    assert r["pronto"] is False  # 4 imagens não bastam para treinar
+
+
+def test_para_raio_inteiro_usa_a_referencia_de_para_raio() -> None:
+    from nucleo import referencias
+
+    ref = referencias.do_componente("para_raio_inteiro", referencias.componentes())
+    assert ref["aquecimento"] == "dieletrico"
+
+
+def test_gerenciador_de_treinos_valida_e_le_o_andamento(tmp_path) -> None:
+    import os
+
+    from app import treinos as treinos_mod
+
+    t = treinos_mod.Treinos(tmp_path, pasta_dados=lambda: tmp_path / "dados_app", pasta_modelos=lambda: tmp_path / "modelos", python="python")
+    assert t.listar() == []
+    arquivo = t.guardar_rotulos(b"PK", "meu export.zip")
+    assert arquivo.parent == tmp_path / "dados" / "rotulos" and arquivo.name.endswith("_meu_export.zip")
+    assert t.arquivo_rotulos(arquivo.name) == arquivo.resolve()
+    with pytest.raises(FileNotFoundError):
+        t.arquivo_rotulos("../../fora.zip")
+    with pytest.raises(ValueError, match="Identificador"):
+        t.iniciar(arquivo, "Com Espaço", "x", 10, "sessao")
+    # Um treino já registrado, lido do disco como o servidor faz depois de reaberto.
+    pasta = tmp_path / "dados_app" / "treinos" / "para-raios-teste"
+    pasta.mkdir(parents=True)
+    (pasta / "pedido.json").write_text(json.dumps({"id": "para-raios-teste", "nome": "Para-raios", "epocas": 10, "pid": os.getpid(), "criado_em": "2026-09-29T10:00:00"}), encoding="utf-8")
+    (pasta / "progresso.json").write_text(json.dumps({"etapa": "treinando", "epoca": 5, "epocas": 10}), encoding="utf-8")
+    andamento = t.obter("para-raios-teste")
+    assert andamento["etapa"] == "treinando" and andamento["percentual"] == 47  # este processo está vivo
+    assert t.em_andamento()["id"] == "para-raios-teste"
+    with pytest.raises(RuntimeError, match="em andamento"):
+        t.iniciar(arquivo, "outro-modelo", "Outro", 10, "sessao")
+    (pasta / "progresso.json").write_text(json.dumps({"etapa": "pronto", "metricas": {"mAP50": 0.8}}), encoding="utf-8")
+    assert t.obter("para-raios-teste")["percentual"] == 100 and t.em_andamento() is None
+    assert treinos_mod.slug("Para-raios (MobileNet)") == "para-raios-mobilenet"
+
+
 def test_preparo_igual_no_treino_e_no_uso() -> None:
     t = np.full((120, 160), 20.0)
     t[40:60, 40:60] = 40.0

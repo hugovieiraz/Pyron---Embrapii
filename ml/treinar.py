@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import sys
 import time
 from datetime import date
@@ -122,7 +123,33 @@ def _juntar(lote):
     return tuple(zip(*lote))
 
 
-def treinar_modelo(modelo, treino, epocas: int, lote: int, dispositivo, registrar=print):
+class Progresso:
+    """Grava o andamento num .json que o aplicativo lê (tela Modelos › Treinamentos) e mostra no console."""
+
+    def __init__(self, arquivo: Path | None):
+        self.arquivo = arquivo
+        self.estado = {"etapa": "iniciando", "mensagem": "Preparando", "epoca": 0, "epocas": 0, "perda": [], "inicio": time.time(), "pid": os.getpid()}
+        self._ultimo = 0.0
+
+    def atualizar(self, forcar: bool = True, **campos) -> None:
+        self.estado.update(campos)
+        self.estado["atualizado_em"] = time.time()
+        agora = time.time()
+        if self.arquivo and (forcar or agora - self._ultimo > 5):
+            self._ultimo = agora
+            temporario = self.arquivo.with_suffix(".tmp")
+            temporario.write_text(json.dumps(self.estado, ensure_ascii=False), encoding="utf-8")
+            os.replace(temporario, self.arquivo)
+
+
+def _restante(inicio: float, feitas: int, total: int) -> str:
+    if feitas == 0:
+        return ""
+    s = (time.time() - inicio) / feitas * (total - feitas)
+    return f"{int(s // 60)} min {int(s % 60):02d} s" if s >= 60 else f"{int(s)} s"
+
+
+def treinar_modelo(modelo, treino, epocas: int, lote: int, dispositivo, registrar=print, progresso: Progresso | None = None):
     import torch
 
     carregador = torch.utils.data.DataLoader(ConjuntoTermico(treino, aumentar=True), batch_size=lote, shuffle=True, collate_fn=_juntar)
@@ -136,6 +163,7 @@ def treinar_modelo(modelo, treino, epocas: int, lote: int, dispositivo, registra
     )
     modelo.to(dispositivo).train()
     historico = []
+    inicio = time.time()
     for epoca in range(1, epocas + 1):
         soma, n = 0.0, 0
         for imagens, alvos in carregador:
@@ -150,9 +178,13 @@ def treinar_modelo(modelo, treino, epocas: int, lote: int, dispositivo, registra
             agenda.step()
             soma += float(total)
             n += 1
+            if progresso:
+                progresso.atualizar(forcar=False)  # sinal de vida durante épocas longas (CPU)
         historico.append(round(soma / max(n, 1), 4))
-        if epoca == 1 or epoca % 5 == 0 or epoca == epocas:
-            registrar(f"  época {epoca:3d}/{epocas}: perda {historico[-1]:.4f}")
+        restante = _restante(inicio, epoca, epocas)
+        if progresso:
+            progresso.atualizar(etapa="treinando", mensagem=f"Época {epoca} de {epocas}", epoca=epoca, perda=historico, restante=restante)
+        registrar(f"  época {epoca:3d}/{epocas}  perda {historico[-1]:.4f}" + (f"  faltam ~{restante}" if restante and epoca < epocas else ""))
     return historico
 
 
@@ -256,39 +288,80 @@ def figura_previsoes(amostras, previsoes, classes, limiar: float, caminho: Path)
 # ---------------------------------------------------------------- principal
 
 
+def imprimir_analise(r: dict) -> None:
+    """O relatório de ``dados.analisar`` em texto, para o console."""
+    print(f"\nArquivo de rótulos: {r['arquivo']}")
+    print(f"  imagens no arquivo: {r['imagens_no_arquivo']}   rotuladas: {r['imagens_rotuladas']}   "
+          f"achadas na pasta: {r['imagens_encontradas']}   prontas para treinar: {r['imagens_utilizaveis']}")
+    tipos = ", ".join(f"{v} {k}{'s' if v != 1 else ''}" for k, v in r["tipos"].items() if v)
+    print(f"  rótulos: {r['rotulos']} ({tipos})   sessões de fotos: {r['sessoes']}")
+    if r["subconjuntos"]:
+        print("  divisão do CVAT: " + ", ".join(f"{k} {v}" for k, v in r["subconjuntos"].items()))
+    print("  por classe:")
+    for c in r["classes"]:
+        print(f"    {c['nome']:<28} {c['rotulos']:>5} rótulos em {c['imagens']:>4} imagens")
+    for aviso in r["avisos"]:
+        print(f"  ! {aviso}")
+
+
 def main(argv=None) -> dict:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--coco", required=True, type=Path, help="COCO 1.0 exportado do CVAT (.json ou .zip)")
     ap.add_argument("--imagens", type=Path, default=RAIZ / "dados" / "sciencedb_10185", help="pasta com as imagens rotuladas")
-    ap.add_argument("--id", required=True, help="identificador do modelo (nome da pasta)")
-    ap.add_argument("--nome", required=True, help="nome exibido no aplicativo")
+    ap.add_argument("--id", help="identificador do modelo (nome da pasta)")
+    ap.add_argument("--nome", help="nome exibido no aplicativo")
     ap.add_argument("--epocas", type=int, default=60)
     ap.add_argument("--lote", type=int, default=4)
     ap.add_argument("--limiar", type=float, default=0.5, help="confiança mínima usada pelo aplicativo")
+    ap.add_argument("--divisao", choices=["sessao", "cvat"], default="sessao", help="sessao (padrão, mais honesta) ou a divisão feita no CVAT")
     ap.add_argument("--destino", type=Path, default=RAIZ / "modelos", help="pasta de modelos do aplicativo")
+    ap.add_argument("--progresso", type=Path, help="arquivo .json de andamento (usado pelo aplicativo)")
+    ap.add_argument("--so-analisar", action="store_true", help="só mostrar o relatório dos rótulos, sem treinar")
     ap.add_argument("--sem-pre-treino", action="store_true", help="não baixar pesos pré-treinados (só para testes)")
     args = ap.parse_args(argv)
 
+    if args.so_analisar:
+        relatorio = dados.analisar(args.coco, args.imagens)
+        imprimir_analise(relatorio)
+        return relatorio
+    if not args.id or not args.nome:
+        ap.error("--id e --nome são obrigatórios para treinar")
+
+    progresso = Progresso(args.progresso)
+    try:
+        return _treinar(args, progresso)
+    except Exception as erro:
+        progresso.atualizar(etapa="erro", mensagem=str(erro) or erro.__class__.__name__)
+        raise
+
+
+def _treinar(args, progresso: Progresso) -> dict:
     import torch
 
     torch.manual_seed(2026)
     dispositivo = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     inicio = time.time()
-    print(f"Dispositivo: {dispositivo}{' (' + torch.cuda.get_device_name(0) + ')' if dispositivo.type == 'cuda' else ''}")
+    nome_disp = torch.cuda.get_device_name(0) if dispositivo.type == "cuda" else "processador (sem GPU)"
+    print(f"Dispositivo: {nome_disp}")
+    progresso.atualizar(etapa="lendo", mensagem="Lendo rótulos e temperaturas", dispositivo=nome_disp, epocas=args.epocas)
 
     amostras, classes, nomes = dados.ler_coco(args.coco, args.imagens)
-    treino, teste, divisao = dados.dividir(amostras)
+    treino, teste, divisao = dados.dividir(amostras, modo=args.divisao)
     n_rotulos = {nomes[c]: int(sum((a.classes == k).sum() for a in amostras)) for k, c in enumerate(classes)}
     print(f"{len(amostras)} imagens rotuladas ({len(treino)} treino, {len(teste)} teste; {divisao['criterio']})")
     print(f"Rótulos por classe: {n_rotulos}")
+    progresso.atualizar(etapa="treinando", mensagem=f"Treinando com {len(treino)} imagens", imagens_treino=len(treino), imagens_teste=len(teste),
+                        divisao=divisao["criterio"], rotulos_por_classe=n_rotulos)
 
     modelo = criar_modelo(len(classes), pre_treinado=not args.sem_pre_treino)
-    historico = treinar_modelo(modelo, treino, args.epocas, args.lote, dispositivo)
+    historico = treinar_modelo(modelo, treino, args.epocas, args.lote, dispositivo, progresso=progresso)
 
+    progresso.atualizar(etapa="avaliando", mensagem=f"Avaliando em {len(teste)} imagens que o modelo não viu")
     previsoes = prever(modelo.to(dispositivo), teste, dispositivo) if teste else []
     metricas = avaliacao.avaliar(teste, previsoes, classes, limiar_uso=args.limiar) if teste else {}
     print(f"Teste: mAP50 {metricas.get('mAP50')}, erro Tmáx mediano {metricas.get('erro_tmax_mediano_c')} °C")
 
+    progresso.atualizar(etapa="exportando", mensagem="Exportando e conferindo o modelo")
     pasta = args.destino / args.id
     pasta.mkdir(parents=True, exist_ok=True)
     torch.save(modelo.state_dict(), pasta / "pesos.pt")
@@ -336,8 +409,20 @@ def main(argv=None) -> dict:
         "duracao_s": round(time.time() - inicio, 1),
     }
     (pasta / "relatorio.json").write_text(json.dumps(relatorio, ensure_ascii=False, indent=2), encoding="utf-8")
+    progresso.atualizar(etapa="pronto", mensagem="Modelo instalado", metricas=metricas_resumo(metricas), pasta=str(pasta), duracao_s=relatorio["duracao_s"])
     print(f"Modelo instalado em {pasta} ({relatorio['duracao_s']} s). Abra o aplicativo, aba Modelos.")
     return relatorio
+
+
+def metricas_resumo(metricas: dict) -> dict:
+    """O que a tela mostra ao fim do treino."""
+    return {
+        "mAP50": metricas.get("mAP50"),
+        "revocacao": metricas.get("revocacao_no_limiar"),
+        "erro_tmax_mediano_c": metricas.get("erro_tmax_mediano_c"),
+        "erro_tmax_p90_c": metricas.get("erro_tmax_p90_c"),
+        "por_classe": metricas.get("por_classe"),
+    }
 
 
 if __name__ == "__main__":

@@ -164,14 +164,15 @@ def _modelo_onnx_minimo(pasta: Path) -> None:
 
 
 def test_modelo_instalado_e_reconhecido_e_usado(tmp_path: Path) -> None:
-    pytest.importorskip("onnx")
+    # onnx.helper puxa o ml_dtypes, cuja DLL o Controle Inteligente de Aplicativos do Windows pode bloquear.
+    pytest.importorskip("onnx.helper", exc_type=ImportError)
     pytest.importorskip("onnxruntime")
     pasta = tmp_path / "teste-minimo"
     pasta.mkdir()
     _modelo_onnx_minimo(pasta)
 
     ids = [d.id for d in detectores.listar(tmp_path)]
-    assert ids == ["pontos-quentes", "teste-minimo"]
+    assert ids == ["pontos-quentes", "teste-minimo", "teste-minimo+pontos-quentes"]  # um, outro ou os dois
     det = detectores.obter("teste-minimo", tmp_path)
     assert det.tipo == "aprendizado"
     dets = det.detectar(np.full((120, 160), 20.0))

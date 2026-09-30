@@ -91,4 +91,6 @@ def avaliar(amostras, previsoes, classes: list[str], limiar_uso: float = 0.5, li
     resultado["erro_tmax_mediano_c"] = round(float(np.median(erros_tmax)), 2) if erros_tmax else None
     resultado["erro_tmax_p90_c"] = round(float(np.percentile(erros_tmax, 90)), 2) if erros_tmax else None
     resultado["componentes_medidos"] = len(erros_tmax)
+    total = sum(c["rotulos"] for c in por_classe.values())
+    resultado["revocacao_no_limiar"] = round(sum(c["achados_uso"] for c in por_classe.values()) / total, 3) if total else None
     return resultado

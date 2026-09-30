@@ -96,7 +96,10 @@ def main(argv=None) -> None:
     ap.add_argument("--janela", action="store_true", help="abrir em janela própria (Edge em modo aplicativo)")
     ap.add_argument("--sem-navegador", action="store_true", help="só o servidor (o Pyron.exe abre a janela)")
     ap.add_argument("--auto-encerrar", action="store_true", help="desligar quando a interface for fechada")
+    ap.add_argument("--dados", help="outra pasta de dados (demonstração), no lugar de app/dados_app")
     args = ap.parse_args(argv)
+    if args.dados:
+        os.environ["PYRON_DADOS"] = str(Path(args.dados).resolve())
 
     from app import servidor as srv
 

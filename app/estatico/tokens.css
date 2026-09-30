@@ -1,0 +1,226 @@
+/* ==========================================================================
+   Pyron · tokens do sistema de design (fonte única de valores)
+
+   Regra dura: nenhuma tela usa cor, espaçamento, tamanho de texto, raio, sombra ou
+   duração fora deste arquivo. Precisou de um valor novo? Ele entra aqui primeiro.
+
+   Direção estética: software industrial claro. Fundo branco e neutros frios levemente
+   azulados; azul-índigo como cor de ação; violeta só como subtom (barra lateral, realces).
+   A cor forte fica para os dados: o termograma e a severidade. Sem emoji, sem sombra
+   pesada, sem gradiente fora da barra lateral.
+   ========================================================================== */
+
+:root {
+  /* ---------------------------------------------------------------- cor: primária (azul-índigo) */
+  --azul-50: #EEF1FF;
+  --azul-100: #E0E6FF;
+  --azul-200: #C6D0FD;
+  --azul-300: #A2B1FA;
+  --azul-400: #7A8CF3;
+  --azul-500: #5669E8;
+  --azul-600: #3F50D6;
+  --azul-700: #3341B3;
+  --azul-800: #2A358F;
+  --azul-900: #222B70;
+
+  /* ---------------------------------------------------------------- cor: destaque (violeta, em subtom) */
+  --violeta-50: #F5F2FF;
+  --violeta-100: #ECE6FE;
+  --violeta-300: #C3B3FB;
+  --violeta-500: #7D5CF0;
+  --violeta-600: #6A47DE;
+  --violeta-900: #2C2787;
+
+  /* ---------------------------------------------------------------- neutros (9 tons, frios) */
+  --branco: #FFFFFF;
+  --n-100: #F6F7FB;
+  --n-200: #EDEFF6;
+  --n-300: #DFE3EE;
+  --n-400: #C5CBDC;
+  --n-500: #9AA2B9;
+  --n-600: #5F6886;
+  --n-700: #4A5270;
+  --n-800: #2D3350;
+  --n-900: #171B33;
+
+  /* ---------------------------------------------------------------- semânticas: base, fundo, texto */
+  --sucesso: #179B67;  --sucesso-fundo: #E3F6EE;  --sucesso-texto: #0B6645;
+  --aviso: #D99A0B;    --aviso-fundo: #FDF3D6;    --aviso-texto: #6E5200;
+  --erro: #D8402B;     --erro-fundo: #FCE7E3;     --erro-texto: #962614;
+  --info: var(--azul-600); --info-fundo: var(--azul-50); --info-texto: var(--azul-800);
+
+  /* ---------------------------------------------------------------- severidade (dado, nunca botão) */
+  --normal: #179B67;     --normal-fundo: #E3F6EE;     --normal-texto: #0B6645;
+  --atencao: #D9A40B;    --atencao-fundo: #FDF4D6;    --atencao-texto: #6E5200;
+  --programar: #E8751A;  --programar-fundo: #FDEBDC;  --programar-texto: #8C3F06;
+  --urgente: #DC3F26;    --urgente-fundo: #FCE6E1;    --urgente-texto: #93220F;
+  --imediato: #B0123A;   --imediato-fundo: #FAE3EA;   --imediato-texto: #86082A;
+
+  /* ---------------------------------------------------------------- séries de gráfico (comparação de modelos: dado) */
+  --serie-1: var(--azul-600);
+  --serie-2: #0E8C7E;
+  --serie-3: var(--violeta-500);
+  --serie-4: #B8750A;
+  --grafico-grade: var(--n-300);
+
+  /* ---------------------------------------------------------------- papéis */
+  --fundo: var(--n-100);
+  --superficie: var(--branco);
+  --superficie-2: var(--n-100);
+  --superficie-3: var(--n-200);
+  --borda: var(--n-300);
+  --borda-forte: var(--n-400);
+  --texto: var(--n-900);
+  --texto-2: var(--n-700);
+  --texto-3: var(--n-600);
+  --texto-apagado: var(--n-500);
+  --acao: var(--azul-600);
+  --acao-hover: var(--azul-700);
+  --acao-texto: var(--branco);
+  --acao-suave: var(--azul-50);
+  --acao-suave-2: var(--azul-100);
+  --realce: var(--violeta-500);
+  --realce-suave: var(--violeta-50);
+  --foco: var(--azul-500);
+  --marca-brasa: #F06A1A; /* só a chama da logo; a interface não usa laranja */
+
+  /* barra lateral: azul com subtom violeta */
+  --lateral-topo: var(--azul-700);
+  --lateral-base: var(--violeta-900);
+  --lateral-texto: var(--azul-100);
+  --lateral-texto-2: var(--azul-300);
+  --lateral-hover: rgba(255, 255, 255, .10);
+  --lateral-ativo: var(--branco);
+  --lateral-ativo-texto: var(--azul-700);
+  --lateral-cartao: rgba(255, 255, 255, .08);
+  --lateral-borda: rgba(255, 255, 255, .14);
+
+  /* palco do termograma: índigo profundo, onde as cores térmicas se leem melhor */
+  --palco: #0E1330;
+  --palco-2: #171D45;
+  --palco-texto: #C9CEEA;
+  --palco-texto-2: #8F97C4;
+  --veu: rgba(14, 19, 48, .55);            /* fundo de diálogo */
+  --rotulo-imagem: rgba(14, 19, 48, .9);   /* etiquetas e leitura sobre o termograma */
+  --contorno-imagem: rgba(0, 0, 0, .55);   /* contorno fino de marcas brancas sobre a imagem */
+  --realce-imagem: rgba(255, 255, 255, .6);
+  --brilho: rgba(255, 255, 255, .55);      /* brilho do esqueleto de carregamento */
+  --brilho-palco: rgba(255, 255, 255, .08);
+  --linha-clara: rgba(255, 255, 255, .28); /* contorno de botão sobre fundo escuro */
+  --hover-claro: rgba(255, 255, 255, .1);
+  --anel-giro: rgba(255, 255, 255, .35);
+
+  /* ---------------------------------------------------------------- tipografia (proporção 1,2; 2 famílias) */
+  --fonte: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --fonte-num: "Cascadia Mono", "Cascadia Code", Consolas, "SFMono-Regular", monospace;
+  --t-1: 12px;  --a-1: 16px;   /* legendas, selos, cabeçalho de tabela */
+  --t-2: 14px;  --a-2: 20px;   /* corpo, controles */
+  --t-3: 17px;  --a-3: 24px;   /* título de cartão */
+  --t-4: 21px;  --a-4: 28px;   /* título de página */
+  --t-5: 25px;  --a-5: 32px;   /* números de destaque */
+  --t-6: 30px;  --a-6: 38px;   /* abertura (Sobre) */
+  --p-normal: 400;
+  --p-medio: 600;
+  --p-forte: 700;
+  --espaco-letra: .06em;       /* sobrerrótulos em maiúsculas */
+
+  /* ---------------------------------------------------------------- espaçamento (múltiplos de 4 px) */
+  --e-1: 4px;
+  --e-2: 8px;
+  --e-3: 12px;
+  --e-4: 16px;
+  --e-5: 20px;
+  --e-6: 24px;
+  --e-8: 32px;
+  --e-10: 40px;
+  --e-12: 48px;
+  --e-16: 64px;
+
+  /* ---------------------------------------------------------------- tamanhos */
+  --alvo: 40px;         /* altura de botão e campo */
+  --alvo-sm: 32px;      /* compacto, dentro de tabelas e cartões */
+  --alvo-toque: 44px;   /* mínimo em telas de toque */
+  --ic: 16px;
+  --ic-g: 20px;
+  --ponto: 8px;         /* bolinha de status */
+  --lateral: 248px;
+  --topo: 60px;
+  --inspetor: 432px;
+  --conteudo-max: 1640px;
+  --secao-max: 1120px;       /* formulários longos */
+  --col-p: 180px;            /* largura mínima de coluna em grades: pequena, média, grande */
+  --col-m: 240px;
+  --col-g: 360px;
+  --col-lateral: 300px;      /* coluna lateral de apoio */
+  --col-num: 128px;          /* campo numérico com unidade */
+  --miniatura: 64px;         /* termograma pequeno em tabela */
+  --logo-g: 220px;
+  --dialogo: 520px;
+  --lista-max: 288px;        /* lista rolável dentro de diálogo */
+  --medida: 68ch;            /* comprimento de linha para texto corrido */
+
+  /* ---------------------------------------------------------------- raio (3 valores) */
+  --r-p: 6px;
+  --r-m: 10px;
+  --r-g: 16px;
+
+  /* ---------------------------------------------------------------- sombras (3 níveis) */
+  --sombra-1: 0 1px 2px rgba(23, 27, 51, .06), 0 1px 1px rgba(23, 27, 51, .03);
+  --sombra-2: 0 8px 20px -6px rgba(23, 27, 51, .14), 0 2px 4px rgba(23, 27, 51, .05);
+  --sombra-3: 0 28px 56px -16px rgba(23, 27, 51, .34);
+
+  /* ---------------------------------------------------------------- movimento */
+  --dur-rapida: 150ms;   /* toque, hover, clique */
+  --dur-media: 250ms;    /* troca de página, abrir painel */
+  --dur-lenta: 400ms;    /* entrada de conteúdo grande */
+  --escalonar: 30ms;     /* entre itens de lista (no máximo 6 animados) */
+  --ease-entrada: cubic-bezier(.16, 1, .3, 1);   /* desacelera ao chegar */
+  --ease-saida: cubic-bezier(.4, 0, 1, 1);       /* acelera ao sair (mais rápido) */
+  --ease-padrao: cubic-bezier(.2, 0, 0, 1);
+
+  /* ---------------------------------------------------------------- camadas */
+  --z-topo: 20;
+  --z-sobre: 40;
+  --z-aviso: 60;
+
+  color-scheme: light;
+}
+
+/* ---------------------------------------------------------------- tema escuro (opcional; o padrão é claro) */
+:root[data-tema="escuro"] {
+  --branco: #FFFFFF;
+  --n-100: #0F1226; --n-200: #161A33; --n-300: #232845; --n-400: #323857; --n-500: #5E6688;
+  --n-600: #A3AACB; --n-700: #C3C8E2; --n-800: #DDE0F0; --n-900: #EFF1FA;
+  --fundo: #0B0E1F;
+  --superficie: #131731;
+  --superficie-2: #181D3A;
+  --superficie-3: #1F2447;
+  --borda: #262C4F;
+  --borda-forte: #353C66;
+  --acao: var(--azul-400);
+  --acao-hover: var(--azul-300);
+  --acao-texto: #0B0E1F;
+  --acao-suave: #1C2352;
+  --acao-suave-2: #242C63;
+  --realce-suave: #231D4D;
+  --sucesso-fundo: #0F2E22; --sucesso-texto: #7FDCB2;
+  --aviso-fundo: #33290B;   --aviso-texto: #F1D27A;
+  --erro-fundo: #3A1812;    --erro-texto: #F7A08C;
+  --info-fundo: #1C2352;    --info-texto: var(--azul-200);
+  --normal-fundo: #0F2E22;    --normal-texto: #7FDCB2;
+  --atencao-fundo: #33290B;   --atencao-texto: #F1D27A;
+  --programar-fundo: #3A230F; --programar-texto: #F7B37A;
+  --urgente-fundo: #3B1810;   --urgente-texto: #F7A08C;
+  --imediato-fundo: #3D0F1B;  --imediato-texto: #F58AA5;
+  --serie-1: var(--azul-400);
+  --serie-2: #3CC9B3;
+  --serie-3: var(--violeta-300);
+  --serie-4: #E6B34D;
+  --grafico-grade: #2A3052;
+  --lateral-topo: #1E2670;
+  --lateral-base: #1B1850;
+  --sombra-1: 0 1px 2px rgba(0, 0, 0, .35);
+  --sombra-2: 0 8px 20px -6px rgba(0, 0, 0, .5);
+  --sombra-3: 0 28px 56px -16px rgba(0, 0, 0, .7);
+  color-scheme: dark;
+}

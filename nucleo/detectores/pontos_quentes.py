@@ -58,7 +58,7 @@ class PontosQuentes(Detector):
         self.delta_min, self.janela_frac, self.maximo = delta_min, janela_frac, maximo
         self.area_max_frac = area_max_frac
 
-    def detectar(self, temperatura: np.ndarray) -> list[Deteccao]:
+    def detectar(self, temperatura: np.ndarray, imagem: np.ndarray | None = None) -> list[Deteccao]:
         objetos = mascara_objetos(temperatura)
         if objetos.sum() < 30:
             return []

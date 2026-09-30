@@ -163,24 +163,36 @@ def _variantes(recorte):
     yield ImageOps.expand(ImageOps.invert(realce_img), 30, 255).convert("RGB")
 
 
-def ler_limites(rgb: np.ndarray, barra: Barra, ocr) -> tuple[float | None, float | None, dict]:
+def ler_limites(rgb: np.ndarray, barra: Barra, ocr, rapido: bool = False) -> tuple[float | None, float | None, dict]:
     """Lê máximo e mínimo da escala. ``ocr`` é um RapidOCR (ou algo com a mesma chamada).
 
     Na câmera em pé o texto sobe de baixo para cima, então o recorte é girado 90° no sentido
     horário. As três preparações votam: vence o valor mais frequente e, no empate, o de maior
     confiança.
+
+    ``rapido`` (vídeo) pula a etapa que localiza o texto e só reconhece o recorte inteiro: cerca de
+    100 ms em vez de 3 s. Sem a localização, o cadeado ao lado do número vira um "8" ou "6"; por isso
+    ele é apagado antes (é branco, o número é cinza) e o valor só vale com dois votos iguais. Sem
+    isso, devolve None e quem chamou pode tentar o caminho completo.
     """
     from PIL import Image
 
     valores: dict[str, float | None] = {}
     textos: dict[str, str] = {}
     for nome, (x0, y0, x1, y1) in regioes_rotulo(barra, rgb.shape[:2]).items():
-        recorte = Image.fromarray(rgb[y0:y1, x0:x1])
+        pedaco = rgb[y0:y1, x0:x1]
+        if rapido:
+            pedaco = np.where((pedaco.min(axis=2) > 200)[..., None], 0, pedaco).astype(np.uint8)
+        recorte = Image.fromarray(pedaco)
         if barra.orientacao == "H":
             recorte = recorte.rotate(-90, expand=True)
         leituras = []
         for img in _variantes(recorte):
-            resultado, _ = ocr(np.array(img))
+            if rapido:
+                resultado, _ = ocr(np.array(img), use_det=False, use_cls=False)
+                resultado = [(((0, 0),), texto, conf) for texto, conf in resultado or []]
+            else:
+                resultado, _ = ocr(np.array(img))
             valor, texto, conf = _interpretar(resultado)
             if valor is not None:
                 leituras.append((valor, texto, conf))
@@ -189,7 +201,7 @@ def ler_limites(rgb: np.ndarray, barra: Barra, ocr) -> tuple[float | None, float
             continue
         votos = {l[0]: sum(abs(l[0] - m[0]) < 1e-6 for m in leituras) for l in leituras}
         valor, texto, _ = max(leituras, key=lambda l: (votos[l[0]], l[2]))
-        valores[nome], textos[nome] = valor, texto
+        valores[nome], textos[nome] = (None, texto) if rapido and votos[valor] < 2 else (valor, texto)
     return valores.get("max"), valores.get("min"), textos
 
 
@@ -263,6 +275,18 @@ def posicao_para_temperatura(pos: np.ndarray, t_max: float, t_min: float, modelo
     return _temperatura(r_max - pos * (r_max - r_min))
 
 
+def projetar_na_barra(lab: np.ndarray, lab_barra: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Posição na barra (0 quente, 1 frio) e distância até ela de cada cor (N x 3, ou N x 2 em ``ab``)."""
+    n = len(lab_barra)
+    dist, idx = cKDTree(lab_barra).query(lab)
+    # Refino: projeta a cor no segmento até o vizinho mais próximo na barra.
+    viz = np.clip(np.where(idx + 1 < n, idx + 1, idx - 1), 0, n - 1)
+    seg = lab_barra[viz] - lab_barra[idx]
+    comp2 = np.maximum((seg**2).sum(axis=1), 1e-9)
+    frac = np.clip(((lab - lab_barra[idx]) * seg).sum(axis=1) / comp2, 0, 1)
+    return (idx + frac * (viz - idx)) / (n - 1), dist
+
+
 @dataclass
 class Inversao:
     temperatura_c: np.ndarray  # float32, NaN fora da cena ou onde a cor não pertence à paleta
@@ -288,21 +312,10 @@ def inverter(
     if esc.t_max is None or esc.t_min is None:
         raise ValueError("limites da escala desconhecidos")
     canais = slice(0, 3) if espaco == "lab" else slice(1, 3)
-    lab_barra_total = rgb_para_lab(esc.cores)
-    lab_barra = lab_barra_total[:, canais]
-    n = len(lab_barra)
-    arvore = cKDTree(lab_barra)
+    n = len(esc.cores)
     forma = rgb.shape[:2]
     lab_total = rgb_para_lab(rgb.reshape(-1, 3))
-    lab = lab_total[:, canais]
-    dist, idx = arvore.query(lab)
-
-    # Refino: projeta o pixel no segmento até o vizinho mais próximo na barra.
-    viz = np.clip(np.where(idx + 1 < n, idx + 1, idx - 1), 0, n - 1)
-    seg = lab_barra[viz] - lab_barra[idx]
-    comp2 = np.maximum((seg**2).sum(axis=1), 1e-9)
-    frac = np.clip(((lab - lab_barra[idx]) * seg).sum(axis=1) / comp2, 0, 1)
-    pos = (idx + frac * (viz - idx)) / (n - 1)
+    pos, dist = projetar_na_barra(lab_total[:, canais], rgb_para_lab(esc.cores)[:, canais])
 
     temp = posicao_para_temperatura(pos, esc.t_max, esc.t_min, modelo)
     valido = (dist.reshape(forma) <= limiar_distancia) & ~mascara_sobreposicao(esc.barra, forma)

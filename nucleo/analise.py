@@ -11,6 +11,9 @@ Segue a ABNT NBR 15866: cada anomalia é avaliada contra referências explícita
 
 A severidade final é a pior das avaliações aplicáveis e registra qual critério a disparou. A
 comparação com o entorno imediato é mostrada, mas não classifica: não é critério de norma.
+
+Com um modelo de componentes e o detector de pontos quentes juntos, ``relacionar_componentes``
+diz em qual peça está cada ponto quente e o ponto mais quente da cena, e compara as peças iguais.
 """
 
 from __future__ import annotations
@@ -177,6 +180,95 @@ def _referencia_semelhantes(itens: list[dict]) -> float:
     return float(np.median(maximos)) if len(maximos) >= 3 else maximos[0]
 
 
+# ---------------------------------------------------------------- componentes × pontos quentes
+
+PONTO_QUENTE = "ponto_quente"
+LIMITE_CONFERIR_C = 150.0  # acima disso, pedir para conferir se não é o sol ou um reflexo (só aviso; não muda a severidade)
+MARGEM_FORA_C = 1.0  # um ponto fora das peças só é citado se for pelo menos isso mais quente que o das peças
+
+
+def _contem(caixa: list[float], x: float, y: float) -> bool:
+    """O pixel (x, y) da matriz cai dentro da caixa (pelo centro do pixel)."""
+    x0, y0, x1, y1 = caixa
+    return x0 <= x + 0.5 <= x1 and y0 <= y + 0.5 <= y1
+
+
+def _area(caixa: list[float]) -> float:
+    return max(caixa[2] - caixa[0], 0.0) * max(caixa[3] - caixa[1], 0.0)
+
+
+def _identidade(item: dict) -> dict:
+    return {"id": item.get("id"), "nome": item.get("nome") or item.get("classe"), "classe": item.get("classe")}
+
+
+def componente_em(componentes: list[dict], x: float, y: float) -> dict | None:
+    """O componente mais específico que contém o pixel: a menor caixa (o terminal, e não o para-raio inteiro)."""
+    candidatos = [c for c in componentes if _contem(c["caixa"], x, y)]
+    return min(candidatos, key=lambda c: _area(c["caixa"])) if candidatos else None
+
+
+def relacionar_componentes(itens: list[dict]) -> tuple[dict | None, list[dict]]:
+    """Junta o que o modelo de componentes achou com os pontos quentes.
+
+    - cada ponto quente ganha ``componente``: a peça onde está o pixel mais quente dele;
+    - devolve o **ponto mais quente** da cena (entre os componentes, ou entre todas as regiões se não
+      houver componentes) e em qual componente ele está;
+    - devolve a **comparação entre componentes** do mesmo tipo: Tmáx de cada um, a diferença para a
+      referência dos semelhantes (a mesma do critério) e entre o mais quente e o mais frio.
+    """
+    medidos = [i for i in itens if i.get("medida")]
+    componentes = [i for i in medidos if i.get("classe") != PONTO_QUENTE]
+    for i in medidos:
+        if componentes and i.get("classe") == PONTO_QUENTE:  # sem peças identificadas, não há a que ligar
+            dono = componente_em(componentes, i["medida"]["x_max"], i["medida"]["y_max"])
+            i["componente"] = _identidade(dono) if dono else None
+
+    base = componentes or medidos
+    ponto = None
+    if base:
+        topo = max(base, key=lambda i: i["medida"]["t_max"])
+        x, y = topo["medida"]["x_max"], topo["medida"]["y_max"]
+        dono = componente_em(componentes, x, y)
+        mancha = next((i for i in medidos if i.get("classe") == PONTO_QUENTE and _contem(i["caixa"], x, y)), None)
+        ponto = {
+            "t_max": topo["medida"]["t_max"],
+            "x": x,
+            "y": y,
+            "componente": _identidade(dono) if dono else None,
+            "dentro_de": [_identidade(c) for c in componentes if c is not dono and _contem(c["caixa"], x, y)],
+            "regiao": _identidade(mancha or dono or topo),
+            "severidade": (dono or topo).get("severidade", "normal"),
+            "mais_quente_fora": None,
+        }
+        # Um ponto quente fora das peças identificadas (outro equipamento, estrutura) mais quente que elas.
+        fora = [i for i in medidos if i.get("classe") == PONTO_QUENTE and componentes and not i.get("componente")
+                and i["medida"]["t_max"] >= ponto["t_max"] + MARGEM_FORA_C]
+        if fora:
+            maior = max(fora, key=lambda i: i["medida"]["t_max"])
+            ponto["mais_quente_fora"] = {"t_max": maior["medida"]["t_max"], "regiao": _identidade(maior)}
+
+    grupos: dict[str, list[dict]] = {}
+    for c in componentes:
+        grupos.setdefault(c.get("classe") or "componente", []).append(c)
+    comparacao = []
+    for classe, grupo in grupos.items():
+        grupo = sorted(grupo, key=lambda i: -i["medida"]["t_max"])
+        referencia = _referencia_semelhantes(grupo) if len(grupo) >= 2 else None
+        maximos = [i["medida"]["t_max"] for i in grupo]
+        comparacao.append({
+            "classe": classe,
+            "nome": grupo[0]["referencia"]["nome"],
+            "aquecimento": grupo[0]["referencia"]["aquecimento"],
+            "referencia_c": referencia,
+            "amplitude_c": max(maximos) - min(maximos) if len(grupo) >= 2 else None,
+            "itens": [{**_identidade(i), "t_max": i["medida"]["t_max"], "t_med": i["medida"]["t_med"],
+                       "dt": i["medida"]["t_max"] - referencia if referencia is not None else None,
+                       "severidade": i.get("severidade", "normal")} for i in grupo],
+        })
+    comparacao.sort(key=lambda g: -(g["amplitude_c"] if g["amplitude_c"] is not None else -1.0))
+    return ponto, comparacao
+
+
 def analisar_regioes(
     temperatura: np.ndarray,
     regioes: list[dict],
@@ -298,7 +390,19 @@ def analisar_regioes(
             "Dê a mesma classe às regiões das três fases para comparar semelhantes."
         )
     pcts = [i["pct_mta"] for i in saida if i.get("pct_mta") is not None]
+    ponto_mais_quente, comparacao = relacionar_componentes(saida)
+    if ponto_mais_quente and ponto_mais_quente["t_max"] > LIMITE_CONFERIR_C:
+        avisos.append(
+            f"O ponto mais quente passa de {LIMITE_CONFERIR_C:.0f} °C ({ponto_mais_quente['t_max']:.0f} °C). "
+            "Confira na imagem se não é o sol ou um reflexo dentro da caixa antes de concluir."
+        )
+    if ponto_mais_quente and ponto_mais_quente.get("mais_quente_fora"):
+        fora = ponto_mais_quente["mais_quente_fora"]
+        valor = f"{fora['t_max']:.1f}".replace(".", ",")
+        avisos.append(f"Há um ponto mais quente fora das peças identificadas: {fora['regiao']['nome']}, {valor} °C.")
     resumo = {
+        "ponto_mais_quente": ponto_mais_quente,
+        "comparacao_componentes": comparacao,
         "severidade": sev,
         "severidade_rotulo": NIVEIS[sev]["rotulo"],
         "mensagem": mensagem,

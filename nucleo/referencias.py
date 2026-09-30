@@ -66,6 +66,33 @@ COMPONENTES_PADRAO: dict[str, dict] = {
 }
 
 
+# Nomes que aparecem nos rótulos do CVAT e nos modelos treinados, levados à classe da biblioteca.
+# Sem isso, "para-raio inteiro" cairia na classe genérica (resistiva, 90 °C) em vez de dielétrica.
+SINONIMOS: dict[str, str] = {
+    "para_raio_inteiro": "para_raio",
+    "para_raios": "para_raio",
+    "pararaio": "para_raio",
+    "pararaios": "para_raio",
+    "surge_arrester": "para_raio",
+    "corpo_do_para_raio": "para_raio",
+    "isoladora": "parte_isoladora",
+    "aletas_isoladoras": "parte_isoladora",
+    "aletas": "parte_isoladora",
+    "parte_isolante": "parte_isoladora",
+    "corpo_isolante": "parte_isoladora",
+    "terminal_de_linha": "terminal_superior",
+    "terminal_de_terra": "terminal_inferior",
+    "conector": "conexao",
+    "conexoes": "conexao",
+    "buchas": "bucha",
+}
+
+
+def classe_da_biblioteca(classe: str) -> str:
+    """Classe canônica da biblioteca para um nome vindo de rótulo ou modelo."""
+    return SINONIMOS.get(classe, classe)
+
+
 def componentes(personalizados: dict | None = None) -> dict[str, dict]:
     """Biblioteca em uso: padrão com as trocas do usuário por cima."""
     saida = {k: dict(v) for k, v in COMPONENTES_PADRAO.items()}
@@ -77,5 +104,5 @@ def componentes(personalizados: dict | None = None) -> dict[str, dict]:
 
 
 def do_componente(classe: str, biblioteca: dict[str, dict]) -> dict:
-    """Referência da classe; classes desconhecidas usam a genérica (90 °C, resistiva)."""
-    return biblioteca.get(classe) or biblioteca["componente"]
+    """Referência da classe (ou do seu sinônimo); classes desconhecidas usam a genérica (90 °C, resistiva)."""
+    return biblioteca.get(classe) or biblioteca.get(classe_da_biblioteca(classe)) or biblioteca["componente"]

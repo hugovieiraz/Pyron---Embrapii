@@ -1,17 +1,20 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-tema="claro">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Pyron</title>
 <link rel="icon" href="marca/icone-64.png" type="image/png">
 <link rel="apple-touch-icon" href="marca/icone-192.png">
+<link rel="stylesheet" href="tokens.css">
 <link rel="stylesheet" href="estilo.css">
 </head>
 <body>
 <svg class="sprite" aria-hidden="true">
+  <symbol id="i-painel" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="9" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="5" rx="1.5"/><rect x="13.5" y="11.5" width="7" height="9" rx="1.5"/><rect x="3.5" y="15.5" width="7" height="5" rx="1.5"/></symbol>
   <symbol id="i-analise" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="2.2"/><path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4"/></symbol>
   <symbol id="i-inspecoes" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="2.5"/><path d="M8 9h8M8 12.5h8M8 16h5"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M3.5 8.5a2 2 0 0 1 2-2h2l1.5-2h6l1.5 2h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5"/></symbol>
   <symbol id="i-modelos" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="2"/><path d="M9.5 2.5v4M14.5 2.5v4M9.5 17.5v4M14.5 17.5v4M2.5 9.5h4M2.5 14.5h4M17.5 9.5h4M17.5 14.5h4"/></symbol>
   <symbol id="i-config" viewBox="0 0 24 24"><path d="M4 6.5h9M17 6.5h3M4 12h3M11 12h9M4 17.5h11M19 17.5h1"/><circle cx="15" cy="6.5" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17.5" r="2"/></symbol>
   <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.8v.2"/></symbol>
@@ -29,379 +32,664 @@
   <symbol id="i-mais" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
   <symbol id="i-refazer" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20.5 4v5h-5"/></symbol>
   <symbol id="i-voltar" viewBox="0 0 24 24"><path d="M15 5.5 8.5 12l6.5 6.5"/></symbol>
+  <symbol id="i-seta" viewBox="0 0 24 24"><path d="m9 5.5 6.5 6.5L9 18.5"/></symbol>
   <symbol id="i-salvar" viewBox="0 0 24 24"><path d="M5 3.5h11l3.5 3.5v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-13.5a2 2 0 0 1 2-2z"/><path d="M8 3.5v4.5h7M7.5 20.5v-6h9v6"/></symbol>
   <symbol id="i-copiar" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="12" height="12" rx="2"/><path d="M15.5 8.5V5.5a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3"/></symbol>
   <symbol id="i-termo" viewBox="0 0 24 24"><path d="M14 14.6V5a2 2 0 1 0-4 0v9.6a4 4 0 1 0 4 0z"/><path d="M12 9v7.5"/></symbol>
   <symbol id="i-desfazer" viewBox="0 0 24 24"><path d="M4 8.5h10.5a5.5 5.5 0 0 1 0 11H9"/><path d="M8 4.5 4 8.5l4 4"/></symbol>
+  <symbol id="i-sino" viewBox="0 0 24 24"><path d="M6 16.5V11a6 6 0 1 1 12 0v5.5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="i-pasta" viewBox="0 0 24 24"><path d="M3.5 7a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></symbol>
+  <symbol id="i-mensagem" viewBox="0 0 24 24"><path d="M4 5.5h16a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 20 17.5H9.5L5 21v-3.5H4A1.5 1.5 0 0 1 2.5 16V7A1.5 1.5 0 0 1 4 5.5z"/><path d="M7 10h10M7 13.5h6"/></symbol>
+  <symbol id="i-ligar" viewBox="0 0 24 24"><path d="M12 3v8"/><path d="M6.4 6.8a8 8 0 1 0 11.2 0"/></symbol>
+  <symbol id="i-tabela" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 9.5v10"/></symbol>
+  <symbol id="i-grade" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></symbol>
+  <symbol id="i-externo" viewBox="0 0 24 24"><path d="M14 4.5h5.5V10M19.5 4.5 11 13"/><path d="M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/></symbol>
+  <symbol id="i-etiqueta" viewBox="0 0 24 24"><path d="M3.5 12.2V4.5a1 1 0 0 1 1-1h7.7l8.3 8.3a1.5 1.5 0 0 1 0 2.1l-6.1 6.1a1.5 1.5 0 0 1-2.1 0z"/><circle cx="8.2" cy="8.2" r="1.4"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.8v14.4a1 1 0 0 0 1.5.9l11.3-7.2a1 1 0 0 0 0-1.8L8.5 3.9A1 1 0 0 0 7 4.8z"/></symbol>
+  <symbol id="i-pausa" viewBox="0 0 24 24"><rect x="6" y="4.5" width="4" height="15" rx="1"/><rect x="14" y="4.5" width="4" height="15" rx="1"/></symbol>
+  <symbol id="i-video" viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10.5 5-3v9l-5-3z"/></symbol>
+  <symbol id="i-grafico" viewBox="0 0 24 24"><path d="M3.5 20.5h17"/><rect x="5" y="11" width="3.5" height="7" rx="1"/><rect x="10.25" y="5.5" width="3.5" height="12.5" rx="1"/><rect x="15.5" y="8.5" width="3.5" height="9.5" rx="1"/></symbol>
+  <symbol id="i-offline" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M8.5 16.5a5 5 0 0 1 7 0M5 13a10 10 0 0 1 4.3-2.5M19 13a10 10 0 0 0-2.3-1.6M2 9.5a15 15 0 0 1 4.5-2.8M22 9.5A15 15 0 0 0 11 5.1M12 20v.1"/></symbol>
 </svg>
 
 <div class="app">
+  <!-- ======================================================= BARRA LATERAL -->
   <aside class="lateral">
-    <a class="marca" href="#analise" aria-label="Pyron, início">
-      <img src="marca/icone-192.png" alt="" width="38" height="38">
+    <a class="marca" href="#painel" aria-label="Pyron, painel">
+      <img src="marca/icone-192.png" alt="" width="40" height="40">
       <span><b>PYRON</b><small>Termografia preditiva</small></span>
     </a>
     <nav class="nav" aria-label="Seções">
-      <a href="#analise" data-rota="analise"><svg class="ic"><use href="#i-analise"/></svg>Análise</a>
+      <p class="nav-grupo">Operação</p>
+      <a href="#painel" data-rota="painel"><svg class="ic"><use href="#i-painel"/></svg>Painel</a>
+      <a href="#analise" data-rota="analise"><svg class="ic"><use href="#i-analise"/></svg>Nova análise</a>
+      <a href="#video" data-rota="video"><svg class="ic"><use href="#i-video"/></svg>Vídeo ao vivo<span class="ponto" id="nav-video-ponto" hidden></span></a>
       <a href="#inspecoes" data-rota="inspecoes"><svg class="ic"><use href="#i-inspecoes"/></svg>Inspeções<span class="contador" id="contador-inspecoes" hidden></span></a>
+      <a href="#monitoramento" data-rota="monitoramento"><svg class="ic"><use href="#i-camera"/></svg>Monitoramento<span class="ponto" id="nav-monitor-ponto" hidden></span><span class="contador alerta" id="contador-alertas" hidden></span></a>
+      <p class="nav-grupo">Sistema</p>
       <a href="#modelos" data-rota="modelos"><svg class="ic"><use href="#i-modelos"/></svg>Modelos</a>
+      <a href="#avaliacao" data-rota="avaliacao"><svg class="ic"><use href="#i-grafico"/></svg>Avaliação</a>
       <a href="#configuracoes" data-rota="configuracoes"><svg class="ic"><use href="#i-config"/></svg>Configurações</a>
     </nav>
     <div class="lateral-rodape">
-      <div class="detector-ativo">
+      <div class="cartao-lateral">
         <span class="sobrerrotulo">Detector em uso</span>
         <b id="modelo-nome">…</b>
-        <span id="modelo-tipo" class="tipo-mini"></span>
+        <span id="modelo-tipo"></span>
       </div>
-      <a href="#sobre" data-rota="sobre" class="link-sobre"><svg class="ic"><use href="#i-info"/></svg>Sobre · v<span id="versao">0.1</span></a>
+      <a href="#sobre" data-rota="sobre" class="link-sobre"><svg class="ic"><use href="#i-info"/></svg>Sobre o Pyron · v<span id="versao">—</span></a>
     </div>
   </aside>
 
-  <main class="conteudo" id="conteudo">
-    <!-- ======================================================= ANÁLISE -->
-    <section class="vista" data-vista="analise">
-      <div id="analise-vazia">
+  <div class="principal">
+    <!-- ======================================================= TOPO -->
+    <header class="topo">
+      <nav class="trilha" id="trilha" aria-label="Você está em"></nav>
+      <div class="topo-estado">
+        <span class="estado-chip" id="chip-servidor" title="O Pyron roda só neste computador"><i class="ponto ok"></i>Servidor local</span>
+        <a class="estado-chip" href="#modelos" id="chip-treino" hidden><i class="ponto ativo"></i><span></span></a>
+        <a class="estado-chip" href="#monitoramento" id="chip-monitor"><i class="ponto desligado"></i><span>Monitoramento desligado</span></a>
+        <a class="btn btn-fantasma btn-icone btn-sino" href="#monitoramento" id="btn-alertas" aria-label="Alertas do monitoramento" title="Alertas do monitoramento"><svg class="ic"><use href="#i-sino"/></svg><span class="bolinha" id="alertas-n" hidden></span></a>
+        <button class="btn btn-primaria" type="button" id="topo-nova" data-abrir-arquivos><svg class="ic"><use href="#i-upload"/></svg>Nova análise</button>
+      </div>
+    </header>
+
+    <div class="faixa-offline" id="offline" role="alert" hidden>
+      <svg class="ic"><use href="#i-offline"/></svg>
+      <span><b>Sem conexão com o servidor do Pyron.</b> Se a janela principal foi fechada, abra o Pyron de novo pela área de trabalho.</span>
+      <button class="btn btn-sm" type="button" id="btn-reconectar"><svg class="ic"><use href="#i-refazer"/></svg>Tentar de novo</button>
+    </div>
+
+    <div class="faixa-offline faixa-aviso" id="atualizar" role="alert" hidden>
+      <svg class="ic"><use href="#i-refazer"/></svg>
+      <span id="atualizar-texto"></span>
+    </div>
+
+    <main class="conteudo" id="conteudo">
+      <!-- ======================================================= PAINEL -->
+      <section class="vista" data-vista="painel" hidden>
         <header class="cabecalho">
-          <div>
-            <h1>Nova análise</h1>
-            <p class="sub">Solte um ou vários termogramas. Várias imagens de uma vez são analisadas em lote e vão para Inspeções.</p>
-          </div>
+          <div><h1>Painel</h1><p class="sub">Situação dos equipamentos inspecionados neste computador: o que está crítico, o que precisa de reparo programado e o que o monitoramento viu.</p></div>
+          <div class="acoes"><a class="btn" href="#inspecoes"><svg class="ic"><use href="#i-inspecoes"/></svg>Ver todas as inspeções</a></div>
         </header>
-        <div class="entrada">
-          <div class="soltar" id="soltar" tabindex="0" role="button" aria-label="Escolher ou arrastar termogramas">
-            <div class="soltar-icone"><svg class="ic"><use href="#i-upload"/></svg></div>
-            <h2>Solte os termogramas aqui</h2>
-            <p>JPEG radiométrico da câmera FLIR, com temperatura medida, ou imagem colorida com a barra de escala visível, com temperatura estimada.</p>
-            <div class="soltar-acoes">
-              <button class="btn btn-primaria" id="btn-arquivos" type="button"><svg class="ic"><use href="#i-upload"/></svg>Escolher arquivos</button>
-              <span class="atalho">ou Ctrl + O</span>
-            </div>
-            <input type="file" id="arquivos" accept=".jpg,.jpeg,.png" multiple hidden>
-          </div>
-          <ol class="fluxo">
-            <li><span class="fluxo-n">1</span><div><b>Lê a temperatura</b><small>de cada pixel, com emissividade e distância</small></div></li>
-            <li><span class="fluxo-n">2</span><div><b>Encontra os componentes</b><small>e os pontos mais quentes que o entorno</small></div></li>
-            <li><span class="fluxo-n">3</span><div><b>Classifica a severidade</b><small>pelo limite do componente (NBR 15866) e pelo ΔT entre fases</small></div></li>
-            <li><span class="fluxo-n">4</span><div><b>Gera o laudo</b><small>em PDF, pronto para revisar e assinar</small></div></li>
-          </ol>
-        </div>
-        <div class="bloco" id="bloco-recentes" hidden>
-          <div class="bloco-titulo"><h2>Recentes</h2><a href="#inspecoes" class="link">Ver todas</a></div>
-          <div class="grade-recentes" id="recentes"></div>
-        </div>
-        <div class="bloco" id="bloco-exemplos" hidden>
-          <div class="bloco-titulo"><h2>Exemplos</h2><span class="nota" id="exemplos-fonte"></span></div>
-          <div class="grade-exemplos" id="exemplos"></div>
-        </div>
-      </div>
+        <div id="painel-corpo"></div>
+      </section>
 
-      <div id="analise-cheia" hidden>
-        <header class="cabecalho cabecalho-analise">
-          <div class="titulo-analise">
-            <button class="btn btn-fantasma btn-icone" id="btn-voltar" type="button" aria-label="Nova análise" title="Nova análise"><svg class="ic"><use href="#i-voltar"/></svg></button>
+      <!-- ======================================================= ANÁLISE -->
+      <section class="vista" data-vista="analise" hidden>
+        <div id="analise-vazia">
+          <header class="cabecalho">
             <div>
-              <h1 id="a-arquivo" class="nome-arquivo">—</h1>
-              <div class="etiquetas" id="a-etiquetas"></div>
+              <h1>Nova análise</h1>
+              <p class="sub">Solte um ou vários termogramas. Uma imagem abre direto para revisão; várias são analisadas em lote e vão para Inspeções.</p>
+            </div>
+          </header>
+          <div class="entrada">
+            <div class="soltar" id="soltar" tabindex="0" role="button" aria-label="Escolher ou arrastar termogramas">
+              <div class="soltar-icone"><svg class="ic"><use href="#i-upload"/></svg></div>
+              <h2>Solte os termogramas aqui</h2>
+              <p>JPEG radiométrico da câmera FLIR, com temperatura medida, ou imagem colorida com a barra de escala visível, com temperatura estimada.</p>
+              <div class="soltar-acoes">
+                <button class="btn btn-primaria" id="btn-arquivos" type="button"><svg class="ic"><use href="#i-upload"/></svg>Escolher arquivos</button>
+                <span class="atalho">ou <kbd>Ctrl</kbd> + <kbd>O</kbd></span>
+              </div>
+              <input type="file" id="arquivos" accept=".jpg,.jpeg,.png" multiple hidden>
+            </div>
+            <ol class="fluxo">
+              <li><span class="fluxo-n">1</span><div><b>Lê a temperatura</b><small>de cada pixel, com emissividade e distância</small></div></li>
+              <li><span class="fluxo-n">2</span><div><b>Encontra os componentes</b><small>e os pontos mais quentes que o entorno</small></div></li>
+              <li><span class="fluxo-n">3</span><div><b>Classifica a severidade</b><small>pelo limite do componente (NBR 15866) e pelo ΔT entre fases</small></div></li>
+              <li><span class="fluxo-n">4</span><div><b>Gera o laudo</b><small>em PDF, pronto para revisar e assinar</small></div></li>
+            </ol>
+          </div>
+          <div class="bloco" id="bloco-recentes" hidden>
+            <div class="bloco-titulo"><h2>Recentes</h2><a href="#inspecoes" class="link">Ver todas</a></div>
+            <div class="grade-recentes" id="recentes"></div>
+          </div>
+          <div class="bloco" id="bloco-exemplos" hidden>
+            <div class="bloco-titulo"><h2>Exemplos para testar</h2><span class="nota" id="exemplos-fonte"></span></div>
+            <div class="grade-exemplos" id="exemplos"></div>
+          </div>
+        </div>
+
+        <div id="analise-cheia" hidden>
+          <header class="cabecalho cabecalho-analise">
+            <div class="titulo-analise">
+              <button class="btn btn-fantasma btn-icone" id="btn-voltar" type="button" aria-label="Voltar para nova análise" title="Nova análise"><svg class="ic"><use href="#i-voltar"/></svg></button>
+              <div>
+                <h1 id="a-arquivo" class="nome-arquivo">—</h1>
+                <div class="etiquetas" id="a-etiquetas"></div>
+              </div>
+            </div>
+            <div class="acoes" id="a-acoes">
+              <div class="grupo-detector">
+                <select id="sel-modelo" aria-label="Detector"></select>
+                <button class="btn" id="btn-detectar" type="button"><svg class="ic"><use href="#i-refazer"/></svg>Detectar</button>
+              </div>
+              <button class="btn btn-primaria" id="btn-laudo" type="button"><svg class="ic"><use href="#i-laudo"/></svg>Gerar laudo</button>
+            </div>
+          </header>
+
+          <ol class="etapas" id="etapas" aria-label="Etapas do processamento" aria-live="polite"></ol>
+
+          <div class="area-analise" id="area-analise">
+            <div class="palco">
+              <div class="palco-barra">
+                <div class="segmentado" role="group" aria-label="Paleta" id="seg-paleta">
+                  <button type="button" data-valor="ferro" aria-pressed="true">Ferro</button>
+                  <button type="button" data-valor="arco-iris" aria-pressed="false">Arco-íris</button>
+                  <button type="button" data-valor="cinza" aria-pressed="false">Cinza</button>
+                </div>
+                <div class="segmentado" role="group" aria-label="Escala" id="seg-faixa">
+                  <button type="button" data-valor="equipamento" aria-pressed="true" title="Realça o equipamento; o céu fica na cor mais escura">Equipamento</button>
+                  <button type="button" data-valor="completa" aria-pressed="false" title="Da menor à maior temperatura da cena">Cena</button>
+                </div>
+                <span class="divisor"></span>
+                <div class="segmentado" role="group" aria-label="Ferramenta" id="seg-ferramenta">
+                  <button type="button" data-valor="selecionar" aria-pressed="true" title="Selecionar (S)" aria-label="Selecionar"><svg class="ic"><use href="#i-cursor"/></svg></button>
+                  <button type="button" data-valor="desenhar" aria-pressed="false" title="Desenhar região (D)" aria-label="Desenhar região"><svg class="ic"><use href="#i-desenhar"/></svg></button>
+                </div>
+                <button type="button" class="btn-palco" id="btn-isoterma" aria-pressed="false" title="Isoterma: destaca tudo acima de uma temperatura"><svg class="ic"><use href="#i-isoterma"/></svg>Isoterma</button>
+                <button type="button" class="btn-palco" id="btn-foto" aria-pressed="false" hidden title="Foto visível da câmera"><svg class="ic"><use href="#i-foto"/></svg>Foto</button>
+                <span class="divisor" id="divisor-camada" hidden></span>
+                <div class="segmentado" role="group" aria-label="Mostrar" id="seg-camada" hidden>
+                  <button type="button" data-valor="tudo" aria-pressed="true" title="Peças e pontos quentes">Tudo</button>
+                  <button type="button" data-valor="pecas" aria-pressed="false" title="Só as peças identificadas">Peças</button>
+                  <button type="button" data-valor="pontos" aria-pressed="false" title="Só os pontos quentes">Pontos quentes</button>
+                </div>
+                <button type="button" class="btn-palco" id="btn-rotulos" aria-pressed="true" title="Nome e temperatura sobre as caixas (R)"><svg class="ic"><use href="#i-etiqueta"/></svg>Rótulos</button>
+              </div>
+              <div class="isoterma-controle" id="isoterma-controle" hidden>
+                <label for="isoterma-valor">Acima de</label>
+                <input type="range" id="isoterma-valor" step="0.1">
+                <output id="isoterma-saida">—</output>
+                <span class="isoterma-area" id="isoterma-area"></span>
+              </div>
+              <div class="poco">
+                <div class="palco-imagens" id="palco-imagens">
+                  <div class="quadro" id="quadro">
+                    <canvas id="tela"></canvas>
+                    <div class="sobreposicao" id="sobreposicao"></div>
+                    <div class="leitura" id="leitura" hidden></div>
+                    <div class="dica-desenho" id="dica-desenho" hidden>Arraste para medir uma região · Esc cancela</div>
+                  </div>
+                  <figure class="quadro-foto" id="quadro-foto" hidden><img id="img-foto" alt="Foto visível da câmera"><figcaption>Foto visível</figcaption></figure>
+                </div>
+                <div class="escala">
+                  <div class="escala-barra"><canvas id="barra-cores" width="256" height="1"></canvas><span class="escala-marca" id="escala-marca" hidden></span></div>
+                  <div class="escala-ticks" id="escala-ticks"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="inspetor">
+              <div class="abas" role="tablist" aria-label="Detalhes da análise">
+                <button role="tab" type="button" data-aba="resultado" aria-selected="true">Resultado</button>
+                <button role="tab" type="button" data-aba="condicoes" aria-selected="false">Condições</button>
+                <button role="tab" type="button" data-aba="laudo" aria-selected="false">Laudo</button>
+              </div>
+
+              <div class="painel-aba" data-painel="resultado" role="tabpanel">
+                <div class="veredito" id="veredito">
+                  <svg class="ic veredito-icone"><use href="#i-alerta"/></svg>
+                  <div><b id="veredito-titulo">—</b><p id="veredito-texto"></p></div>
+                </div>
+                <div class="kpis">
+                  <div class="kpi"><span>Máxima da cena</span><b id="k-max" class="num">—</b></div>
+                  <div class="kpi"><span id="k-dt-rotulo">Mais perto do limite</span><b id="k-dt" class="num">—</b></div>
+                  <div class="kpi"><span>Regiões</span><b id="k-regioes" class="num">—</b></div>
+                </div>
+                <ul class="avisos" id="avisos"></ul>
+                <div class="ponto-maximo" id="ponto-maximo" hidden></div>
+                <div class="comparacao-componentes" id="comparacao-componentes" hidden></div>
+                <div class="lista-titulo">
+                  <h3>Regiões</h3>
+                  <button class="btn btn-sm btn-fantasma" type="button" id="btn-nova-regiao"><svg class="ic"><use href="#i-mais"/></svg>Desenhar região</button>
+                </div>
+                <div class="regioes" id="regioes"></div>
+                <p class="nota">Dê a mesma classe às regiões das três fases (por exemplo, três "Terminal superior") para comparar componentes semelhantes, como pede o critério.</p>
+              </div>
+
+              <div class="painel-aba" data-painel="condicoes" role="tabpanel" hidden>
+                <form class="form" id="form-condicoes">
+                  <div class="campos-2">
+                    <label>Temperatura ambiente<div class="campo-unidade"><input id="c-ambiente" type="number" step="0.1" placeholder="não informada"><span>°C</span></div></label>
+                    <label>Carga no momento<div class="campo-unidade"><input id="c-carga" type="number" step="1" min="1" max="200" placeholder="não informada"><span>%</span></div></label>
+                  </div>
+                  <p class="nota">Com ambiente e carga, cada região é projetada para plena carga, T<sub>amb</sub> + (T − T<sub>amb</sub>) × (100 / carga)², e comparada com a máxima temperatura admissível (MTA) do componente, como pede a NBR 15866. Abaixo de 40% de carga a projeção fica pouco confiável. Evite medir com vento acima de 4 m/s.</p>
+                  <div class="form-acoes"><button class="btn btn-primaria" type="submit"><svg class="ic"><use href="#i-refazer"/></svg>Recalcular</button></div>
+                </form>
+                <h3 class="subtitulo-painel sobrerrotulo">Medição da câmera</h3>
+                <dl class="meta" id="meta"></dl>
+                <h3 class="subtitulo-painel sobrerrotulo">Critério em uso</h3>
+                <p class="nota" id="criterio-nome"></p>
+                <a href="#configuracoes/criterio" class="link">Ajustar o critério</a>
+              </div>
+
+              <div class="painel-aba" data-painel="laudo" role="tabpanel" hidden>
+                <form class="form" id="form-laudo">
+                  <div class="campos-2">
+                    <label>Instalação<input id="i-instalacao" placeholder="SE Campina Grande II"></label>
+                    <label>Equipamento<input id="i-equipamento" placeholder="TR-01 69/13,8 kV"></label>
+                    <label>Responsável técnico<select id="i-responsavel"></select></label>
+                    <label>ART nº<input id="i-art" placeholder="opcional" autocomplete="off"></label>
+                  </div>
+                  <label>Observações<textarea id="i-observacoes" rows="3" placeholder="Vento, sol, acesso, pendências"></textarea></label>
+                  <div class="form-acoes">
+                    <button class="btn" type="submit"><svg class="ic"><use href="#i-salvar"/></svg>Salvar dados</button>
+                    <button class="btn btn-primaria" type="button" id="btn-laudo-2"><svg class="ic"><use href="#i-laudo"/></svg>Gerar laudo PDF</button>
+                  </div>
+                </form>
+                <p class="nota">O responsável vem do cadastro em Configurações, assim como o nome da empresa no cabeçalho. Para um relatório com várias imagens, selecione-as em Inspeções.</p>
+              </div>
             </div>
           </div>
-          <div class="acoes">
-            <div class="grupo-detector">
-              <select id="sel-modelo" aria-label="Detector"></select>
-              <button class="btn" id="btn-detectar" type="button"><svg class="ic"><use href="#i-refazer"/></svg>Detectar</button>
-            </div>
-            <button class="btn btn-primaria" id="btn-laudo" type="button"><svg class="ic"><use href="#i-laudo"/></svg>Gerar laudo</button>
-          </div>
-        </header>
+          <div id="analise-estado"></div>
+        </div>
+      </section>
 
-        <ol class="etapas" id="etapas" aria-label="Etapas do processamento"></ol>
-
-        <div class="area-analise">
-          <div class="palco">
-            <div class="palco-barra">
-              <div class="segmentado" role="group" aria-label="Paleta" id="seg-paleta">
-                <button type="button" data-valor="ferro" aria-pressed="true">Ferro</button>
-                <button type="button" data-valor="arco-iris" aria-pressed="false">Arco-íris</button>
-                <button type="button" data-valor="cinza" aria-pressed="false">Cinza</button>
-              </div>
-              <div class="segmentado" role="group" aria-label="Escala" id="seg-faixa">
-                <button type="button" data-valor="equipamento" aria-pressed="true" title="Realça o equipamento; o céu fica na cor mais escura">Equipamento</button>
-                <button type="button" data-valor="completa" aria-pressed="false" title="Da menor à maior temperatura da cena">Cena</button>
-              </div>
-              <span class="divisor"></span>
-              <div class="segmentado" role="group" aria-label="Ferramenta" id="seg-ferramenta">
-                <button type="button" data-valor="selecionar" aria-pressed="true" title="Selecionar (S)"><svg class="ic"><use href="#i-cursor"/></svg></button>
-                <button type="button" data-valor="desenhar" aria-pressed="false" title="Desenhar região (D)"><svg class="ic"><use href="#i-desenhar"/></svg></button>
-              </div>
-              <button type="button" class="btn-palco" id="btn-isoterma" aria-pressed="false" title="Isoterma: destaca tudo acima de uma temperatura"><svg class="ic"><use href="#i-isoterma"/></svg>Isoterma</button>
-              <button type="button" class="btn-palco" id="btn-foto" aria-pressed="false" hidden title="Foto visível da câmera"><svg class="ic"><use href="#i-foto"/></svg>Foto</button>
+      <!-- ======================================================= VÍDEO AO VIVO -->
+      <section class="vista" data-vista="video" hidden>
+        <div id="video-inicio">
+          <header class="cabecalho">
+            <div><h1>Vídeo ao vivo</h1><p class="sub">Simula a câmera analisando em tempo real: o vídeo é quebrado em quadros e cada um passa pelo detector no ritmo que este computador aguenta, como se chegasse da câmera naquele instante.</p></div>
+          </header>
+          <div class="video-entrada">
+            <div class="soltar" id="soltar-video" tabindex="0" role="button" aria-label="Escolher ou arrastar um vídeo">
+              <div class="soltar-icone"><svg class="ic"><use href="#i-video"/></svg></div>
+              <h2>Solte um vídeo da câmera aqui</h2>
+              <p>Gravação da tela da câmera térmica, com a barra de escala visível. MP4, AVI, MOV ou MKV, até 2 GB.</p>
+              <div class="soltar-acoes"><button class="btn btn-primaria" type="button" id="btn-video"><svg class="ic"><use href="#i-upload"/></svg>Escolher vídeo</button></div>
+              <div class="envio-video" id="envio-video" hidden><div class="progresso"><i></i></div><span class="nota num" id="envio-video-texto"></span></div>
+              <input type="file" id="arquivo-video" accept="video/*,.mp4,.avi,.mov,.mkv,.m4v,.wmv,.webm" hidden>
             </div>
-            <div class="isoterma-controle" id="isoterma-controle" hidden>
-              <label for="isoterma-valor">Acima de</label>
-              <input type="range" id="isoterma-valor" step="0.1">
-              <output id="isoterma-saida">—</output>
-              <span class="isoterma-area" id="isoterma-area"></span>
-            </div>
-            <div class="palco-imagens" id="palco-imagens">
-              <div class="quadro" id="quadro">
-                <canvas id="tela"></canvas>
-                <div class="sobreposicao" id="sobreposicao"></div>
-                <div class="leitura" id="leitura" hidden></div>
-                <div class="dica-desenho" id="dica-desenho" hidden>Arraste para medir uma região · Esc cancela</div>
+            <form class="cartao form video-opcoes" id="form-video">
+              <h2>Como analisar</h2>
+              <div class="campo-bloco">
+                <span class="rotulo-campo">Ritmo</span>
+                <div class="segmentado" role="group" aria-label="Ritmo da análise" id="seg-video-modo">
+                  <button type="button" data-valor="ao_vivo" aria-pressed="true">Ao vivo</button>
+                  <button type="button" data-valor="intervalo" aria-pressed="false">Um quadro a cada intervalo</button>
+                </div>
+                <p class="nota" id="video-modo-nota"></p>
               </div>
-              <figure class="quadro-foto" id="quadro-foto" hidden><img id="img-foto" alt="Foto visível da câmera"><figcaption>Foto visível</figcaption></figure>
-            </div>
-            <div class="escala">
-              <div class="escala-barra"><canvas id="barra-cores" width="256" height="1"></canvas><span class="escala-marca" id="escala-marca" hidden></span></div>
-              <div class="escala-ticks" id="escala-ticks"></div>
-            </div>
-          </div>
-
-          <div class="inspetor">
-            <div class="abas" role="tablist">
-              <button role="tab" type="button" data-aba="resultado" aria-selected="true">Resultado</button>
-              <button role="tab" type="button" data-aba="condicoes" aria-selected="false">Condições</button>
-              <button role="tab" type="button" data-aba="laudo" aria-selected="false">Laudo</button>
-            </div>
-
-            <div class="painel-aba" data-painel="resultado">
-              <div class="veredito" id="veredito">
-                <svg class="ic veredito-icone"><use href="#i-alerta"/></svg>
-                <div><b id="veredito-titulo">—</b><p id="veredito-texto"></p></div>
+              <div class="campos-2">
+                <label id="campo-velocidade">Velocidade do vídeo<select id="v-velocidade"><option value="0.5">0,5× (mais devagar)</option><option value="1" selected>1× (tempo real)</option><option value="2">2× (mais rápido)</option></select></label>
+                <label id="campo-intervalo" hidden>Intervalo entre quadros<div class="campo-unidade"><input id="v-intervalo" type="number" min="0.05" max="60" step="0.05" value="0.5"><span>s</span></div></label>
+                <label>Detector<select id="v-modelo"></select></label>
               </div>
-              <div class="kpis">
-                <div class="kpi"><span>Máxima da cena</span><b id="k-max">—</b></div>
-                <div class="kpi"><span id="k-dt-rotulo">Mais perto do limite</span><b id="k-dt">—</b></div>
-                <div class="kpi"><span>Regiões</span><b id="k-regioes">—</b></div>
-              </div>
-              <ul class="avisos" id="avisos"></ul>
-              <div class="lista-titulo">
-                <h3>Regiões</h3>
-                <button class="btn btn-sm btn-fantasma" type="button" id="btn-nova-regiao"><svg class="ic"><use href="#i-mais"/></svg>Desenhar</button>
-              </div>
-              <div class="regioes" id="regioes"></div>
-              <p class="nota">Dê a mesma classe às regiões das três fases (por exemplo, três "Terminal superior") para comparar componentes semelhantes, como pede o critério.</p>
-            </div>
-
-            <div class="painel-aba" data-painel="condicoes" hidden>
-              <form class="form" id="form-condicoes">
+              <details class="video-escala">
+                <summary>Escala travada na câmera (opcional)</summary>
+                <p class="nota">Por padrão o Pyron lê os números da barra de cores quando eles mudam. Se a escala estava travada durante a gravação, informe os limites: a temperatura fica exata e a análise, mais rápida.</p>
                 <div class="campos-2">
-                  <label>Temperatura ambiente<div class="campo-unidade"><input id="c-ambiente" type="number" step="0.1" placeholder="não informada"><span>°C</span></div></label>
-                  <label>Carga no momento<div class="campo-unidade"><input id="c-carga" type="number" step="1" min="1" max="200" placeholder="não informada"><span>%</span></div></label>
+                  <label>Mínimo da escala<div class="campo-unidade"><input id="v-tmin" type="number" step="0.1" placeholder="ler da imagem"><span>°C</span></div></label>
+                  <label>Máximo da escala<div class="campo-unidade"><input id="v-tmax" type="number" step="0.1" placeholder="ler da imagem"><span>°C</span></div></label>
                 </div>
-                <p class="nota">Com ambiente e carga, cada região é projetada para plena carga, T<sub>amb</sub> + (T − T<sub>amb</sub>) × (100 / carga)², e comparada com a máxima temperatura admissível (MTA) do componente, como pede a NBR 15866. Abaixo de 40% de carga a projeção fica pouco confiável. Evite medir com vento acima de 4 m/s.</p>
-                <div class="form-acoes"><button class="btn btn-primaria" type="submit"><svg class="ic"><use href="#i-refazer"/></svg>Recalcular</button></div>
-              </form>
-              <h3 class="subtitulo-painel">Medição da câmera</h3>
-              <dl class="meta" id="meta"></dl>
-              <h3 class="subtitulo-painel">Critério em uso</h3>
-              <p class="nota" id="criterio-nome"></p>
-              <a href="#configuracoes" class="link">Ajustar o critério</a>
-            </div>
-
-            <div class="painel-aba" data-painel="laudo" hidden>
-              <form class="form" id="form-laudo">
-                <div class="campos-2">
-                  <label>Instalação<input id="i-instalacao" placeholder="SE Campina Grande II"></label>
-                  <label>Equipamento<input id="i-equipamento" placeholder="TR-01 69/13,8 kV"></label>
-                  <label>Responsável técnico<input id="i-responsavel" placeholder="Nome do engenheiro"></label>
-                  <label>Registro / ART<input id="i-art" placeholder="CREA-PB 000000"></label>
-                </div>
-                <label>Observações<textarea id="i-observacoes" rows="3" placeholder="Vento, sol, acesso, pendências"></textarea></label>
-                <div class="form-acoes">
-                  <button class="btn" type="submit"><svg class="ic"><use href="#i-salvar"/></svg>Salvar</button>
-                  <button class="btn btn-primaria" type="button" id="btn-laudo-2"><svg class="ic"><use href="#i-laudo"/></svg>Gerar laudo PDF</button>
-                </div>
-              </form>
-              <p class="nota">O laudo sai como rascunho: revise e assine antes de emitir. O nome da empresa no cabeçalho vem de Configurações.</p>
-            </div>
+              </details>
+            </form>
+          </div>
+          <div class="bloco">
+            <div class="bloco-titulo"><h2>Vídeos analisados</h2><span class="nota" id="videos-total"></span></div>
+            <div id="lista-videos"></div>
           </div>
         </div>
-      </div>
-    </section>
 
-    <!-- ======================================================= INSPEÇÕES -->
-    <section class="vista" data-vista="inspecoes" hidden>
-      <header class="cabecalho">
-        <div><h1>Inspeções</h1><p class="sub">Todas as imagens analisadas neste computador, com regiões, condições e dados do laudo.</p></div>
-        <div class="acoes"><button class="btn btn-primaria" type="button" data-abrir-arquivos><svg class="ic"><use href="#i-upload"/></svg>Analisar imagens</button></div>
-      </header>
-      <div class="kpis-grandes" id="kpis-inspecoes"></div>
-      <div class="filtros">
-        <div class="busca"><svg class="ic"><use href="#i-busca"/></svg><input type="search" id="busca" placeholder="Buscar por arquivo, instalação ou equipamento" aria-label="Buscar inspeções"></div>
-        <div class="segmentado segmentado-claro" role="group" aria-label="Filtrar por severidade" id="seg-filtro">
-          <button type="button" data-valor="todas" aria-pressed="true">Todas</button>
-          <button type="button" data-valor="grave" aria-pressed="false">Graves</button>
-          <button type="button" data-valor="programar" aria-pressed="false">Programar</button>
-          <button type="button" data-valor="atencao" aria-pressed="false">Atenção</button>
-          <button type="button" data-valor="normal" aria-pressed="false">Normais</button>
-        </div>
-        <select id="ordem" aria-label="Ordenar">
-          <option value="recentes">Mais recentes</option>
-          <option value="graves">Mais graves primeiro</option>
-          <option value="nome">Nome do arquivo</option>
-        </select>
-      </div>
-      <div class="grade-inspecoes" id="grade-inspecoes"></div>
-      <div class="vazio" id="inspecoes-vazio" hidden>
-        <svg class="ic"><use href="#i-inspecoes"/></svg>
-        <h2>Nenhuma inspeção por aqui</h2>
-        <p>Analise um termograma e ele aparece nesta lista.</p>
-        <button class="btn btn-primaria" type="button" data-abrir-arquivos><svg class="ic"><use href="#i-upload"/></svg>Analisar imagens</button>
-      </div>
-    </section>
-
-    <!-- ======================================================= MODELOS -->
-    <section class="vista" data-vista="modelos" hidden>
-      <header class="cabecalho">
-        <div><h1>Modelos</h1><p class="sub">Os detectores que encontram componentes nas imagens. O escolhido é usado nas próximas análises.</p></div>
-      </header>
-      <div class="grade-modelos" id="grade-modelos"></div>
-      <div class="cartao">
-        <h2>Treinar e instalar um modelo</h2>
-        <ol class="passos">
-          <li><b>Rotule</b> no CVAT, com caixas, e exporte em COCO 1.0 sem as imagens.</li>
-          <li><b>Treine</b> com o comando abaixo. A rede aprende com a temperatura verdadeira de cada imagem e é avaliada em sessões que não viu.</li>
-          <li><b>Pronto:</b> o modelo é instalado sozinho e aparece nesta tela. Clique em "Usar este modelo".</li>
-        </ol>
-        <div class="comando">
-          <code id="comando-treino">.venv\Scripts\python.exe -m ml.treinar --coco dados\rotulos\para_raios.zip --id para-raios-v1 --nome "Para-raios" --epocas 60</code>
-          <button class="btn btn-sm" type="button" id="btn-copiar-comando"><svg class="ic"><use href="#i-copiar"/></svg>Copiar</button>
-        </div>
-        <p class="nota">Pasta de modelos: <span id="pasta-modelos">—</span></p>
-      </div>
-    </section>
-
-    <!-- ======================================================= CONFIGURAÇÕES -->
-    <section class="vista" data-vista="configuracoes" hidden>
-      <header class="cabecalho">
-        <div><h1>Configurações</h1><p class="sub">Identidade do laudo, responsável padrão, aparência e critério de severidade.</p></div>
-      </header>
-      <div class="grade-config">
-        <form class="cartao form" id="form-empresa">
-          <h2>Empresa</h2>
-          <p class="nota">Aparece no cabeçalho de todos os laudos.</p>
-          <label>Nome<input id="cfg-empresa-nome" placeholder="Sua empresa de engenharia"></label>
-          <label>Subtítulo<input id="cfg-empresa-sub" placeholder="Manutenção preditiva · Campina Grande, PB"></label>
-          <div class="form-acoes"><button class="btn btn-primaria" type="submit"><svg class="ic"><use href="#i-salvar"/></svg>Salvar</button></div>
-        </form>
-        <form class="cartao form" id="form-responsavel">
-          <h2>Responsável técnico padrão</h2>
-          <p class="nota">Já vem preenchido em cada nova análise; dá para trocar em cada laudo.</p>
-          <label>Nome<input id="cfg-resp-nome" placeholder="Nome do engenheiro"></label>
-          <label>Registro profissional<input id="cfg-resp-registro" placeholder="CREA-PB 000000"></label>
-          <div class="form-acoes"><button class="btn btn-primaria" type="submit"><svg class="ic"><use href="#i-salvar"/></svg>Salvar</button></div>
-        </form>
-        <div class="cartao">
-          <h2>Aparência</h2>
-          <p class="nota">O termograma fica sempre sobre fundo escuro, que é onde as cores térmicas se leem melhor.</p>
-          <div class="segmentado segmentado-claro" role="group" aria-label="Tema" id="seg-tema">
-            <button type="button" data-valor="sistema" aria-pressed="true">Sistema</button>
-            <button type="button" data-valor="claro" aria-pressed="false">Claro</button>
-            <button type="button" data-valor="escuro" aria-pressed="false">Escuro</button>
-          </div>
-        </div>
-        <form class="cartao form cartao-largo" id="form-criterio">
-          <div class="cartao-cabeca">
-            <div><h2>Critério de severidade</h2><p class="nota" id="criterio-estado"></p></div>
+        <div id="video-aberto" hidden>
+          <header class="cabecalho cabecalho-analise">
+            <div class="titulo-analise">
+              <button class="btn btn-fantasma btn-icone" id="btn-video-voltar" type="button" aria-label="Voltar para os vídeos" title="Vídeos"><svg class="ic"><use href="#i-voltar"/></svg></button>
+              <div><h1 id="v-arquivo" class="nome-arquivo">—</h1><div class="etiquetas" id="v-etiquetas"></div></div>
+            </div>
             <div class="acoes">
-              <span class="nota">Partir de um modelo:</span>
-              <button class="btn btn-sm" type="button" data-modelo-criterio="brasil">Brasil (NBR 15866)</button>
-              <button class="btn btn-sm" type="button" data-modelo-criterio="neta">NETA MTS</button>
+              <button class="btn" type="button" id="btn-video-parar" hidden><svg class="ic"><use href="#i-x"/></svg>Parar análise</button>
+              <button class="btn btn-primaria" type="button" id="btn-video-salvar" title="Abre este quadro como uma inspeção comum, com laudo"><svg class="ic"><use href="#i-salvar"/></svg>Salvar quadro como inspeção</button>
+            </div>
+          </header>
+          <div class="progresso progresso-video" id="v-progresso" hidden><i></i></div>
+          <div class="area-analise">
+            <div class="palco">
+              <div class="palco-barra">
+                <div class="segmentado" role="group" aria-label="Mostrar" id="seg-video-camada" hidden>
+                  <button type="button" data-valor="tudo" aria-pressed="true" title="Peças e pontos quentes">Tudo</button>
+                  <button type="button" data-valor="pecas" aria-pressed="false" title="Só as peças identificadas">Peças</button>
+                  <button type="button" data-valor="pontos" aria-pressed="false" title="Só os pontos quentes">Pontos quentes</button>
+                </div>
+                <button type="button" class="btn-palco" id="btn-video-rotulos" aria-pressed="true" title="Nome e temperatura sobre as caixas (R)"><svg class="ic"><use href="#i-etiqueta"/></svg>Rótulos</button>
+                <span class="nota palco-dica">Espaço reproduz ou pausa · ← → um quadro</span>
+              </div>
+              <div class="poco">
+                <div class="hud" id="v-hud" aria-live="off"></div>
+                <div class="quadro quadro-video" id="quadro-video">
+                  <img id="v-imagem" alt="Quadro do vídeo">
+                  <div class="sobreposicao sobreposicao-video" id="v-sobreposicao"></div>
+                </div>
+              </div>
+              <div class="video-controles">
+                <button class="btn btn-icone" type="button" id="btn-video-tocar" aria-label="Reproduzir" title="Reproduzir (espaço)"><svg class="ic"><use href="#i-play"/></svg></button>
+                <input type="range" id="v-linha" min="0" max="0" value="0" step="1" aria-label="Quadro analisado">
+                <span class="num video-tempo" id="v-tempo">0:00</span>
+                <select id="v-ritmo" aria-label="Velocidade da reprodução"><option value="0.5">0,5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select>
+                <button class="btn btn-sm" type="button" id="btn-video-aovivo" hidden><i class="ponto-vivo"></i>Voltar ao vivo</button>
+              </div>
+            </div>
+            <div class="inspetor inspetor-video">
+              <div class="kpis kpis-video" id="v-kpis"></div>
+              <div id="v-grafico"></div>
+              <div id="v-quadro"></div>
+              <div id="v-eventos"></div>
             </div>
           </div>
-          <p class="nota">Cada região é avaliada contra a máxima temperatura admissível (MTA) do componente e contra o componente semelhante de outra fase. Vale o pior resultado. Deixe um campo vazio para não usar aquele nível.</p>
-          <div class="tabela-criterio">
-            <div class="crit-grupo"><h3>% da MTA (temperatura projetada)</h3><div id="crit-mta_faixas"></div></div>
-            <div class="crit-grupo"><h3>ΔT entre semelhantes · partes que conduzem corrente</h3><div id="crit-similares"></div></div>
-            <div class="crit-grupo"><h3>ΔT entre semelhantes · para-raios e isoladores</h3><div id="crit-dieletrico"></div></div>
-            <div class="crit-grupo">
-              <h3>ΔT sobre o ar ambiente (NETA)</h3>
-              <label class="alternador"><input type="checkbox" id="crit-usar-ambiente"> Usar este critério</label>
-              <div id="crit-ambiente"></div>
+        </div>
+      </section>
+
+      <!-- ======================================================= INSPEÇÕES -->
+      <section class="vista" data-vista="inspecoes" hidden>
+        <header class="cabecalho">
+          <div><h1>Inspeções</h1><p class="sub">Todas as imagens analisadas neste computador, com regiões, condições e dados do laudo. Clique numa linha para abrir.</p></div>
+          <div class="acoes"><button class="btn btn-primaria" type="button" data-abrir-arquivos><svg class="ic"><use href="#i-upload"/></svg>Analisar imagens</button></div>
+        </header>
+        <div class="kpis-grandes" id="kpis-inspecoes"></div>
+        <div class="filtros" id="filtros-inspecoes">
+          <div class="busca"><svg class="ic"><use href="#i-busca"/></svg><input type="search" id="busca" placeholder="Buscar por arquivo, instalação ou equipamento" aria-label="Buscar inspeções"></div>
+          <div class="segmentado" role="group" aria-label="Filtrar por severidade" id="seg-filtro">
+            <button type="button" data-valor="todas" aria-pressed="true">Todas</button>
+            <button type="button" data-valor="grave" aria-pressed="false">Críticas</button>
+            <button type="button" data-valor="programar" aria-pressed="false">Programar</button>
+            <button type="button" data-valor="atencao" aria-pressed="false">Atenção</button>
+            <button type="button" data-valor="normal" aria-pressed="false">Normais</button>
+          </div>
+          <select id="ordem" aria-label="Ordenar">
+            <option value="recentes">Mais recentes</option>
+            <option value="graves">Mais graves primeiro</option>
+            <option value="nome">Nome do arquivo</option>
+          </select>
+          <div class="segmentado" role="group" aria-label="Forma de exibir" id="seg-exibir">
+            <button type="button" data-valor="tabela" aria-pressed="true" title="Tabela" aria-label="Tabela"><svg class="ic"><use href="#i-tabela"/></svg></button>
+            <button type="button" data-valor="grade" aria-pressed="false" title="Miniaturas" aria-label="Miniaturas"><svg class="ic"><use href="#i-grade"/></svg></button>
+          </div>
+        </div>
+        <div class="barra-selecao" id="barra-selecao" hidden></div>
+        <div id="lista-inspecoes"></div>
+      </section>
+
+      <!-- ======================================================= MONITORAMENTO -->
+      <section class="vista" data-vista="monitoramento" hidden>
+        <header class="cabecalho">
+          <div><h1>Monitoramento</h1><p class="sub">Análise automática das imagens que chegam da câmera térmica e alerta para o responsável quando algum equipamento passa do limite.</p></div>
+          <div class="acoes">
+            <button class="btn" type="button" id="btn-verificar"><svg class="ic"><use href="#i-refazer"/></svg>Verificar agora</button>
+            <button class="btn btn-primaria" type="button" id="btn-ligar-monitor"><svg class="ic"><use href="#i-ligar"/></svg><span>Ligar monitoramento</span></button>
+          </div>
+        </header>
+
+        <div class="cartao faixa-estado" id="monitor-estado"></div>
+
+        <form id="form-monitor" class="pilha">
+          <div class="grade-monitor">
+            <div class="pilha">
+              <div class="cartao">
+                <div class="cartao-cabeca"><div><h2>1. Fonte das imagens</h2><p class="nota">De onde chegam os termogramas que o Pyron vai analisar sozinho.</p></div></div>
+                <div class="opcoes" role="radiogroup" aria-label="Fonte das imagens">
+                  <label class="opcao"><input type="radio" name="fonte" value="pasta" checked><span><b>Pasta monitorada</b><small>A câmera, o cartão sincronizado, o FTP da câmera fixa ou o FLIR Thermal Studio gravam os JPEG numa pasta; cada arquivo novo é analisado.</small></span><span class="etiqueta disponivel">Disponível</span></label>
+                  <label class="opcao indisponivel"><input type="radio" name="fonte" value="rtsp" disabled><span><b>Câmera de rede (RTSP / ONVIF)</b><small>Conexão direta com câmeras térmicas fixas pela rede, capturando quadros no intervalo definido.</small></span><span class="etiqueta breve">Em breve</span></label>
+                  <label class="opcao indisponivel"><input type="radio" name="fonte" value="flir_sdk" disabled><span><b>Câmera FLIR fixa (Atlas SDK)</b><small>Séries A e automação, com leitura radiométrica ao vivo.</small></span><span class="etiqueta breve">Em breve</span></label>
+                </div>
+                <div class="form" style="margin-top: var(--e-4)">
+                  <label>Pasta onde a câmera grava<input id="m-pasta" placeholder="C:\Termografia\Entrada" spellcheck="false"><span class="ajuda">Ao ligar, o que já está na pasta fica de fora: só as imagens que chegarem depois são analisadas.</span></label>
+                  <div class="campos-3">
+                    <label>Verificar a cada<div class="campo-unidade"><input id="m-intervalo" type="number" min="2" max="3600" step="1"><span>s</span></div></label>
+                    <label>Instalação<input id="m-instalacao" placeholder="SE Campina Grande II"></label>
+                    <label>Equipamento<input id="m-equipamento" placeholder="TR-01"></label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="cartao">
+                <div class="cartao-cabeca"><div><h2>2. Regra de alerta</h2><p class="nota">Quando uma imagem nova atinge este nível, nasce um alerta.</p></div></div>
+                <div class="form">
+                  <label>Severidade mínima para alertar
+                    <div class="segmentado" role="group" aria-label="Severidade mínima" id="seg-minima">
+                      <button type="button" data-valor="atencao" aria-pressed="false">Atenção</button>
+                      <button type="button" data-valor="programar" aria-pressed="false">Programar</button>
+                      <button type="button" data-valor="urgente" aria-pressed="true">Urgente</button>
+                      <button type="button" data-valor="imediato" aria-pressed="false">Imediato</button>
+                    </div>
+                  </label>
+                  <label>Não repetir o mesmo nível por<div class="campo-unidade campo-curto"><input id="m-repetir" type="number" min="0" max="1440" step="5"><span>min</span></div><span class="ajuda">Se piorar de nível, o alerta sai na hora, mesmo dentro desse intervalo.</span></label>
+                </div>
+              </div>
+            </div>
+
+            <div class="pilha">
+              <div class="cartao">
+                <div class="cartao-cabeca">
+                  <div><h2>3. Responsáveis</h2><p class="nota">Quem recebe o aviso no WhatsApp. Número com DDI e DDD.</p></div>
+                  <button class="btn btn-sm" type="button" id="btn-add-destinatario"><svg class="ic"><use href="#i-mais"/></svg>Adicionar</button>
+                </div>
+                <div class="destinatarios" id="destinatarios"></div>
+              </div>
+
+              <div class="cartao">
+                <div class="cartao-cabeca"><div><h2>4. Envio da mensagem</h2><p class="nota">Como o aviso chega no celular do responsável.</p></div></div>
+                <div class="opcoes" role="radiogroup" aria-label="Forma de envio">
+                  <label class="opcao"><input type="radio" name="envio" value="manual" checked><span><b>Manual pelo WhatsApp</b><small>O Pyron prepara a mensagem; um clique abre o WhatsApp (celular ou computador) com o texto pronto para enviar.</small></span><span class="etiqueta disponivel">Disponível</span></label>
+                  <label class="opcao indisponivel"><input type="radio" name="envio" value="automatico" disabled><span><b>Automático (WhatsApp Business)</b><small>Envio sem intervenção pela API oficial da Meta, com número verificado da empresa.</small></span><span class="etiqueta breve">Em breve</span></label>
+                </div>
+                <h3 class="sobrerrotulo" style="margin: var(--e-4) 0 var(--e-2)">Prévia da mensagem</h3>
+                <div id="previa-mensagem"></div>
+              </div>
             </div>
           </div>
-          <div class="campos-3">
-            <label>Nome do critério<input id="crit-nome"></label>
-            <label>Expoente da correção de carga<input id="crit-expoente" type="number" step="0.1" min="1" max="3"></label>
-            <label>Carga mínima confiável<div class="campo-unidade"><input id="crit-carga" type="number" step="1" min="0" max="100"><span>%</span></div></label>
-          </div>
-          <div class="form-acoes">
-            <button class="btn btn-fantasma" type="button" id="btn-crit-padrao">Restaurar padrão</button>
-            <button class="btn btn-primaria" type="submit"><svg class="ic"><use href="#i-salvar"/></svg>Salvar critério</button>
-          </div>
+          <div class="form-acoes"><button class="btn btn-primaria" type="submit"><svg class="ic"><use href="#i-salvar"/></svg>Salvar configuração</button></div>
         </form>
-        <form class="cartao form cartao-largo" id="form-componentes">
+
+        <div class="cartao tabela-cartao" style="margin-top: var(--e-5)">
+          <div class="cartao-cabeca" style="padding: var(--e-5) var(--e-5) 0"><div><h2>Alertas</h2><p class="nota">Tudo o que o monitoramento avisou, do mais novo para o mais antigo.</p></div></div>
+          <div id="lista-alertas"></div>
+        </div>
+
+        <div class="cartao" style="margin-top: var(--e-5)">
+          <div class="cartao-cabeca"><div><h2>Em desenvolvimento</h2><p class="nota">O que falta para o monitoramento contínuo completo. Está no roteiro do produto.</p></div><span class="etiqueta breve">Backlog</span></div>
+          <ul class="backlog">
+            <li><b>Conexão direta com a câmera</b><span>RTSP/ONVIF e FLIR Atlas SDK, sem depender de pasta.</span></li>
+            <li><b>WhatsApp automático</b><span>Envio pela API oficial do WhatsApp Business, com confirmação de leitura.</span></li>
+            <li><b>Aviso no celular</b><span>Aplicativo ou página instalável com notificação e acesso ao laudo.</span></li>
+            <li><b>Serviço do Windows</b><span>Monitoramento rodando mesmo com a janela do Pyron fechada.</span></li>
+            <li><b>Escalonamento</b><span>Se ninguém responder em X minutos, avisa o próximo da lista.</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ======================================================= MODELOS -->
+      <section class="vista" data-vista="modelos" hidden>
+        <header class="cabecalho">
+          <div><h1>Modelos</h1><p class="sub">Escolha o que detectar: só as peças (modelo treinado), só o calor (pontos quentes) ou os dois juntos, que diz em qual peça está cada ponto quente e compara as peças iguais. O escolhido é usado nas próximas análises e no monitoramento.</p></div>
+          <div class="acoes">
+            <button class="btn" type="button" id="btn-instalar-modelo"><svg class="ic"><use href="#i-upload"/></svg>Instalar modelo treinado</button>
+            <input type="file" id="arquivo-modelo" accept=".zip" hidden>
+            <button class="btn btn-primaria" type="button" id="btn-ir-treinar"><svg class="ic"><use href="#i-modelos"/></svg>Treinar novo modelo</button>
+          </div>
+        </header>
+        <div id="lista-treinos" class="pilha"></div>
+        <div class="grade-modelos" id="grade-modelos"></div>
+
+        <div class="cartao" id="cartao-treinar">
           <div class="cartao-cabeca">
-            <div>
-              <h2>Biblioteca de componentes</h2>
-              <p class="nota">Quanto cada componente aguenta. Use o valor do fabricante quando houver; sem ele, valem as normas de projeto e a prática brasileira (90 °C para conexões metálicas, 70 °C para cabos isolados).</p>
+            <div><h2>Treinar um modelo</h2><p class="nota">Do rótulo no CVAT ao modelo em uso, sem sair do Pyron. A rede aprende com a temperatura verdadeira de cada imagem e é avaliada em fotos que não viu.</p></div>
+            <span class="etiqueta" id="ambiente-treino">Verificando o PyTorch…</span>
+          </div>
+          <div id="ambiente-aviso"></div>
+          <ol class="passos-treino">
+            <li><b>Exporte do CVAT.</b> Abra o projeto (ou a tarefa), menu <b>⋮ › Exportar conjunto de dados</b>, formato <b>COCO 1.0</b>, com <b>Salvar imagens desmarcado</b>. Se o download não começar, ele fica em <b>Solicitações</b>.</li>
+            <li><b>Solte o .zip aqui.</b> O Pyron junta treino, validação e teste, acha as imagens originais pelo nome e mostra o que tem antes de treinar.</li>
+            <li><b>Treine.</b> Acompanhe época por época aqui. No fim, o modelo aparece nesta tela para usar.</li>
+          </ol>
+          <div id="treino-etapa"></div>
+          <details class="terminal">
+            <summary>Treinar pelo terminal</summary>
+            <p class="nota">Arraste o .zip do CVAT para o atalho <b>Pyron - Treinar modelo</b> na área de trabalho, ou rode:</p>
+            <div class="comando">
+              <code id="comando-treino">.venv\Scripts\python.exe -m ml.assistente dados\rotulos\seu_export.zip</code>
+              <button class="btn btn-sm" type="button" id="btn-copiar-comando"><svg class="ic"><use href="#i-copiar"/></svg>Copiar</button>
+            </div>
+            <p class="nota">Pasta de modelos: <span id="pasta-modelos" class="mono">—</span></p>
+          </details>
+        </div>
+      </section>
+
+      <!-- ======================================================= AVALIAÇÃO DE MODELOS -->
+      <section class="vista" data-vista="avaliacao" hidden>
+        <header class="cabecalho">
+          <div><h1>Avaliação de modelos</h1><p class="sub">Compare os detectores treinados no Colab: quanto cada um acerta, quais peças deixa escapar, como aprendeu e onde errou nas fotos de teste.</p></div>
+          <div class="acoes">
+            <select id="sel-avaliacao" aria-label="Avaliação exibida" hidden></select>
+            <button class="btn btn-primaria" type="button" id="btn-importar-avaliacao"><svg class="ic"><use href="#i-upload"/></svg>Importar do Colab</button>
+            <input type="file" id="arquivo-avaliacao" accept=".zip" hidden>
+          </div>
+        </header>
+        <div id="conteudo-avaliacao" class="pilha"></div>
+      </section>
+
+      <!-- ======================================================= CONFIGURAÇÕES -->
+      <section class="vista" data-vista="configuracoes" hidden>
+        <header class="cabecalho">
+          <div><h1>Configurações</h1><p class="sub">Identidade do laudo, critério de severidade, limites de cada componente e aparência.</p></div>
+        </header>
+        <div class="abas abas-pagina" role="tablist" aria-label="Seções de configuração" id="abas-config">
+          <button role="tab" type="button" data-aba-config="identidade" aria-selected="true">Empresa e responsável</button>
+          <button role="tab" type="button" data-aba-config="criterio" aria-selected="false">Critério de severidade</button>
+          <button role="tab" type="button" data-aba-config="componentes" aria-selected="false">Biblioteca de componentes</button>
+          <button role="tab" type="button" data-aba-config="aparencia" aria-selected="false">Aparência</button>
+          <button role="tab" type="button" data-aba-config="dados" aria-selected="false">Dados e sistema</button>
+        </div>
+
+        <div class="secao-config" data-secao-config="identidade" role="tabpanel">
+          <form class="cartao form" id="form-identidade">
+            <div class="cartao-cabeca"><div><h2>Empresa</h2><p class="nota">Aparece no cabeçalho de todos os laudos.</p></div></div>
+            <div class="campos-2">
+              <label>Nome<input id="cfg-empresa-nome" placeholder="Sua empresa de engenharia"></label>
+              <label>Subtítulo<input id="cfg-empresa-sub" placeholder="Manutenção preditiva · Campina Grande, PB"></label>
+            </div>
+            <div class="cartao-cabeca" style="margin: var(--e-2) 0 0">
+              <div><h2>Responsáveis técnicos</h2><p class="nota">O laudo só sai com um responsável deste cadastro: nome e registro nunca são digitados na hora, para não sair errado. O marcado como padrão já vem escolhido em cada análise.</p></div>
+              <button class="btn btn-sm" type="button" id="btn-novo-responsavel"><svg class="ic"><use href="#i-mais"/></svg>Adicionar</button>
+            </div>
+            <div id="lista-responsaveis" class="lista-responsaveis"></div>
+            <div class="cartao-rodape"><button class="btn btn-primaria" type="submit"><svg class="ic"><use href="#i-salvar"/></svg>Salvar</button></div>
+          </form>
+        </div>
+
+        <div class="secao-config" data-secao-config="criterio" role="tabpanel" hidden>
+          <form class="cartao form" id="form-criterio">
+            <div class="cartao-cabeca">
+              <div><h2>Critério de severidade</h2><p class="nota" id="criterio-estado"></p></div>
+              <div class="acoes">
+                <span class="nota">Partir de um modelo:</span>
+                <button class="btn btn-sm" type="button" data-modelo-criterio="brasil">Brasil (NBR 15866)</button>
+                <button class="btn btn-sm" type="button" data-modelo-criterio="neta">NETA MTS</button>
+              </div>
+            </div>
+            <p class="nota">Cada região é avaliada contra a máxima temperatura admissível (MTA) do componente e contra o componente semelhante de outra fase. Vale o pior resultado. Deixe um campo vazio para não usar aquele nível.</p>
+            <div class="tabela-criterio">
+              <div class="crit-grupo"><h3>% da MTA (temperatura projetada)</h3><div id="crit-mta_faixas"></div></div>
+              <div class="crit-grupo"><h3>ΔT entre semelhantes · partes que conduzem corrente</h3><div id="crit-similares"></div></div>
+              <div class="crit-grupo"><h3>ΔT entre semelhantes · para-raios e isoladores</h3><div id="crit-dieletrico"></div></div>
+              <div class="crit-grupo">
+                <h3>ΔT sobre o ar ambiente (NETA)</h3>
+                <label class="alternador"><input type="checkbox" id="crit-usar-ambiente"> Usar este critério</label>
+                <div id="crit-ambiente"></div>
+              </div>
+            </div>
+            <div class="campos-3">
+              <label>Nome do critério<input id="crit-nome"></label>
+              <label>Expoente da correção de carga<input id="crit-expoente" type="number" step="0.1" min="1" max="3"></label>
+              <label>Carga mínima confiável<div class="campo-unidade"><input id="crit-carga" type="number" step="1" min="0" max="100"><span>%</span></div></label>
+            </div>
+            <div class="cartao-rodape">
+              <button class="btn btn-fantasma" type="button" id="btn-crit-padrao">Restaurar padrão</button>
+              <button class="btn btn-primaria" type="submit"><svg class="ic"><use href="#i-salvar"/></svg>Salvar critério</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="secao-config" data-secao-config="componentes" role="tabpanel" hidden>
+          <form class="cartao form" id="form-componentes">
+            <div class="cartao-cabeca"><div><h2>Biblioteca de componentes</h2><p class="nota">Quanto cada componente aguenta. Use o valor do fabricante quando houver; sem ele, valem as normas de projeto e a prática brasileira (90 °C para conexões metálicas, 70 °C para cabos isolados). Campos alterados ficam em azul.</p></div></div>
+            <div class="tabela-rolagem">
+              <table class="tabela tabela-componentes">
+                <thead><tr><th>Componente</th><th>Aquecimento</th><th>MTA</th><th>Fonte</th></tr></thead>
+                <tbody id="lista-componentes"></tbody>
+              </table>
+            </div>
+            <div class="cartao-rodape">
+              <button class="btn btn-fantasma" type="button" id="btn-comp-padrao">Restaurar padrão</button>
+              <button class="btn btn-primaria" type="submit"><svg class="ic"><use href="#i-salvar"/></svg>Salvar biblioteca</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="secao-config" data-secao-config="aparencia" role="tabpanel" hidden>
+          <div class="cartao">
+            <div class="cartao-cabeca"><div><h2>Aparência</h2><p class="nota">O padrão é o tema claro. O termograma fica sempre sobre fundo índigo escuro, onde as cores térmicas se leem melhor.</p></div></div>
+            <div class="segmentado" role="group" aria-label="Tema" id="seg-tema">
+              <button type="button" data-valor="claro" aria-pressed="true">Claro</button>
+              <button type="button" data-valor="escuro" aria-pressed="false">Escuro</button>
+              <button type="button" data-valor="sistema" aria-pressed="false">Seguir o Windows</button>
             </div>
           </div>
-          <div class="tabela-rolagem">
-            <table class="tabela-componentes">
-              <thead><tr><th>Componente</th><th>Aquecimento</th><th>MTA</th><th>Fonte</th></tr></thead>
-              <tbody id="lista-componentes"></tbody>
-            </table>
-          </div>
-          <div class="form-acoes">
-            <button class="btn btn-fantasma" type="button" id="btn-comp-padrao">Restaurar padrão</button>
-            <button class="btn btn-primaria" type="submit"><svg class="ic"><use href="#i-salvar"/></svg>Salvar biblioteca</button>
-          </div>
-        </form>
-        <div class="cartao cartao-largo">
-          <h2>Dados</h2>
-          <dl class="meta meta-larga">
-            <div><dt>Inspeções e configurações</dt><dd id="pasta-dados">—</dd></div>
-            <div><dt>Versão</dt><dd id="versao-2">—</dd></div>
-          </dl>
         </div>
-      </div>
-    </section>
 
-    <!-- ======================================================= SOBRE -->
-    <section class="vista" data-vista="sobre" hidden>
-      <div class="heroi heroi-marca">
-        <div>
-          <p class="sobretitulo">Pyron · Manutenção preditiva · Termografia digital</p>
-          <h1>Ver o defeito antes da falha</h1>
-          <p class="lede">Manutenção preditiva por termografia para transformadores e equipamentos de subestação. Lê a temperatura de cada ponto, encontra os componentes, compara com o limite de cada um e com as outras fases, classifica a severidade e entrega o laudo pronto para revisar e assinar.</p>
+        <div class="secao-config" data-secao-config="dados" role="tabpanel" hidden>
+          <div class="cartao">
+            <div class="cartao-cabeca"><div><h2>Dados e sistema</h2><p class="nota">Tudo fica neste computador. Nenhuma imagem ou laudo sai daqui sem você mandar.</p></div></div>
+            <dl class="meta meta-larga">
+              <div><dt>Inspeções, alertas e configurações</dt><dd id="pasta-dados" class="mono">—</dd></div>
+              <div><dt>Modelos instalados</dt><dd id="pasta-modelos-2" class="mono">—</dd></div>
+              <div><dt>Versão</dt><dd id="versao-2" class="num">—</dd></div>
+            </dl>
+          </div>
         </div>
-        <div class="logo-grande"><img src="marca/logo.png" alt="Pyron: Manutenção Preditiva, Termografia Digital" width="240"></div>
-      </div>
-      <div class="pilares">
-        <div class="pilar"><svg class="ic"><use href="#i-termo"/></svg><h3>Temperatura medida</h3><p>Lê os dados radiométricos da câmera, com emissividade e distância. Imagem só colorida vira temperatura estimada pela paleta e aparece marcada assim.</p></div>
-        <div class="pilar"><svg class="ic"><use href="#i-modelos"/></svg><h3>Componentes, não pixels</h3><p>Modelos treinados apontam buchas, terminais e para-raios; a comparação é entre fases semelhantes, como o termografista faz.</p></div>
-        <div class="pilar"><svg class="ic"><use href="#i-alerta"/></svg><h3>Critério explícito</h3><p>Severidade pela NBR 15866: temperatura projetada para plena carga contra a máxima admissível do componente, e ΔT entre fases. Cada número do laudo mostra de onde veio.</p></div>
-        <div class="pilar"><svg class="ic"><use href="#i-laudo"/></svg><h3>Laudo em minutos</h3><p>Termograma, foto visível, tabela, severidade, recomendação e responsabilidade técnica, na estrutura da NBR 15572.</p></div>
-      </div>
-      <div class="cartao">
-        <h2>Para onde vai</h2>
-        <div class="linha-tempo">
-          <div class="marco atual"><span>Agora</span><b>Inspeção</b><p>Laudo automático a partir das imagens de uma inspeção.</p></div>
-          <div class="marco"><span>Próximo</span><b>Previsão</b><p>Tendência de cada componente e tempo estimado até ficar crítico.</p></div>
-          <div class="marco"><span>Depois</span><b>Monitoramento contínuo</b><p>Câmera fixa, alertas em tempo real e gêmeo térmico do transformador.</p></div>
-        </div>
-      </div>
-      <div class="cartao">
-        <h2>Estado desta versão</h2>
-        <ul class="estado">
-          <li class="ok">Leitura radiométrica FLIR conferida com os valores impressos pela câmera (menos de 1 °C de diferença).</li>
-          <li class="ok">Inversão de paleta testada em 891 imagens contra a temperatura verdadeira: erro mediano de 0,5 °C.</li>
-          <li class="ok">Medição por região, máxima temperatura admissível por componente, projeção para plena carga, ΔT entre fases, isoterma, severidade e laudo em PDF.</li>
-          <li class="ok">Treino e instalação de modelos testados de ponta a ponta na GPU.</li>
-          <li class="pendente">Detector de componentes treinado com rótulos reais: em andamento. Até lá, a regra de pontos quentes dá uma classificação indicativa.</li>
-          <li class="pendente">Máximas admissíveis e faixas de severidade a conferir na edição vigente da NBR 15866, nos dados dos fabricantes e com termografista certificado.</li>
-        </ul>
-        <p class="nota">Imagens de exemplo: dataset de estudo ScienceDB 10185 (CC BY-NC-SA 4.0), usado só para estudo e demonstração.</p>
-      </div>
-    </section>
-  </main>
-</div>
+      </section>
 
-<div class="carregando" id="carregando" hidden>
-  <div class="carregando-caixa">
-    <div class="giro" aria-hidden="true"></div>
-    <div><b id="carregando-titulo">Analisando…</b><p id="carregando-texto">Lendo a temperatura</p></div>
+      <!-- ======================================================= SOBRE -->
+      <section class="vista" data-vista="sobre" hidden>
+        <div class="heroi-marca">
+          <div>
+            <p class="sobretitulo">Pyron · Manutenção preditiva · Termografia digital</p>
+            <h1>Ver o defeito antes da falha</h1>
+            <p class="lede">Manutenção preditiva por termografia para transformadores e equipamentos de subestação. Lê a temperatura de cada ponto, encontra os componentes, compara com o limite de cada um e com as outras fases, classifica a severidade, vigia a pasta da câmera e entrega o laudo pronto para revisar e assinar.</p>
+          </div>
+          <div class="logo-grande"><img src="marca/logo.png" alt="Pyron: Manutenção Preditiva, Termografia Digital"></div>
+        </div>
+        <div class="pilares">
+          <div class="pilar"><svg class="ic"><use href="#i-termo"/></svg><h3>Temperatura medida</h3><p>Lê os dados radiométricos da câmera, com emissividade e distância. Imagem só colorida vira temperatura estimada pela paleta e aparece marcada assim.</p></div>
+          <div class="pilar"><svg class="ic"><use href="#i-modelos"/></svg><h3>Componentes, não pixels</h3><p>Modelos treinados apontam buchas, terminais e para-raios; a comparação é entre fases semelhantes, como o termografista faz.</p></div>
+          <div class="pilar"><svg class="ic"><use href="#i-alerta"/></svg><h3>Critério explícito</h3><p>Severidade pela NBR 15866: temperatura projetada para plena carga contra a máxima admissível do componente, e ΔT entre fases. Cada número do laudo mostra de onde veio.</p></div>
+          <div class="pilar"><svg class="ic"><use href="#i-camera"/></svg><h3>Monitoramento</h3><p>Vigia a pasta onde a câmera grava, analisa cada imagem nova e prepara o aviso para o WhatsApp do responsável.</p></div>
+        </div>
+        <div class="cartao">
+          <h2>Para onde vai</h2>
+          <div class="linha-tempo">
+            <div class="marco atual"><span>Agora</span><b>Inspeção e monitoramento</b><p>Laudo automático, pasta vigiada e alertas com mensagem pronta.</p></div>
+            <div class="marco"><span>Próximo</span><b>Previsão</b><p>Tendência de cada componente e tempo estimado até ficar crítico; conexão direta com câmeras fixas.</p></div>
+            <div class="marco"><span>Depois</span><b>Gêmeo térmico e celular</b><p>Modelo térmico do transformador, aviso no celular e envio automático pelo WhatsApp Business.</p></div>
+          </div>
+        </div>
+        <div class="cartao">
+          <h2>Estado desta versão</h2>
+          <ul class="estado">
+            <li class="ok">Leitura radiométrica FLIR conferida com os valores impressos pela câmera (menos de 1 °C de diferença).</li>
+            <li class="ok">Inversão de paleta testada em 893 imagens contra a temperatura verdadeira: erro mediano de 0,5 °C e leitura da escala em 100% delas.</li>
+            <li class="ok">Medição por região, máxima temperatura admissível por componente, projeção para plena carga, ΔT entre fases, isoterma, severidade e laudo em PDF.</li>
+            <li class="ok">Monitoramento de pasta com alertas e mensagem pronta para o WhatsApp.</li>
+            <li class="ok">Treino e instalação de modelos testados de ponta a ponta na GPU.</li>
+            <li class="pendente">Detector de componentes treinado com rótulos reais: em andamento. Até lá, a regra de pontos quentes dá uma classificação indicativa.</li>
+            <li class="pendente">Máximas admissíveis e faixas de severidade a conferir na edição vigente da NBR 15866, nos dados dos fabricantes e com termografista certificado.</li>
+          </ul>
+          <p class="nota">Imagens de exemplo: dataset de estudo ScienceDB 10185 (CC BY-NC-SA 4.0), usado só para estudo e demonstração.</p>
+        </div>
+      </section>
+    </main>
   </div>
 </div>
 
@@ -414,6 +702,7 @@
 </dialog>
 
 <div class="avisos-flutuantes" id="toasts" aria-live="polite"></div>
+<script src="textos.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
