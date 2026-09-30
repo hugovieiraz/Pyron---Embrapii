@@ -14,6 +14,11 @@ de pontos quentes e simulação de câmera ao vivo a partir de vídeo).
 Todas as funcionalidades, tela por tela: [`docs/Pyron_Funcionalidades.pdf`](docs/Pyron_Funcionalidades.pdf)
 (gerado por `docs/manual/gerar_manual.py`).
 
+> Os termogramas das capturas do manual (`docs/manual/imagens/`) vêm do *Infrared Thermal Image
+> Dataset of High Voltage Electrical Power Equipment under Different Operating Conditions*
+> ([ScienceDB 10185](https://doi.org/10.57760/sciencedb.10185)), licença
+> [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/): uso não comercial, para estudo.
+
 ## Abrir o aplicativo
 
 Dois cliques em **`Pyron.exe`** na área de trabalho. Aparece a tela de abertura, o motor carrega
