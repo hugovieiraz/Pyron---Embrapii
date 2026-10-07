@@ -99,6 +99,52 @@ def _imagem(pil: Image.Image, largura_mm: float) -> RLImage:
     return RLImage(buf, width=largura_mm * mm, height=altura * mm)
 
 
+def _quando(a: dict) -> datetime:
+    """Data da captura (ou da análise) de uma inspeção."""
+    for valor in ((a.get("metadados") or {}).get("data_hora"), a.get("criado_em")):
+        if valor:
+            try:
+                return datetime.fromisoformat(str(valor).replace(" ", "T")[:19])
+            except ValueError:
+                continue
+    return datetime.now()
+
+
+def _tmax(a: dict) -> float | None:
+    p = (a.get("resumo") or {}).get("ponto_mais_quente")
+    return p["t_max"] if p else (a.get("resumo") or {}).get("t_max_cena")
+
+
+def _grafico_historico(pontos: list[tuple[datetime, float, str]], largura: float, altura: float):
+    """Máxima de cada inspeção no tempo, na cor da severidade, com a reta de tendência tracejada."""
+    from reportlab.graphics.shapes import Circle, Drawing, Line, PolyLine, String
+
+    d = Drawing(largura, altura)
+    m = {"e": 30, "d": 8, "t": 8, "b": 18}
+    ts = [p[0].timestamp() for p in pontos]
+    vs = [p[1] for p in pontos]
+    t0, t1 = min(ts), max(ts)
+    if t1 - t0 < 86400:
+        t0, t1 = t0 - 86400, t1 + 86400
+    folga = max(1.0, (max(vs) - min(vs)) * 0.15)
+    lo, hi = np.floor(min(vs) - folga), np.ceil(max(vs) + folga)
+    x = lambda t: m["e"] + (t - t0) / (t1 - t0) * (largura - m["e"] - m["d"])  # noqa: E731
+    y = lambda v: m["b"] + (v - lo) / (hi - lo) * (altura - m["t"] - m["b"])  # noqa: E731
+    fonte = _fontes()[0]
+    for v in (lo, (lo + hi) / 2, hi):
+        d.add(Line(m["e"], y(v), largura - m["d"], y(v), strokeColor=LINHA, strokeWidth=0.4))
+        d.add(String(m["e"] - 4, y(v) - 2.5, _num(float(v), 0), fontName=fonte, fontSize=6.5, fillColor=CINZA, textAnchor="end"))
+    for t, ancora in ((t0, "start"), ((t0 + t1) / 2, "middle"), (t1, "end")):
+        d.add(String(x(t), 4, datetime.fromtimestamp(t).strftime("%d/%m/%Y"), fontName=fonte, fontSize=6.5, fillColor=CINZA, textAnchor=ancora))
+    if len(pontos) >= 3:
+        k, b = np.polyfit(ts, vs, 1)
+        d.add(Line(x(ts[0]), y(k * ts[0] + b), x(ts[-1]), y(k * ts[-1] + b), strokeColor=CINZA, strokeWidth=0.8, strokeDashArray=[3, 2]))
+    d.add(PolyLine([c for t, v in zip(ts, vs) for c in (x(t), y(v))], strokeColor=ACENTO, strokeWidth=1.2))
+    for (t, v, sev) in zip(ts, vs, (p[2] for p in pontos)):
+        d.add(Circle(x(t), y(v), 2.6, fillColor=COR_SEV.get(sev, CINZA), strokeColor=colors.white, strokeWidth=0.6))
+    return d
+
+
 def _observacoes(avisos: list[str]) -> list[str]:
     saida = []
     for aviso in avisos:
@@ -274,6 +320,19 @@ def gerar_relatorio(itens: list[tuple[dict, np.ndarray, bytes | None]], versao: 
             faixas[k] = COR_SEV.get(r["severidade"], CINZA)
         corpo.append(tabela(["Item", "Equipamento / imagem", "Tmáx", "Local da Tmáx", "Classificação"], linhas,
                             [14 * mm, 62 * mm, 22 * mm, 46 * mm, 32 * mm], faixas))
+
+        # Todas as imagens do mesmo equipamento: o histórico e a tendência entram no relatório.
+        chaves = {((a.get("identificacao") or {}).get("instalacao", "").strip().lower(), (a.get("identificacao") or {}).get("equipamento", "").strip().lower())
+                  for a, _, _ in itens}
+        pontos = sorted((_quando(a), _tmax(a), a["resumo"]["severidade"]) for a, _, _ in itens if _tmax(a) is not None)
+        if len(chaves) == 1 and next(iter(chaves))[1] and len(pontos) >= 2:
+            texto = f"Máxima de cada inspeção de {_esc(rotulo_imagem(itens[0][0]))} entre {pontos[0][0]:%d/%m/%Y} e {pontos[-1][0]:%d/%m/%Y}."
+            dias = (pontos[-1][0] - pontos[0][0]).days
+            if len(pontos) >= 3 and dias >= 30:
+                k = np.polyfit([p[0].timestamp() for p in pontos], [p[1] for p in pontos], 1)[0] * 86400 * 30
+                texto += f" Tendência: {'+' if k > 0 else ''}{_num(float(k), 1)} °C por mês (reta tracejada, mínimos quadrados)."
+            corpo.append(KeepTogether([Spacer(1, 3 * mm), Paragraph("Histórico do equipamento", est["h2"]), Paragraph(texto, est["p"]),
+                                       _grafico_historico(pontos, LARGURA_UTIL, 52 * mm)]))
 
     # ---------------------------------------------------------------- 4. registros termográficos
     referencias_usadas: dict[str, dict] = {}
