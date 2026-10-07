@@ -114,3 +114,19 @@ def test_rotas_de_equipamento(cliente) -> None:
     cliente.put(f"/api/analises/{b['id']}", json={"identificacao": {"equipamento": "TR-01", "instalacao": "SE Teste", "art": "PB1"}})
     cliente.post("/api/analises/identificacao", json={"ids": [b["id"]], "instalacao": "SE Teste", "equipamento": "TR-02"})
     assert cliente.get(f"/api/analises/{b['id']}").json()["identificacao"]["art"] == "PB1"
+
+
+def test_tendencia_a_plena_carga_com_ambiente_e_carga() -> None:
+    base = datetime(2026, 1, 1)
+    itens = []
+    # Mesma elevação real a plena carga (40 °C) medida com cargas diferentes: a medida oscila, a normalizada não.
+    for i, (carga, amb) in enumerate([(50, 25.0), (100, 30.0), (70, 20.0), (90, 28.0)]):
+        it = _item(f"a{i}", (base + timedelta(days=30 * i)).isoformat(), amb + 40 * (carga / 100) ** 2)
+        it["condicoes"] = {"ambiente_c": amb, "carga_pct": carga}
+        itens.append(it)
+    [e] = eq.listar(itens)
+    assert [p["elevacao_plena"] for p in e["serie"]] == pytest.approx([40.0] * 4, abs=0.2)
+    assert abs(e["tendencia_plena"]["por_mes"]) < 0.1 and e["tendencia"]["r2"] < 0.9
+    it = _item("b", "2026-06-01T10:00:00", 50)
+    it["condicoes"] = {"ambiente_c": 25.0, "carga_pct": 30}  # carga baixa demais: não projeta
+    assert eq.ponto(it)["elevacao_plena"] is None

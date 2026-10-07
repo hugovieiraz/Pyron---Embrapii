@@ -5,6 +5,9 @@
 - a série da temperatura máxima ao longo das inspeções (data da captura, não do envio);
 - a tendência dessa série, em °C por mês, por mínimos quadrados (só com 3 inspeções ou mais,
   espalhadas por pelo menos um mês: em poucos dias, a diferença é de carga e de horário);
+- quando as inspeções têm temperatura ambiente e carga, a mesma tendência sobre a elevação acima do
+  ambiente projetada para plena carga, ΔT × (100 / carga)², como na NBR 15866: compara inspeções
+  feitas com cargas e dias diferentes;
 - a projeção até a MTA, quando as regiões têm máxima admissível: em quantos dias o % da MTA
   chegaria a 100% se a tendência continuar (é uma estimativa e aparece como tal);
 - a próxima inspeção, pela severidade atual: anual quando está normal (a NFPA 70B pede ao menos
@@ -25,6 +28,8 @@ PRAZO_DIAS = {"normal": 365, "atencao": 90, "programar": 30, "urgente": 7, "imed
 SEM_EQUIPAMENTO = "sem-equipamento"
 MINIMO_PONTOS = 3
 MINIMO_DIAS = 30  # em poucos dias a diferença é de carga e horário, não de desgaste
+EXPOENTE_CARGA = 2.0
+CARGA_MINIMA = 40.0  # abaixo disso a projeção para plena carga exagera demais (como no critério)
 
 
 def chave(instalacao: str | None, equipamento: str | None) -> str:
@@ -55,6 +60,11 @@ def ponto(item: dict) -> dict:
     r = item.get("resumo") or {}
     d = item.get("destaque") or {}
     t_max = d.get("t_max") if d.get("t_max") is not None else r.get("t_max_cena")
+    cond = item.get("condicoes") or {}
+    amb, carga = cond.get("ambiente_c"), cond.get("carga_pct")
+    elevacao = None
+    if t_max is not None and amb is not None and carga and carga >= CARGA_MINIMA:
+        elevacao = round(max(float(t_max) - amb, 0.0) * (100.0 / carga) ** EXPOENTE_CARGA, 1)
     return {
         "id": item["id"],
         "data": _data(item).isoformat(timespec="seconds"),
@@ -63,6 +73,7 @@ def ponto(item: dict) -> dict:
         "dt": None if d.get("dt") is None else round(float(d["dt"]), 1),
         "severidade": r.get("severidade", "normal"),
         "regiao": d.get("nome"),
+        "elevacao_plena": elevacao,
     }
 
 
@@ -141,13 +152,15 @@ def resumir(g: dict, hoje: datetime | None = None) -> dict:
         "t_max": ultima["t_max"],
         "serie": pontos,
         "tendencia": tendencia(pontos),
+        "tendencia_plena": tendencia(pontos, "elevacao_plena"),
         "projecao_mta": projecao_mta(pontos),
     }
     if g["chave"] != SEM_EQUIPAMENTO:
         saida["proxima_inspecao"] = proxima_inspecao(ultima, hoje)
-    for campo in ("por_dia", "ultimo_ajustado", "ultima_data"):
-        if saida["tendencia"]:
-            saida["tendencia"].pop(campo, None)
+    for t in (saida["tendencia"], saida["tendencia_plena"]):
+        for campo in ("por_dia", "ultimo_ajustado", "ultima_data"):
+            if t:
+                t.pop(campo, None)
     return saida
 
 

@@ -97,6 +97,7 @@ class Armazenamento:
                     "identificacao": a.get("identificacao", {}),
                     "destaque": _destaque(a),
                     "acompanhamento": a.get("acompanhamento"),
+                    "condicoes": a.get("condicoes"),
                 }
             )
         return itens

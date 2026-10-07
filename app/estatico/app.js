@@ -1502,14 +1502,24 @@ function desenharEquipamento(d) {
 
   const kpi = (rotulo, valor, nota) => el("div", { class: "kpi-grande" }, el("span", {}, rotulo), valor, nota ? el("small", {}, nota) : null);
   const prox = d.proxima_inspecao;
+  // Com ambiente e carga em ao menos 2 inspeções, dá para comparar a elevação projetada para plena carga.
+  const temPlena = d.serie.filter((p) => p.elevacao_plena != null).length >= 2;
+  const modo = temPlena ? (estado.modoSerieEquip || (d.tendencia_plena ? "plena" : "medida")) : "medida";
+  const tend = modo === "plena" ? d.tendencia_plena : d.tendencia;
   const kpis = el("div", { class: "kpis-grandes" },
     kpi(E.estadoAtual, el("b", {}, el("span", { class: `selo selo-grande ${d.severidade}` }, T.niveis[d.severidade])), E.ultima(dataCurta(d.ultima))),
     kpi(E.tmaxUltima, el("b", { class: "num" }, fmt(d.t_max, 1, " °C")), d.serie[d.serie.length - 1].regiao || null),
-    kpi(E.tendenciaRotulo, el("b", {}, selotendencia(d.tendencia)), d.projecao_mta ? E.estimativaMta(dataCurta(d.projecao_mta.data)) + (d.projecao_mta.confiavel ? "" : E.estimativaFraca) : null),
+    kpi(modo === "plena" ? E.tendenciaPlenaRotulo : E.tendenciaRotulo, el("b", {}, selotendencia(tend)),
+      d.projecao_mta ? E.estimativaMta(dataCurta(d.projecao_mta.data)) + (d.projecao_mta.confiavel ? "" : E.estimativaFraca) : modo === "plena" ? E.plenaNota : null),
     prox ? kpi(E.proximaRotulo, el("b", { class: prox.vencida ? "texto-erro" : "" }, dataCurta(prox.data)), prox.vencida ? E.vencidaHa(-prox.dias) : E.prazo(prox.prazo_dias)) : null);
 
   const abrirPonto = (p) => { location.hash = `analise/${p.id}`; };
-  const grafico = graficoDatas(E.graficoTitulo, [{ nome: d.equipamento || E.semInstalacao, indice: 0, pontos: d.serie.map((p) => ({ ...p, valor: p.t_max })) }], { aoClicar: abrirPonto, tendencia: !!d.tendencia });
+  const grafico = graficoDatas(modo === "plena" ? E.graficoPlenaTitulo : E.graficoTitulo,
+    [{ nome: d.equipamento || E.semInstalacao, indice: 0, pontos: d.serie.map((p) => ({ ...p, valor: modo === "plena" ? p.elevacao_plena : p.t_max })) }],
+    { aoClicar: abrirPonto, tendencia: !!tend });
+  const trocaModo = temPlena ? el("div", { class: "segmentado", role: "group", "aria-label": E.serieRotulo },
+    ["medida", "plena"].map((m) => el("button", { type: "button", "aria-pressed": String(m === modo), title: m === "plena" ? E.plenaNota : null,
+      onclick: () => { estado.modoSerieEquip = m; desenharEquipamento(d); } }, m === "plena" ? E.serieplena : E.serieMedida))) : null;
   const pecas = d.componentes.filter((c) => c.classe !== "ponto_quente");
   const graficoPecas = pecas.length > 1
     ? graficoDatas(E.graficoPecasTitulo, pecas.slice(0, 4).map((c, i) => ({ nome: nomeClasse(c.classe), indice: i, pontos: c.pontos.map((p) => ({ ...p, valor: p.t_max, severidade: null })) })), { aoClicar: abrirPonto })
@@ -1542,7 +1552,7 @@ function desenharEquipamento(d) {
 
   $("#equip-detalhe").replaceChildren(...[
     cabecalho, kpis,
-    el("div", { class: "cartao" }, grafico, el("p", { class: "nota" }, E.graficoDica)),
+    el("div", { class: "cartao" }, trocaModo ? el("div", { class: "barra-grafico" }, trocaModo) : null, grafico, el("p", { class: "nota" }, E.graficoDica)),
     graficoPecas ? el("div", { class: "cartao" }, graficoPecas) : null,
     el("div", { class: "grade-equip-detalhe" }, tabelaPecas, historico),
   ].filter(Boolean));

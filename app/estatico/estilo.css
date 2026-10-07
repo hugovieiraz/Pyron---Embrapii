@@ -874,6 +874,7 @@ kbd { display: inline-grid; place-items: center; min-width: var(--e-5); height: 
 .grade-equip-detalhe > :only-child { grid-column: 1 / -1; }
 .tabela-compacta td, .tabela-compacta th { padding: var(--e-2); }
 .grafico-svg .ponto-clicavel { cursor: pointer; }
+.barra-grafico { display: flex; justify-content: flex-end; margin-bottom: var(--e-2); }
 .linha-inspecoes { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-1); max-height: var(--altura-lista); overflow-y: auto; }
 .linha-inspecoes a { display: grid; grid-template-columns: var(--e-16) minmax(0, 1fr) auto; align-items: center; gap: var(--e-3); padding: var(--e-2); border-radius: var(--r-m); color: inherit; text-decoration: none; }
 .linha-inspecoes a:hover { background: var(--acao-suave); }
