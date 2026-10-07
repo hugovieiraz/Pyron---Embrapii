@@ -126,3 +126,23 @@ def test_desenho_numerado_nao_sobrepoe_rotulos() -> None:
         assert lugar is not None
         ocupadas.append(lugar)
     assert all(not render._sobrepoe(a, b) for i, a in enumerate(ocupadas) for b in ocupadas[i + 1:])
+
+
+def test_logotipo_da_empresa_no_cabecalho(cliente) -> None:
+    import io
+
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGBA", (1200, 400), (30, 60, 200, 255)).save(buf, format="PNG")
+    r = cliente.post("/api/configuracoes/logo", files={"arquivo": ("logo.png", buf.getvalue(), "image/png")})
+    assert r.status_code == 200 and r.json()["largura"] == 800  # reduzido para o laudo não pesar
+    assert cliente.get("/api/configuracoes").json()["tem_logo"] is True
+    assert cliente.get("/api/configuracoes/logo.png").content[:4] == b"\x89PNG"
+    a = _analisar(cliente)
+    id_resp = cadastrar_responsavel(cliente)
+    assert cliente.get(f"/api/analises/{a['id']}/laudo.pdf", params={"responsavel": id_resp}).status_code == 200
+    assert cliente.post("/api/configuracoes/logo", files={"arquivo": ("x.png", b"nao e imagem", "image/png")}).status_code == 422
+    assert cliente.delete("/api/configuracoes/logo").status_code == 200
+    assert cliente.get("/api/configuracoes").json()["tem_logo"] is False
+    assert cliente.get("/api/configuracoes/logo.png").status_code == 404

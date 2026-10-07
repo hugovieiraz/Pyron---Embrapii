@@ -64,6 +64,12 @@
   <symbol id="i-offline" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M8.5 16.5a5 5 0 0 1 7 0M5 13a10 10 0 0 1 4.3-2.5M19 13a10 10 0 0 0-2.3-1.6M2 9.5a15 15 0 0 1 4.5-2.8M22 9.5A15 15 0 0 0 11 5.1M12 20v.1"/></symbol>
 </svg>
 
+<dialog class="paleta" id="paleta" aria-label="Busca rápida">
+  <div class="paleta-busca"><svg class="ic"><use href="#i-busca"/></svg><input id="paleta-texto" placeholder="Buscar inspeção, equipamento, tela ou ação" autocomplete="off" aria-label="Buscar" aria-controls="paleta-lista"><kbd>Esc</kbd></div>
+  <ul class="paleta-lista" id="paleta-lista" role="listbox"></ul>
+  <div class="paleta-rodape"><span><kbd>↑</kbd><kbd>↓</kbd> navegar</span><span><kbd>Enter</kbd> abrir</span><span><kbd>?</kbd> atalhos de teclado</span></div>
+</dialog>
+
 <datalist id="dl-instalacoes"></datalist>
 <datalist id="dl-equipamentos"></datalist>
 
@@ -102,6 +108,7 @@
     <!-- ======================================================= TOPO -->
     <header class="topo">
       <nav class="trilha" id="trilha" aria-label="Você está em"></nav>
+      <button class="busca-topo" type="button" id="btn-busca" aria-label="Buscar (Ctrl+K)"><svg class="ic"><use href="#i-busca"/></svg><span>Buscar inspeção, equipamento ou tela</span><kbd>Ctrl K</kbd></button>
       <div class="topo-estado">
         <span class="estado-chip" id="chip-servidor" title="O Pyron roda só neste computador"><i class="ponto ok"></i>Servidor local</span>
         <a class="estado-chip" href="#modelos" id="chip-treino" hidden><i class="ponto ativo"></i><span></span></a>
@@ -677,6 +684,18 @@
             <div class="campos-2">
               <label>Nome<input id="cfg-empresa-nome" placeholder="Sua empresa de engenharia"></label>
               <label>Subtítulo<input id="cfg-empresa-sub" placeholder="Manutenção preditiva · Campina Grande, PB"></label>
+            </div>
+            <div class="campo-logo">
+              <div class="logo-previa" id="logo-previa"><svg class="ic"><use href="#i-foto"/></svg></div>
+              <div>
+                <b>Logotipo</b>
+                <p class="nota">Vai no canto do cabeçalho de cada laudo. PNG com fundo transparente fica melhor.</p>
+                <div class="acoes">
+                  <button class="btn btn-sm" type="button" id="btn-logo"><svg class="ic"><use href="#i-upload"/></svg>Enviar logotipo</button>
+                  <button class="btn btn-sm btn-fantasma" type="button" id="btn-logo-remover" hidden>Remover</button>
+                </div>
+                <input type="file" id="arquivo-logo" accept="image/png,image/jpeg" hidden>
+              </div>
             </div>
             <div class="cartao-cabeca" style="margin: var(--e-2) 0 0">
               <div><h2>Responsáveis técnicos</h2><p class="nota">O laudo só sai com um responsável deste cadastro: nome e registro nunca são digitados na hora, para não sair errado. O marcado como padrão já vem escolhido em cada análise.</p></div>

@@ -749,6 +749,43 @@ section[data-vista="sobre"] .cartao h2 { margin-bottom: var(--e-3); }
 .item-menu small { font-size: var(--t-1); color: var(--texto-3); }
 .form-parametros { margin-top: var(--e-5); padding-top: var(--e-4); border-top: 1px solid var(--borda); }
 
+/* ---------------------------------------------------------------- busca rápida e atalhos */
+.busca-topo { display: flex; align-items: center; gap: var(--e-2); flex: 0 1 var(--col-g); min-width: 0; height: var(--alvo-sm); margin-left: auto; margin-right: var(--e-3); padding: 0 var(--e-2) 0 var(--e-3); border: 1px solid var(--borda); border-radius: var(--r-m); background: var(--superficie-2); color: var(--texto-3); font: inherit; font-size: var(--t-2); cursor: pointer; transition: border-color var(--dur-rapida) var(--ease-padrao); }
+.busca-topo:hover { border-color: var(--borda-forte); color: var(--texto-2); }
+.busca-topo span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+kbd { display: inline-grid; place-items: center; min-width: var(--e-5); height: var(--e-5); padding: 0 var(--e-1); border: 1px solid var(--borda); border-bottom-width: 2px; border-radius: var(--r-p); background: var(--superficie); color: var(--texto-2); font: var(--p-medio) var(--t-1) / 1 var(--fonte); }
+.paleta { width: min(var(--largura-paleta), calc(100vw - var(--e-8))); max-height: min(70vh, var(--altura-paleta)); margin: 12vh auto auto; padding: 0; border: 1px solid var(--borda); border-radius: var(--r-g); background: var(--superficie); color: var(--texto); box-shadow: var(--sombra-3); overflow: hidden; }
+.paleta[open] { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; }
+.paleta::backdrop { background: var(--veu); }
+.paleta-busca { display: flex; align-items: center; gap: var(--e-3); padding: var(--e-3) var(--e-4); border-bottom: 1px solid var(--borda); }
+.paleta-busca .ic { color: var(--texto-3); }
+.paleta-busca input { flex: 1; border: 0; padding: var(--e-2) 0; font-size: var(--t-3); background: transparent; box-shadow: none; outline: none; }
+.paleta-lista { list-style: none; margin: 0; padding: var(--e-2); overflow-y: auto; }
+.paleta-grupo { padding: var(--e-2) var(--e-2) var(--e-1); font-size: var(--t-1); font-weight: var(--p-forte); letter-spacing: var(--espaco-letra); text-transform: uppercase; color: var(--texto-3); }
+.paleta-item { display: flex; align-items: center; gap: var(--e-3); padding: var(--e-2); border-radius: var(--r-m); cursor: pointer; }
+.paleta-item .ic { color: var(--texto-3); flex: none; }
+.paleta-item.atual { background: var(--acao-suave); }
+.paleta-item.atual .ic { color: var(--acao); }
+.paleta-texto { flex: 1; display: grid; min-width: 0; }
+.paleta-texto b, .paleta-texto small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.paleta-texto b { font-weight: var(--p-medio); }
+.paleta-texto small { font-size: var(--t-1); color: var(--texto-3); }
+.paleta-vazio { padding: var(--e-6) var(--e-4); text-align: center; color: var(--texto-3); }
+.paleta-rodape { display: flex; gap: var(--e-5); padding: var(--e-2) var(--e-4); border-top: 1px solid var(--borda); font-size: var(--t-1); color: var(--texto-3); }
+.paleta-rodape span { display: inline-flex; align-items: center; gap: var(--e-1); }
+.atalhos { display: grid; gap: var(--e-4); }
+.bloco-atalhos dl { margin: var(--e-2) 0 0; display: grid; gap: var(--e-1); }
+.bloco-atalhos dl > div { display: grid; grid-template-columns: var(--e-24) minmax(0, 1fr); align-items: center; gap: var(--e-3); }
+.bloco-atalhos dt { display: flex; align-items: center; gap: var(--e-1); color: var(--texto-3); }
+.bloco-atalhos dd { margin: 0; }
+
+/* ---------------------------------------------------------------- logotipo da empresa */
+.campo-logo { display: flex; align-items: center; gap: var(--e-4); padding: var(--e-3); border: 1px solid var(--borda); border-radius: var(--r-m); }
+.campo-logo .acoes { margin-top: var(--e-2); }
+.logo-previa { position: relative; flex: none; display: grid; place-items: center; width: calc(var(--e-24) + var(--e-12)); height: var(--e-16); border-radius: var(--r-m); background: var(--superficie-2); overflow: hidden; }
+.logo-previa img { position: absolute; inset: var(--e-1); width: calc(100% - var(--e-2)); height: calc(100% - var(--e-2)); object-fit: contain; }
+.logo-previa.vazia { border: 1.5px dashed var(--borda-forte); color: var(--texto-3); }
+
 /* ---------------------------------------------------------------- painel: próximas inspeções */
 .lista-proximas { list-style: none; margin: var(--e-3) 0 0; padding: 0; display: grid; gap: var(--e-1); }
 .lista-proximas a { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--e-3); padding: var(--e-2); border-radius: var(--r-m); color: inherit; text-decoration: none; }
@@ -909,6 +946,8 @@ section[data-vista="sobre"] .cartao h2 { margin-bottom: var(--e-3); }
   .nav-grupo, .lateral-rodape { display: none; }
   .topo { padding: 0 var(--e-4); }
   .topo-estado .estado-chip { display: none; }
+  .busca-topo span { display: none; }
+  .busca-topo { flex: none; }
   .entrada, .video-entrada, .grade-equip-detalhe, .tabela-criterio, .linha-tempo, .heroi-marca, .boas-vindas { grid-template-columns: 1fr; }
   .palco-dica { display: none; }
   .conteudo { padding: var(--e-4); }

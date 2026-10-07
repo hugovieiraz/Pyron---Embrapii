@@ -160,6 +160,8 @@
   --lista-max: 288px;        /* lista rolável dentro de diálogo */
   --medida: 68ch;            /* comprimento de linha para texto corrido */
   --altura-lista: 480px;     /* listas longas dentro de um cartão rolam por dentro */
+  --largura-paleta: 640px;   /* busca rápida (Ctrl+K) */
+  --altura-paleta: 560px;
 
   /* ---------------------------------------------------------------- raio (3 valores) */
   --r-p: 6px;

@@ -412,6 +412,35 @@ const TEXTOS = {
     selecione: "Escolha o responsável",
   },
 
+  busca: {
+    grupoTelas: "Telas",
+    grupoAcoes: "Ações",
+    grupoEquipamentos: "Equipamentos",
+    grupoInspecoes: "Inspeções",
+    nada: "Nada encontrado. Tente o nome do arquivo, do equipamento ou da instalação.",
+    telas: {
+      painel: ["Painel", "painel"], analise: ["Nova análise", "analise"], video: ["Vídeo ao vivo", "video"],
+      inspecoes: ["Inspeções", "inspecoes"], equipamentos: ["Equipamentos", "ativos"], pendencias: ["Pendências", "chave"],
+      monitoramento: ["Monitoramento", "camera"], modelos: ["Modelos", "modelos"], avaliacao: ["Avaliação de modelos", "grafico"],
+      configuracoes: ["Configurações", "config"], sobre: ["Sobre o Pyron", "info"],
+    },
+    acaoAnalisar: "Analisar imagens…",
+    acaoVideo: "Analisar um vídeo da câmera",
+    acaoPlanilha: "Exportar planilha de inspeções (Excel)",
+    acaoTema: "Alternar tema claro ou escuro",
+    acaoAtalhos: "Atalhos de teclado",
+  },
+
+  atalhos: {
+    titulo: "Atalhos de teclado",
+    grupos: [
+      ["Em qualquer tela", [["Ctrl+K", "Busca rápida"], ["Ctrl+O", "Analisar imagens"], ["?", "Esta lista"]]],
+      ["Na análise", [["S", "Selecionar"], ["D", "Desenhar região"], ["P", "Medir um ponto"], ["L", "Perfil ao longo de uma linha"],
+        ["R", "Rótulos sobre as caixas"], ["Delete", "Remover a região selecionada"], ["Esc", "Cancelar e voltar à seleção"]]],
+      ["No vídeo", [["Espaço", "Reproduzir ou pausar"], ["←", "Quadro anterior"], ["→", "Próximo quadro"], ["R", "Rótulos"]]],
+    ],
+  },
+
   pend: {
     erroTitulo: "Não consegui carregar as pendências",
     vazioTitulo: "Nenhuma anomalia para acompanhar",
@@ -578,6 +607,11 @@ const TEXTOS = {
 
   config: {
     erroTitulo: "Não foi possível carregar as configurações",
+    logoSalvo: "Logotipo salvo. Os próximos laudos saem com ele no cabeçalho.",
+    logoRemovido: "Logotipo removido.",
+    logoAlt: "Logotipo da empresa",
+    logoEnviar: "Enviar logotipo",
+    logoTrocar: "Trocar logotipo",
     empresaSalva: "Empresa e responsáveis salvos. Os próximos laudos saem com esses dados.",
     respNome: "Nome",
     respFuncao: "Função",

@@ -616,7 +616,8 @@ def laudo_pdf(id_: str, responsavel: str | None = None, art: str | None = None) 
     a, m = _carregar(id_)
     resp = _escolher_responsavel(responsavel, a)
     art = (art if art is not None else (a.get("identificacao") or {}).get("art")) or ""
-    pdf = laudo.gerar(a, m, armazenamento.foto(id_), VERSAO, empresa=_config()["empresa"], responsavel=resp, art=art[:60], criterios=_criterios())
+    pdf = laudo.gerar(a, m, armazenamento.foto(id_), VERSAO, empresa=_config()["empresa"], responsavel=resp, art=art[:60],
+                      criterios=_criterios(), logo=_logo())
     nome = f"relatorio_{re.sub(r'[^A-Za-z0-9_-]', '_', Path(a['arquivo']).stem)}_{a['id'][:6]}.pdf"
     return Response(pdf, media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="{nome}"'})
 
@@ -635,7 +636,7 @@ def laudo_varias(corpo: dict = Body(...)) -> Response:
         itens.append((a, m, armazenamento.foto(id_)))
     resp = _escolher_responsavel(corpo.get("responsavel"))
     pdf = laudo.gerar_relatorio(itens, VERSAO, empresa=_config()["empresa"], responsavel=resp,
-                                art=str(corpo.get("art") or "")[:60], criterios=_criterios())
+                                art=str(corpo.get("art") or "")[:60], criterios=_criterios(), logo=_logo())
     nome = f"relatorio_termografico_{datetime.now():%Y%m%d_%H%M}_{len(itens)}_imagens.pdf"
     return Response(pdf, media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="{nome}"'})
 
@@ -749,7 +750,46 @@ def configuracoes() -> dict:
         "pasta_dados": str(PASTA_DADOS),
         "pasta_modelos": str(PASTA_MODELOS),
         "versao": VERSAO,
+        "tem_logo": (PASTA_DADOS / "logo.png").exists(),
     }
+
+
+def _logo() -> bytes | None:
+    arq = PASTA_DADOS / "logo.png"
+    return arq.read_bytes() if arq.exists() else None
+
+
+@app.post("/api/configuracoes/logo")
+async def enviar_logo(arquivo: UploadFile = File(...)) -> dict:
+    """Logotipo da empresa para o cabeçalho do laudo (guardado em PNG, até 800 px de largura)."""
+    dados = await arquivo.read()
+    if len(dados) > 5 * 1024 * 1024:
+        raise HTTPException(422, "Logotipo maior que 5 MB.")
+    try:
+        img = Image.open(io.BytesIO(dados))
+        img.load()
+    except OSError as erro:
+        raise HTTPException(422, "Não consegui abrir o arquivo como imagem. Envie PNG ou JPEG.") from erro
+    img = img.convert("RGBA")
+    if img.width > 800:
+        img = img.resize((800, round(img.height * 800 / img.width)), Image.LANCZOS)
+    PASTA_DADOS.mkdir(parents=True, exist_ok=True)
+    img.save(PASTA_DADOS / "logo.png", format="PNG")
+    return {"ok": True, "largura": img.width, "altura": img.height}
+
+
+@app.get("/api/configuracoes/logo.png")
+def ver_logo() -> Response:
+    dados = _logo()
+    if dados is None:
+        raise HTTPException(404, "Nenhum logotipo enviado.")
+    return Response(dados, media_type="image/png", headers={"Cache-Control": "no-store"})
+
+
+@app.delete("/api/configuracoes/logo")
+def apagar_logo() -> dict:
+    (PASTA_DADOS / "logo.png").unlink(missing_ok=True)
+    return {"ok": True}
 
 
 @app.put("/api/configuracoes")

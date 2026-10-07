@@ -1012,6 +1012,120 @@ function cartaoDadosAvaliacao(d) {
     el("div", { class: "cartao-rodape" }, apagar));
 }
 
+// ================================================================= busca rápida (Ctrl+K) e atalhos (?)
+
+const normalizar = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+/** Tudo o que dá para achar: telas, ações, equipamentos e inspeções. */
+function itensDaBusca() {
+  const B = T.busca;
+  const telas = Object.entries(B.telas).map(([rota, [nome, icone_]]) => ({ tipo: B.grupoTelas, rotulo: nome, icone: icone_, executar: () => { location.hash = rota; } }));
+  const acoes = [
+    { rotulo: B.acaoAnalisar, icone: "upload", executar: abrirArquivos },
+    { rotulo: B.acaoVideo, icone: "video", executar: () => { location.hash = "video"; } },
+    { rotulo: B.acaoPlanilha, icone: "baixar", executar: () => { const a = el("a", { href: "/api/inspecoes.csv", download: "" }); document.body.append(a); a.click(); a.remove(); } },
+    { rotulo: B.acaoTema, icone: "config", executar: () => { const novo = document.documentElement.dataset.tema === "escuro" ? "claro" : "escuro"; aplicarTema(novo); salvarConfig({ tema: novo }); } },
+    { rotulo: B.acaoAtalhos, icone: "info", executar: mostrarAtalhos },
+  ].map((a) => ({ ...a, tipo: B.grupoAcoes }));
+  const equips = (estado.equipamentos || []).filter((e) => e.chave !== SEM_EQUIPAMENTO).map((e) => ({
+    tipo: B.grupoEquipamentos, rotulo: e.equipamento, detalhe: e.instalacao, icone: "ativos", severidade: e.severidade,
+    executar: () => { location.hash = `equipamentos/${encodeURIComponent(e.chave)}`; },
+  }));
+  const inspecoes = (estado.inspecoes || []).map((it) => ({
+    tipo: B.grupoInspecoes, rotulo: it.arquivo, icone: "inspecoes", severidade: it.resumo.severidade,
+    detalhe: [it.identificacao.equipamento, it.identificacao.instalacao, dataCurta(it.data_captura || it.criado_em)].filter(Boolean).join(" · "),
+    executar: () => abrirInspecao(it.id),
+  }));
+  return [...telas, ...acoes, ...equips, ...inspecoes];
+}
+
+const busca = { itens: [], achados: [], atual: 0 };
+
+function abrirBusca() {
+  const d = $("#paleta");
+  if (d.open) return;
+  busca.itens = itensDaBusca();
+  $("#paleta-texto").value = "";
+  filtrarBusca();
+  d.showModal();
+  $("#paleta-texto").focus();
+  // Inspeções e equipamentos podem não estar carregados ainda: chegam e entram na lista.
+  if (!estado.inspecoes.length || !estado.equipamentos) {
+    Promise.all([api("/api/analises"), api("/api/equipamentos")]).then(([l, e]) => {
+      estado.inspecoes = l;
+      estado.equipamentos = e;
+      if (d.open) { busca.itens = itensDaBusca(); filtrarBusca(); }
+    }).catch(() => {});
+  }
+}
+
+function filtrarBusca() {
+  const termos = normalizar($("#paleta-texto").value).split(/\s+/).filter(Boolean);
+  busca.achados = busca.itens.filter((it) => {
+    if (!termos.length) return it.tipo !== T.busca.grupoInspecoes; // sem texto: telas, ações e equipamentos
+    const texto = normalizar(`${it.rotulo} ${it.detalhe || ""} ${it.tipo} ${it.severidade ? T.niveis[it.severidade] : ""}`);
+    return termos.every((t) => texto.includes(t));
+  }).slice(0, 40);
+  busca.atual = 0;
+  desenharBusca();
+}
+
+function desenharBusca() {
+  const lista = $("#paleta-lista");
+  if (!busca.achados.length) return lista.replaceChildren(el("li", { class: "paleta-vazio" }, T.busca.nada));
+  let grupo = null;
+  const nos = [];
+  busca.achados.forEach((it, i) => {
+    if (it.tipo !== grupo) {
+      grupo = it.tipo;
+      nos.push(el("li", { class: "paleta-grupo", role: "presentation" }, grupo));
+    }
+    nos.push(el("li", {
+      class: `paleta-item${i === busca.atual ? " atual" : ""}`, role: "option", "aria-selected": String(i === busca.atual),
+      onmousemove: () => { if (busca.atual !== i) { busca.atual = i; marcarAtualBusca(); } },
+      onclick: () => executarBusca(i),
+    }, icone(it.icone), el("span", { class: "paleta-texto" }, el("b", {}, it.rotulo), it.detalhe ? el("small", {}, it.detalhe) : null),
+    it.severidade ? el("span", { class: `selo ${it.severidade}` }, T.niveis[it.severidade]) : null));
+  });
+  lista.replaceChildren(...nos);
+}
+
+function marcarAtualBusca() {
+  $$("#paleta-lista .paleta-item").forEach((n, i) => {
+    n.classList.toggle("atual", i === busca.atual);
+    n.setAttribute("aria-selected", String(i === busca.atual));
+  });
+  const atual = $("#paleta-lista .paleta-item.atual");
+  if (atual) atual.scrollIntoView({ block: "nearest" });
+}
+
+function executarBusca(i) {
+  const it = busca.achados[i];
+  $("#paleta").close();
+  if (it) it.executar();
+}
+
+function teclaBusca(ev) {
+  if (ev.key === "ArrowDown" || ev.key === "ArrowUp") {
+    ev.preventDefault();
+    const n = busca.achados.length;
+    if (!n) return;
+    busca.atual = (busca.atual + (ev.key === "ArrowDown" ? 1 : -1) + n) % n;
+    marcarAtualBusca();
+  } else if (ev.key === "Enter") {
+    ev.preventDefault();
+    executarBusca(busca.atual);
+  }
+}
+
+function mostrarAtalhos() {
+  const A = T.atalhos;
+  const tecla = (t) => t.split("+").map((k, i) => [i ? "+" : null, el("kbd", {}, k)]).flat().filter(Boolean);
+  const bloco = ([titulo, linhas]) => el("div", { class: "bloco-atalhos" }, el("h3", { class: "sobrerrotulo" }, titulo),
+    el("dl", {}, linhas.map(([t, d]) => el("div", {}, el("dt", {}, tecla(t)), el("dd", {}, d)))));
+  dialogo({ titulo: A.titulo, conteudo: el("div", { class: "atalhos" }, A.grupos.map(bloco)), acoes: [{ rotulo: T.geral.fechar, valor: "ok", classe: "btn-primaria" }] });
+}
+
 // ================================================================= pendências (acompanhamento das anomalias até a correção)
 
 const FILTROS_PENDENCIA = {
@@ -3608,6 +3722,14 @@ async function enviarWhatsapp(a) {
 
 // ================================================================= configurações
 
+function desenharLogo(tem) {
+  const previa = $("#logo-previa");
+  previa.replaceChildren(tem ? el("img", { src: `/api/configuracoes/logo.png?t=${Date.now()}`, alt: T.config.logoAlt }) : icone("foto"));
+  previa.classList.toggle("vazia", !tem);
+  $("#btn-logo-remover").hidden = !tem;
+  $("#btn-logo").lastChild.textContent = tem ? T.config.logoTrocar : T.config.logoEnviar;
+}
+
 async function carregarConfiguracoes(aba) {
   if (aba) estado.abaConfig = aba;
   mostrarAbaConfig(estado.abaConfig);
@@ -3620,6 +3742,7 @@ async function carregarConfiguracoes(aba) {
   estado.config = c;
   $("#cfg-empresa-nome").value = c.empresa.nome || "";
   $("#cfg-empresa-sub").value = c.empresa.subtitulo || "";
+  desenharLogo(c.tem_logo);
   desenharResponsaveis(c.responsaveis || [], c.responsavel_padrao);
   aplicarTema(c.tema);
   $("#pasta-dados").textContent = c.pasta_dados;
@@ -3924,6 +4047,30 @@ function ligarEventos() {
     mostrarAbaConfig(b.dataset.abaConfig);
     history.replaceState(null, "", `#configuracoes/${b.dataset.abaConfig}`);
   }));
+  $("#btn-logo").addEventListener("click", () => $("#arquivo-logo").click());
+  $("#arquivo-logo").addEventListener("change", async (ev) => {
+    const arquivo = ev.target.files[0];
+    ev.target.value = "";
+    if (!arquivo) return;
+    const dados = new FormData();
+    dados.append("arquivo", arquivo);
+    try {
+      await api("/api/configuracoes/logo", { method: "POST", body: dados });
+      desenharLogo(true);
+      avisar(T.config.logoSalvo);
+    } catch (e) {
+      falhou(e);
+    }
+  });
+  $("#btn-logo-remover").addEventListener("click", async () => {
+    try {
+      await api("/api/configuracoes/logo", { method: "DELETE" });
+      desenharLogo(false);
+      avisar(T.config.logoRemovido);
+    } catch (e) {
+      falhou(e);
+    }
+  });
   $("#form-identidade").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const responsaveis = lerResponsaveis();
@@ -3999,6 +4146,16 @@ function ligarEventos() {
       abrirArquivos();
       return;
     }
+    if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "k") {
+      ev.preventDefault();
+      abrirBusca();
+      return;
+    }
+    if (ev.key === "?" && !digitando && !$("#dialogo").open && !$("#paleta").open) {
+      ev.preventDefault();
+      mostrarAtalhos();
+      return;
+    }
     if (ev.key === "Escape" && $(".menu-suspenso")) return fecharMenu();
     if (digitando || $("#dialogo").open) return;
     if (teclaVideo(ev)) return;
@@ -4020,6 +4177,10 @@ function ligarEventos() {
 
   ligarImagem();
   ligarVideo();
+  $("#btn-busca").addEventListener("click", abrirBusca);
+  $("#paleta-texto").addEventListener("input", filtrarBusca);
+  $("#paleta-texto").addEventListener("keydown", teclaBusca);
+  $("#paleta").addEventListener("click", (ev) => { if (ev.target === ev.currentTarget) ev.currentTarget.close(); });
   window.addEventListener("hashchange", rota);
 }
 

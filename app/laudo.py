@@ -135,14 +135,15 @@ class _Paginas(rl_canvas.Canvas):
 
 
 def gerar(analise: dict, matriz: np.ndarray, foto: bytes | None, versao: str, empresa: dict | None = None,
-          responsavel: dict | None = None, art: str | None = None, criterios: dict | None = None) -> bytes:
+          responsavel: dict | None = None, art: str | None = None, criterios: dict | None = None, logo: bytes | None = None) -> bytes:
     """Relatório de uma imagem."""
-    return gerar_relatorio([(analise, matriz, foto)], versao, empresa, responsavel, art, criterios)
+    return gerar_relatorio([(analise, matriz, foto)], versao, empresa, responsavel, art, criterios, logo)
 
 
 def gerar_relatorio(itens: list[tuple[dict, np.ndarray, bytes | None]], versao: str, empresa: dict | None = None,
-                    responsavel: dict | None = None, art: str | None = None, criterios: dict | None = None) -> bytes:
-    """Relatório de uma ou várias imagens, na ordem recebida."""
+                    responsavel: dict | None = None, art: str | None = None, criterios: dict | None = None,
+                    logo: bytes | None = None) -> bytes:
+    """Relatório de uma ou várias imagens, na ordem recebida. ``logo``: PNG da empresa para o cabeçalho."""
     if not itens:
         raise ValueError("Nenhuma imagem para o relatório.")
     fonte, negrito = _fontes()
@@ -187,9 +188,23 @@ def gerar_relatorio(itens: list[tuple[dict, np.ndarray, bytes | None]], versao: 
     marca = f"<b>{nome_empresa}</b>" if nome_empresa else "<b>Inspeção termográfica</b>"
     if empresa.get("subtitulo", "").strip():
         marca += f'<br/><font size="8" color="#5F6886">{_esc(empresa["subtitulo"].strip())}</font>'
-    cab = Table([[Paragraph(marca, ParagraphStyle("m", fontName=negrito, fontSize=12, textColor=AZUL, leading=15)),
-                  Paragraph(f"Relatório nº <b>{numero}</b><br/>Emissão: {agora:%d/%m/%Y}", est["direita"])]],
-                colWidths=[110 * mm, 66 * mm])
+    celulas = [Paragraph(marca, ParagraphStyle("m", fontName=negrito, fontSize=12, textColor=AZUL, leading=15)),
+               Paragraph(f"Relatório nº <b>{numero}</b><br/>Emissão: {agora:%d/%m/%Y}", est["direita"])]
+    larguras = [110 * mm, 66 * mm]
+    if logo:
+        try:
+            img = Image.open(io.BytesIO(logo))
+            img.load()
+            altura_mm = 14
+            largura_mm = min(40, altura_mm * img.width / img.height)
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            buf.seek(0)
+            celulas.insert(0, RLImage(buf, width=largura_mm * mm, height=largura_mm * img.height / img.width * mm))
+            larguras = [largura_mm * mm + 4 * mm, 110 * mm - largura_mm * mm - 4 * mm, 66 * mm]
+        except OSError:
+            pass  # logotipo ilegível: o cabeçalho sai só com o nome
+    cab = Table([celulas], colWidths=larguras)
     cab.setStyle(TableStyle([("LINEBELOW", (0, 0), (-1, 0), 1.2, ACENTO), ("BOTTOMPADDING", (0, 0), (-1, -1), 6), ("VALIGN", (0, 0), (-1, -1), "BOTTOM")]))
     corpo += [cab, Spacer(1, 5 * mm), Paragraph("Relatório de inspeção termográfica", est["titulo"])]
     n_img = len(itens)
