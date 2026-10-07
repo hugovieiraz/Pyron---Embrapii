@@ -49,6 +49,10 @@ const TEXTOS = {
   },
 
   painel: {
+    configurarTitulo: "Falta pouco para emitir laudos",
+    faltaResponsavel: "cadastre o responsável técnico (nome e registro)",
+    faltaEmpresa: "informe o nome da empresa para o cabeçalho",
+    configurarAgora: "Configurar agora",
     kpiPendencias: "Pendências vencidas",
     kpiPendenciasNota: (n) => (n === 1 ? "1 anomalia em andamento" : `${n} anomalias em andamento`),
     kpiVencidas: "Inspeções vencidas",

@@ -813,6 +813,9 @@ kbd { display: inline-grid; place-items: center; min-width: var(--e-5); height: 
 .logo-previa img { position: absolute; inset: var(--e-1); width: calc(100% - var(--e-2)); height: calc(100% - var(--e-2)); object-fit: contain; }
 .logo-previa.vazia { border: 1.5px dashed var(--borda-forte); color: var(--texto-3); }
 
+.aviso-configuracao { display: flex; align-items: center; gap: var(--e-3); padding: var(--e-3) var(--e-4); margin-bottom: var(--e-4); border: 1px solid var(--aviso); border-radius: var(--r-m); background: var(--aviso-fundo); color: var(--aviso-texto); }
+.aviso-configuracao > div { flex: 1; display: grid; }
+
 /* ---------------------------------------------------------------- painel: próximas inspeções */
 .lista-proximas { list-style: none; margin: var(--e-3) 0 0; padding: 0; display: grid; gap: var(--e-1); }
 .lista-proximas a { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--e-3); padding: var(--e-2); border-radius: var(--r-m); color: inherit; text-decoration: none; }

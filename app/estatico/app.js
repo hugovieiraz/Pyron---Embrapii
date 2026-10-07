@@ -2287,7 +2287,7 @@ async function carregarPainel() {
     return corpo.replaceChildren(boasVindas(), el("div", { class: "painel-grade" }, el("div"), cartaoMonitor(status, alertas)));
   }
 
-  corpo.replaceChildren(kpis, el("div", { class: "painel-grade" },
+  corpo.replaceChildren(...[avisoConfiguracao(), kpis].filter(Boolean), el("div", { class: "painel-grade" },
     cartaoAtencao(lista),
     el("div", { class: "pilha" }, cartaoDistribuicao(lista), cartaoProximas(equips), cartaoMonitor(status, alertas))));
 }
@@ -2306,6 +2306,20 @@ function cartaoProximas(equips) {
   return el("div", { class: "cartao" },
     el("div", { class: "cartao-cabeca" }, el("h2", {}, P.proximasTitulo), el("a", { class: "link", href: "#equipamentos" }, P.verEquipamentos)),
     corpo);
+}
+
+/** O que falta configurar para o laudo sair completo (responsável técnico e empresa). */
+function avisoConfiguracao() {
+  const cfg = estado.config;
+  if (!cfg) return null;
+  const P = T.painel;
+  const falta = [];
+  if (!(cfg.responsaveis || []).length) falta.push(P.faltaResponsavel);
+  if (!((cfg.empresa || {}).nome || "").trim()) falta.push(P.faltaEmpresa);
+  if (!falta.length) return null;
+  return el("div", { class: "aviso-configuracao" }, icone("alerta"),
+    el("div", {}, el("b", {}, P.configurarTitulo), el("span", {}, falta.join(" · "))),
+    el("a", { class: "btn btn-sm", href: "#configuracoes/identidade" }, icone("config"), P.configurarAgora));
 }
 
 function boasVindas() {
