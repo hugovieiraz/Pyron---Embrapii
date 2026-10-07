@@ -879,7 +879,7 @@ def salvar_monitoramento(corpo: dict = Body(...)) -> dict:
     cfg["monitoramento"] = novo
     _salvar_config(cfg)
     if ligando:
-        monitor.linha_de_base(novo["pasta"])  # só o que chegar a partir de agora
+        monitor.linha_de_base(novo["pasta"], novo.get("subpastas", False))  # só o que chegar a partir de agora
     if novo["ativo"]:
         monitor.iniciar()
     else:

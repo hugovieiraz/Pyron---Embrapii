@@ -3600,6 +3600,7 @@ async function carregarMonitoramento() {
   $("#m-intervalo").value = c.intervalo_s;
   $("#m-instalacao").value = c.instalacao || "";
   $("#m-equipamento").value = c.equipamento || "";
+  $("#m-subpastas").checked = !!c.subpastas;
   $("#m-repetir").value = c.repetir_min;
   marcarSegmentado("#seg-minima", c.severidade_minima);
   $$('input[name="fonte"]').forEach((i) => (i.checked = i.value === c.fonte));
@@ -3646,6 +3647,7 @@ function lerMonitorDoFormulario() {
     intervalo_s: Number($("#m-intervalo").value || 10),
     instalacao: $("#m-instalacao").value,
     equipamento: $("#m-equipamento").value,
+    subpastas: $("#m-subpastas").checked,
     severidade_minima: ($("#seg-minima button[aria-pressed='true']") || {}).dataset.valor || "urgente",
     repetir_min: Number($("#m-repetir").value || 0),
     destinatarios: $$(".destinatario").map((l) => ({ nome: $('[data-campo="nome"]', l).value, telefone: $('[data-campo="telefone"]', l).value })),

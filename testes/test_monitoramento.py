@@ -120,3 +120,20 @@ def test_configuracao_invalida_da_mensagem_clara(cliente, tmp_path) -> None:
     r = cliente.put("/api/monitoramento", json={"ativo": True, "pasta": str(tmp_path / "nao_existe")})
     assert r.status_code == 422
     assert "não existe" in r.json()["erro"]
+
+
+def test_cada_subpasta_e_um_equipamento(cliente, tmp_path) -> None:
+    pasta = tmp_path / "cameras"
+    (pasta / "TR-01").mkdir(parents=True)
+    (pasta / "TR-02").mkdir()
+    _gravar_antigo(pasta / "TR-01" / "antiga.jpg", _termograma(45.0))  # já estava: fica de fora
+    r = cliente.put("/api/monitoramento", json={"ativo": True, "pasta": str(pasta), "intervalo_s": 3600, "subpastas": True,
+                                                "instalacao": "SE Teste", "equipamento": "Geral"})
+    assert r.status_code == 200 and r.json()["config"]["subpastas"] is True
+    _gravar_antigo(pasta / "TR-01" / "a.jpg", _termograma(45.0))
+    _gravar_antigo(pasta / "TR-02" / "b.jpg", _termograma(45.0))
+    _gravar_antigo(pasta / "solta.jpg", _termograma(45.0))
+    cliente.post("/api/monitoramento/verificar")
+    equips = {a["arquivo"]: a["identificacao"].get("equipamento") for a in cliente.get("/api/analises").json()}
+    assert equips == {"a.jpg": "TR-01", "b.jpg": "TR-02", "solta.jpg": "Geral"}
+    assert {e["equipamento"] for e in cliente.get("/api/equipamentos").json()} == {"TR-01", "TR-02", "Geral"}

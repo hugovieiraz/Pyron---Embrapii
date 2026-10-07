@@ -36,6 +36,7 @@ PADRAO = {
     "intervalo_s": 10,
     "instalacao": "",
     "equipamento": "",
+    "subpastas": False,  # cada subpasta é um equipamento (uma câmera fixa por pasta, por exemplo)
     "severidade_minima": "urgente",
     "repetir_min": 60,
     "destinatarios": [],
@@ -80,6 +81,7 @@ def validar(cfg: dict) -> dict:
     saida["intervalo_s"] = intervalo
     saida["instalacao"] = str(cfg.get("instalacao") or "")[:120]
     saida["equipamento"] = str(cfg.get("equipamento") or "")[:120]
+    saida["subpastas"] = bool(cfg.get("subpastas", False))
     minima = cfg.get("severidade_minima", "urgente")
     if minima not in ORDEM or minima == "normal":
         raise ConfiguracaoInvalida("Severidade mínima deve ser atenção, programar, urgente ou imediato.")
@@ -189,16 +191,25 @@ class Monitor:
         st = p.stat()
         return f"{p.name}|{st.st_size}|{st.st_mtime_ns}"
 
-    def _imagens(self, pasta: Path) -> list[Path]:
-        return sorted((p for p in pasta.iterdir() if p.is_file() and p.suffix.lower() in EXTENSOES), key=lambda p: p.stat().st_mtime)
+    def _imagens(self, pasta: Path, subpastas: bool = False) -> list[Path]:
+        candidatos = pasta.rglob("*") if subpastas else pasta.iterdir()
+        return sorted((p for p in candidatos if p.is_file() and p.suffix.lower() in EXTENSOES), key=lambda p: p.stat().st_mtime)
 
-    def linha_de_base(self, pasta: str) -> int:
+    @staticmethod
+    def identificacao(p: Path, pasta: Path, cfg: dict) -> dict:
+        """Instalação e equipamento da imagem: os da configuração ou, com subpastas, o nome da subpasta."""
+        ident = {k: cfg[k] for k in ("instalacao", "equipamento") if cfg.get(k)}
+        if cfg.get("subpastas") and p.parent != pasta:
+            ident["equipamento"] = p.parent.name
+        return ident
+
+    def linha_de_base(self, pasta: str, subpastas: bool = False) -> int:
         """Ao ligar numa pasta, o que já estava lá não é analisado: só o que chegar depois."""
         caminho = Path(pasta)
         vistos = self._vistos()
         marcadas = 0
         if caminho.is_dir():
-            for p in self._imagens(caminho):
+            for p in self._imagens(caminho, subpastas):
                 vistos[str(p.resolve()).lower() + "|" + self._chave(p)] = True
                 marcadas += 1
         self._guardar_vistos(vistos)
@@ -218,7 +229,7 @@ class Monitor:
             self.estado["erro"] = None
             vistos = self._vistos()
             novas = []
-            for p in self._imagens(pasta):
+            for p in self._imagens(pasta, cfg.get("subpastas", False)):
                 try:
                     chave = str(p.resolve()).lower() + "|" + self._chave(p)
                     if chave in vistos or time.time() - p.stat().st_mtime < SEGUNDOS_ESTAVEL:
@@ -227,7 +238,7 @@ class Monitor:
                 except OSError:
                     continue  # arquivo sumiu ou está preso pela câmera: tenta na próxima passada
                 vistos[chave] = True
-                ident = {k: cfg[k] for k in ("instalacao", "equipamento") if cfg.get(k)}
+                ident = self.identificacao(p, pasta, cfg)
                 try:
                     a = self._analisar(dados, p.name, ident)
                 except Exception as erro:  # imagem ilegível não pode parar o monitoramento

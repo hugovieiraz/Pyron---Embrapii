@@ -753,6 +753,10 @@ section[data-vista="sobre"] .cartao h2 { margin-bottom: var(--e-3); }
 .destino-envio > .ic { align-self: center; color: var(--acao); }
 .destino-texto { display: grid; align-self: center; }
 @media (max-width: 1000px) { .destino-envio { grid-template-columns: 1fr; } .destino-envio > .ic { display: none; } }
+.opcao { display: flex; align-items: flex-start; gap: var(--e-3); cursor: pointer; }
+.opcao input { margin-top: var(--e-1); }
+.opcao span { display: grid; gap: var(--e-1); }
+.opcao small { font-size: var(--t-1); color: var(--texto-3); font-weight: var(--p-normal); }
 .link-equip { display: inline-flex; align-items: center; gap: var(--e-1); font-weight: var(--p-medio); }
 .link-equip .ic { width: var(--e-4); height: var(--e-4); }
 
