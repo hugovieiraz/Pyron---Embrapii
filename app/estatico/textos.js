@@ -198,6 +198,7 @@ const TEXTOS = {
     selecionadas: (n) => `${n} ${n === 1 ? "inspeção selecionada" : "inspeções selecionadas"}`,
     gerarRelatorio: (n) => (n === 1 ? "Gerar laudo" : `Gerar relatório com ${n}`),
     limparSelecao: "Limpar seleção",
+    semEquipamento: "Sem equipamento",
     apagarTitulo: "Apagar inspeção?",
     apagarTexto: (arquivo) => `${arquivo} e suas regiões serão apagadas deste computador. Não dá para desfazer.`,
     apagada: "Inspeção apagada.",

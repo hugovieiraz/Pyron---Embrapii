@@ -749,6 +749,13 @@ section[data-vista="sobre"] .cartao h2 { margin-bottom: var(--e-3); }
 .item-menu small { font-size: var(--t-1); color: var(--texto-3); }
 .form-parametros { margin-top: var(--e-5); padding-top: var(--e-4); border-top: 1px solid var(--borda); }
 
+.destino-envio { display: grid; grid-template-columns: auto minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr); align-items: end; gap: var(--e-3) var(--e-4); margin: calc(-1 * var(--e-4)) 0 var(--e-8); padding: var(--e-4); border: 1px solid var(--borda); border-radius: var(--r-g); background: var(--superficie); }
+.destino-envio > .ic { align-self: center; color: var(--acao); }
+.destino-texto { display: grid; align-self: center; }
+@media (max-width: 1000px) { .destino-envio { grid-template-columns: 1fr; } .destino-envio > .ic { display: none; } }
+.link-equip { display: inline-flex; align-items: center; gap: var(--e-1); font-weight: var(--p-medio); }
+.link-equip .ic { width: var(--e-4); height: var(--e-4); }
+
 /* ---------------------------------------------------------------- busca rápida e atalhos */
 .busca-topo { display: flex; align-items: center; gap: var(--e-2); flex: 0 1 var(--col-g); min-width: 0; height: var(--alvo-sm); margin-left: auto; margin-right: var(--e-3); padding: 0 var(--e-2) 0 var(--e-3); border: 1px solid var(--borda); border-radius: var(--r-m); background: var(--superficie-2); color: var(--texto-3); font: inherit; font-size: var(--t-2); cursor: pointer; transition: border-color var(--dur-rapida) var(--ease-padrao); }
 .busca-topo:hover { border-color: var(--borda-forte); color: var(--texto-2); }

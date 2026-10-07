@@ -35,7 +35,12 @@ function icone(nome) {
 
 const fmt = (v, casas = 1, sufixo = "") =>
   v == null || !Number.isFinite(v) ? T.geral.semValor : v.toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas }) + sufixo;
-const dataHora = (iso) => (iso || "").replace("T", " ").slice(0, 16);
+/** "2023-07-23T17:23:00" ou "2023-07-23 17:23:00" vira "23/07/2023 17:23". */
+const dataHora = (iso) => {
+  const t = String(iso || "").replace("T", " ");
+  const m = t.match(/^(\d{4})-(\d{2})-(\d{2})(?: (\d{2}:\d{2}))?/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}${m[4] ? ` ${m[4]}` : ""}` : t.slice(0, 16);
+};
 /** Caminho longo de pasta vira as duas últimas partes; o completo fica no title. */
 function caminhoCurto(caminho) {
   const partes = (caminho || "").split(/[\\/]/).filter(Boolean);
@@ -2365,7 +2370,9 @@ function anexarDestino(dados, destino) {
 async function enviarArquivos(lista) {
   const arquivos = [...lista].filter((f) => /\.(jpe?g|png)$/i.test(f.name));
   if (!arquivos.length) return avisar(T.geral.soImagens, { erro: true });
-  const destino = estado.vista === "equipamentos" && location.hash.includes("/") ? estado.destinoEquipamento : null;
+  let destino = estado.vista === "equipamentos" && location.hash.includes("/") ? estado.destinoEquipamento : null;
+  const [inst, equip] = [$("#envio-instalacao").value.trim(), $("#envio-equipamento").value.trim()];
+  if (!destino && estado.vista === "analise" && !estado.analise && (inst || equip)) destino = { instalacao: inst, equipamento: equip, chave: null };
   if (arquivos.length === 1) return analisarArquivo(arquivos[0], destino);
   return analisarLote(arquivos, destino);
 }
@@ -2453,11 +2460,11 @@ async function analisarLote(arquivos, destino = null) {
   texto.textContent = T.analise.loteFim(ok, arquivos.length);
   $("#dialogo-acoes").replaceChildren(
     el("button", { class: "btn", value: "fechar", type: "submit" }, T.geral.fechar),
-    el("button", { class: "btn btn-primaria", value: "ver", type: "submit" }, destino ? T.equip.verEquipamento : T.analise.verInspecoes),
+    el("button", { class: "btn btn-primaria", value: "ver", type: "submit" }, destino && destino.chave ? T.equip.verEquipamento : T.analise.verInspecoes),
   );
   const escolha = await new Promise((r) => (d.onclose = () => r(d.returnValue)));
   estado.equipamentos = null;
-  if (escolha === "ver") location.hash = destino ? `equipamentos/${encodeURIComponent(destino.chave)}` : "inspecoes";
+  if (escolha === "ver") location.hash = destino && destino.chave ? `equipamentos/${encodeURIComponent(destino.chave)}` : "inspecoes";
   else rota();
 }
 
@@ -2576,7 +2583,7 @@ function preencherCabecalho() {
   const e = [el("span", { class: `etiqueta ${a.radiometrica ? "medida" : "estimada"}` }, a.radiometrica ? T.analise.medida : T.analise.estimada)];
   if (a.fonte === "monitoramento") e.push(el("span", { class: "etiqueta info" }, icone("camera"), T.analise.monitor));
   if (a.metadados.camera) e.push(el("span", { class: "etiqueta" }, a.metadados.camera));
-  if (a.metadados.data_hora) e.push(el("span", { class: "etiqueta" }, a.metadados.data_hora));
+  if (a.metadados.data_hora) e.push(el("span", { class: "etiqueta" }, icone("calendario"), dataHora(a.metadados.data_hora)));
   e.push(el("span", { class: "etiqueta" }, a.modelo.nome));
   if (a.parametros_ajustados && a.parametros_ajustados.length) {
     e.push(el("span", { class: "etiqueta info", title: T.analise.ajustadosTitulo }, T.analise.ajustados(fmt(a.metadados.emissividade, 2))));
@@ -3395,6 +3402,8 @@ function desenharInspecoes() {
     const texto = [it.arquivo, it.identificacao.instalacao, it.identificacao.equipamento].filter(Boolean).join(" ").toLowerCase();
     return texto.includes(termo);
   });
+  const quando = (it) => it.data_captura || it.criado_em;
+  if (estado.ordem === "recentes") itens = itens.slice().sort((a, b) => quando(b).localeCompare(quando(a)));
   if (estado.ordem === "graves") itens = itens.slice().sort((a, b) => NIVEIS.indexOf(b.resumo.severidade) - NIVEIS.indexOf(a.resumo.severidade));
   if (estado.ordem === "nome") itens = itens.slice().sort((a, b) => a.arquivo.localeCompare(b.arquivo));
   if (!itens.length) {
@@ -3530,14 +3539,19 @@ function acoesInspecao(it) {
 
 function tabelaInspecoes(itens) {
   const linhas = itens.map((it) => {
-    const local = [it.identificacao.instalacao, it.identificacao.equipamento].filter(Boolean).join(" · ");
+    const ident = it.identificacao;
+    const local = ident.equipamento
+      ? el("div", { class: "principal-celula" },
+        el("a", { class: "link-equip", href: `#equipamentos/${encodeURIComponent(it.equipamento_chave)}`, title: T.equip.chipTitulo, onclick: (ev) => ev.stopPropagation() }, icone("ativos"), ident.equipamento),
+        el("span", {}, ident.instalacao || ""))
+      : el("span", { class: "nota" }, T.inspecoes.semEquipamento);
     return el("tr", { class: `clicavel${estado.selecao.has(it.id) ? " marcada" : ""}`, tabindex: "0", onclick: () => abrirInspecao(it.id), onkeydown: (ev) => { if (ev.key === "Enter" && ev.target.tagName !== "INPUT") abrirInspecao(it.id); } },
       el("td", { class: "celula-marcar" }, caixaSelecao(it)),
       el("td", {}, el("img", { class: "miniatura-tabela", src: miniaturaSrc(it), alt: "", loading: "lazy" })),
       el("td", {}, el("div", { class: "principal-celula" },
         el("b", {}, it.arquivo),
         el("span", {}, [dataHora(it.data_captura || it.criado_em), it.fonte === "monitoramento" ? T.inspecoes.monitor : null, T.geral.regioes(it.resumo.regioes)].filter(Boolean).join(" · ")))),
-      el("td", {}, local || T.geral.semValor),
+      el("td", {}, local),
       el("td", { class: "num" }, valorDestaque(it.destaque) || T.geral.semValor),
       el("td", { class: "num direita" }, fmt(it.resumo.t_max_cena, 1, " °C")),
       el("td", {}, el("span", { class: `selo ${it.resumo.severidade}` }, T.niveis[it.resumo.severidade])),
