@@ -7,9 +7,10 @@ equipamentos de subestação. Lê a temperatura de cada pixel, encontra componen
 compara cada um com o limite do componente e com as outras fases, classifica a severidade e gera o
 laudo.
 
-**Estado:** versão 0.6 (aplicativo local com painel, análise, relatório com várias imagens,
-inspeções, monitoramento de pasta com alertas, detector de para-raios RF-DETR combinado com a regra
-de pontos quentes e simulação de câmera ao vivo a partir de vídeo).
+**Estado:** versão 0.7 (aplicativo local com painel, análise com ferramentas de medição, relatório
+com várias imagens, histórico e tendência por equipamento, pendências até a correção verificada,
+monitoramento de pasta com alertas, detector de para-raios RF-DETR combinado com a regra de pontos
+quentes e simulação de câmera ao vivo a partir de vídeo).
 
 Todas as funcionalidades, tela por tela: [`docs/Pyron_Funcionalidades.pdf`](docs/Pyron_Funcionalidades.pdf)
 (gerado por `docs/manual/gerar_manual.py`).
@@ -67,6 +68,39 @@ fica com a pior:
 Também mostra até que carga o componente chega à MTA. Os detalhes e as fontes estão em
 [`docs/04_referencias_de_temperatura.md`](docs/04_referencias_de_temperatura.md).
 
+## Equipamentos: histórico, tendência e próxima inspeção
+
+Cada imagem pode pertencer a uma instalação e a um equipamento (no envio, na aba Laudo da análise
+ou em Inspeções › marcar várias › **Definir equipamento**). A tela **Equipamentos** mostra, para
+cada um:
+
+- a máxima de cada inspeção pela data da captura, com a **tendência em °C por mês** (mínimos
+  quadrados, a partir de 3 inspeções espalhadas por pelo menos um mês) e a reta no gráfico;
+- quando o % da MTA sobe, **em quanto tempo chegaria à MTA** se a tendência continuar (estimativa,
+  até 5 anos);
+- a **próxima inspeção** pela severidade atual: anual quando normal (a NFPA 70B pede ao menos uma
+  vez por ano), 90 dias em atenção, 30 em programar, 7 em urgente e 1 em imediato;
+- a máxima de cada tipo de peça ao longo do tempo e o histórico de inspeções.
+
+## Pendências: da anomalia à correção verificada
+
+Toda inspeção fora do normal vira uma pendência com prazo pela severidade e a situação **aberta →
+programada (com nº da ordem de serviço) → corrigida → verificada** (ou descartada), com responsável,
+notas e histórico. Uma inspeção normal posterior do mesmo equipamento é sugerida como a reinspeção
+que verifica a correção. O Painel mostra as pendências vencidas e as próximas inspeções.
+
+## Ferramentas de análise
+
+- **Ponto (P)** e **Linha (L)** sobre o termograma, com o perfil de temperatura ao longo da linha;
+  ficam guardados e vão para o laudo.
+- **Escala manual** (nível e amplitude) e paleta: o laudo e a imagem exportada saem como a tela.
+- **Parâmetros de medição** dos termogramas radiométricos: emissividade (com tabela de materiais),
+  temperatura refletida, distância, umidade e temperatura do ar, recalculados a partir do arquivo
+  original, com volta aos valores da câmera.
+- **Exportar**: PNG com regiões, pontos e linhas; matriz de temperaturas e planilha de inspeções em
+  CSV que abre direto no Excel em português.
+- **Busca rápida (Ctrl+K)** por inspeção, equipamento, tela ou ação, e **?** para os atalhos.
+
 ## Relatório de inspeção
 
 O relatório segue a estrutura de um documento técnico: identificação, normas citadas (ABNT NBR
@@ -79,6 +113,7 @@ técnico com ART. Número do relatório (`RT-AAAAMMDD-XXXX`) e "Página x de y" 
 - **Responsável só do cadastro:** o responsável técnico (nome, função, registro) é escolhido de uma
   lista cadastrada em Configurações; o laudo não sai sem ele, para o nome e o registro nunca saírem
   digitados errado. A ART é informada na hora de gerar.
+- **Logotipo da empresa** (Configurações › Empresa) no cabeçalho de cada laudo.
 
 ## Vídeo ao vivo (simulação de câmera)
 
@@ -198,7 +233,7 @@ Demonstração sem tocar nas inspeções reais:
 | Pasta | Conteúdo |
 |---|---|
 | `nucleo/` | Motor sem interface: leitura radiométrica FLIR (`flir.py`), inversão de paleta (`paleta.py`), entrada única (`entrada.py`), referências de temperatura (`referencias.py`), medição e severidade (`analise.py`), desenho (`render.py`), detectores (`detectores/`) |
-| `app/` | Servidor local (FastAPI), laudo em PDF, inspeções e alertas salvos, monitoramento de pasta (`monitoramento.py`) e interface web (`estatico/`) |
+| `app/` | Servidor local (FastAPI), laudo em PDF, inspeções e alertas salvos, equipamentos e tendência (`equipamentos.py`), pendências (`pendencias.py`), vídeo (`videos.py`), monitoramento de pasta (`monitoramento.py`) e interface web (`estatico/`) |
 | `lancador/` | `Pyron.exe`: fonte C# e script de construção |
 | `marca/` | Logo original e o script que gera símbolo, ícones e favicon (`gerar_marca.py`) |
 | `ml/` | Treino de detectores a partir de rótulos do CVAT, avaliação e exportação ONNX |

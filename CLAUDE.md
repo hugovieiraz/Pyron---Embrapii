@@ -52,6 +52,8 @@ núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Te
   `python app/iniciar.py --porta 8790 --sem-navegador --dados <pasta>`.
 - Ao terminar cada etapa, resumir em 3 linhas o que foi feito e o que ficou pendente.
 - Commit e push só quando o usuário pedir. O repositório é https://github.com/hugovieiraz/Pyron---Embrapii.
-- O dataset ScienceDB 10185 é só para estudo (CC BY-NC-SA); não vai para o repositório.
+- O dataset ScienceDB 10185 é só para estudo (CC BY-NC-SA): as imagens em si não vão para o
+  repositório. Capturas de tela que mostram essas imagens (manual) podem ir, com o crédito e a
+  licença no README (decisão do usuário: o projeto é compartilhado para estudo).
 - O `Pyron.exe` precisa continuar pequeno (≈100 KB, sem recursos embutidos): o Controle Inteligente
   de Aplicativos do Windows bloqueou uma versão de 390 KB. Nunca mexer nessa proteção.
