@@ -56,6 +56,7 @@
   <symbol id="i-baixar" viewBox="0 0 24 24"><path d="M12 4v11.5M7 10.5l5 5 5-5"/><path d="M4 16.5V18a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1.5"/></symbol>
   <symbol id="i-mais-opcoes" viewBox="0 0 24 24"><circle cx="5.5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="18.5" cy="12" r="1.3"/></symbol>
   <symbol id="i-escala" viewBox="0 0 24 24"><rect x="9" y="3.5" width="6" height="17" rx="3"/><path d="M4 7h3M4 12h3M4 17h3M17 9.5h3M17 14.5h3"/></symbol>
+  <symbol id="i-chave" viewBox="0 0 24 24"><path d="M14.7 6.3a4.5 4.5 0 0 0 5.6 5.6l-8.6 8.6a2.1 2.1 0 0 1-3-3l8.6-8.6"/><path d="M20.3 11.9a4.5 4.5 0 0 1-5.6-5.6l2.6 2.6 2.4-.4.4-2.4-2.6-2.6"/></symbol>
   <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.8v14.4a1 1 0 0 0 1.5.9l11.3-7.2a1 1 0 0 0 0-1.8L8.5 3.9A1 1 0 0 0 7 4.8z"/></symbol>
   <symbol id="i-pausa" viewBox="0 0 24 24"><rect x="6" y="4.5" width="4" height="15" rx="1"/><rect x="14" y="4.5" width="4" height="15" rx="1"/></symbol>
   <symbol id="i-video" viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10.5 5-3v9l-5-3z"/></symbol>
@@ -80,6 +81,7 @@
       <a href="#video" data-rota="video"><svg class="ic"><use href="#i-video"/></svg>Vídeo ao vivo<span class="ponto" id="nav-video-ponto" hidden></span></a>
       <a href="#inspecoes" data-rota="inspecoes"><svg class="ic"><use href="#i-inspecoes"/></svg>Inspeções<span class="contador" id="contador-inspecoes" hidden></span></a>
       <a href="#equipamentos" data-rota="equipamentos"><svg class="ic"><use href="#i-ativos"/></svg>Equipamentos<span class="contador alerta" id="contador-vencidas" hidden title="Equipamentos com inspeção vencida"></span></a>
+      <a href="#pendencias" data-rota="pendencias"><svg class="ic"><use href="#i-chave"/></svg>Pendências<span class="contador alerta" id="contador-pendencias" hidden title="Pendências com prazo vencido"></span></a>
       <a href="#monitoramento" data-rota="monitoramento"><svg class="ic"><use href="#i-camera"/></svg>Monitoramento<span class="ponto" id="nav-monitor-ponto" hidden></span><span class="contador alerta" id="contador-alertas" hidden></span></a>
       <p class="nav-grupo">Sistema</p>
       <a href="#modelos" data-rota="modelos"><svg class="ic"><use href="#i-modelos"/></svg>Modelos</a>
@@ -269,6 +271,7 @@
                   <div class="kpi"><span>Regiões</span><b id="k-regioes" class="num">—</b></div>
                 </div>
                 <ul class="avisos" id="avisos"></ul>
+                <div class="acompanhamento" id="acompanhamento" hidden></div>
                 <div class="ponto-maximo" id="ponto-maximo" hidden></div>
                 <div class="comparacao-componentes" id="comparacao-componentes" hidden></div>
                 <div class="lista-titulo">
@@ -496,6 +499,25 @@
           <div id="lista-equip"></div>
         </div>
         <div id="equip-detalhe" hidden></div>
+      </section>
+
+      <!-- ======================================================= PENDÊNCIAS -->
+      <section class="vista" data-vista="pendencias" hidden>
+        <header class="cabecalho">
+          <div><h1>Pendências</h1><p class="sub">Cada anomalia encontrada até a correção ser verificada: prazo pela severidade, ordem de serviço, responsável e o histórico do que foi feito.</p></div>
+        </header>
+        <div class="kpis-grandes" id="kpis-pendencias"></div>
+        <div class="filtros" id="filtros-pendencias">
+          <div class="busca"><svg class="ic"><use href="#i-busca"/></svg><input type="search" id="busca-pendencias" placeholder="Buscar por equipamento, região, OS ou responsável" aria-label="Buscar pendências"></div>
+          <div class="segmentado" role="group" aria-label="Situação" id="seg-pendencias">
+            <button type="button" data-valor="andamento" aria-pressed="true">Em andamento</button>
+            <button type="button" data-valor="vencidas" aria-pressed="false">Vencidas</button>
+            <button type="button" data-valor="reinspecao" aria-pressed="false">Reinspeção</button>
+            <button type="button" data-valor="concluidas" aria-pressed="false">Concluídas</button>
+            <button type="button" data-valor="todas" aria-pressed="false">Todas</button>
+          </div>
+        </div>
+        <div id="lista-pendencias"></div>
       </section>
 
       <!-- ======================================================= MONITORAMENTO -->

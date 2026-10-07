@@ -188,7 +188,7 @@ midiaEscura.addEventListener("change", () => {
   if (document.documentElement.dataset.temaEscolhido === "sistema") aplicarTema("sistema");
 });
 
-const VISTAS = ["painel", "analise", "video", "inspecoes", "equipamentos", "monitoramento", "modelos", "avaliacao", "configuracoes", "sobre"];
+const VISTAS = ["painel", "analise", "video", "inspecoes", "equipamentos", "pendencias", "monitoramento", "modelos", "avaliacao", "configuracoes", "sobre"];
 
 function mostrarVista(vista) {
   const trocou = estado.vista !== vista;
@@ -266,6 +266,7 @@ function rota() {
   }
   if (vista === "avaliacao") carregarAvaliacoes();
   if (vista === "configuracoes") carregarConfiguracoes(sub);
+  if (vista === "pendencias") carregarPendencias();
   if (vista === "equipamentos") {
     estado.equipamentoAberto = null;
     carregarEquipamentos(sub);
@@ -1009,6 +1010,146 @@ function cartaoDadosAvaliacao(d) {
     blocoModelo,
     el("dl", { class: "dados-avaliacao" }, linhas.flatMap(([k, v]) => [el("dt", {}, k), el("dd", {}, v)])),
     el("div", { class: "cartao-rodape" }, apagar));
+}
+
+// ================================================================= pendências (acompanhamento das anomalias até a correção)
+
+const FILTROS_PENDENCIA = {
+  andamento: (p) => ["aberta", "programada", "corrigida"].includes(p.status),
+  vencidas: (p) => p.vencida,
+  reinspecao: (p) => p.status === "corrigida" || (p.reinspecao && p.status !== "verificada" && p.status !== "descartada"),
+  concluidas: (p) => p.status === "verificada" || p.status === "descartada",
+  todas: () => true,
+};
+
+function seloStatus(status) {
+  return el("span", { class: `status-pendencia ${status}` }, T.pend.status[status] || status);
+}
+
+function textoPrazo(p) {
+  const P = T.pend;
+  if (p.status === "verificada" || p.status === "descartada") return el("span", { class: "nota" }, dataCurta(p.prazo));
+  return el("span", { class: `prazo${p.vencida ? " vencido" : p.dias <= 7 ? " perto" : ""}` }, icone("calendario"),
+    dataCurta(p.prazo), el("small", {}, p.vencida ? P.vencidaHa(-p.dias) : P.faltam(p.dias)));
+}
+
+async function carregarPendencias() {
+  const alvo = $("#lista-pendencias");
+  $("#kpis-pendencias").replaceChildren(...esqueleto.kpis(4).children);
+  if (!estado.pendencias) alvo.replaceChildren(esqueleto.tabela(5));
+  try {
+    estado.pendencias = await api("/api/pendencias");
+  } catch (e) {
+    $("#kpis-pendencias").replaceChildren();
+    return alvo.replaceChildren(estadoErro(T.pend.erroTitulo, e, carregarPendencias));
+  }
+  atualizarContadorPendencias();
+  desenharPendencias();
+}
+
+function atualizarContadorPendencias() {
+  const n = (estado.pendencias || []).filter((p) => p.vencida).length;
+  const c = $("#contador-pendencias");
+  c.hidden = !n;
+  c.textContent = String(n);
+}
+
+function desenharPendencias() {
+  const P = T.pend;
+  const todas = estado.pendencias || [];
+  const alvo = $("#lista-pendencias");
+  const filtro = estado.filtroPendencia || "andamento";
+  $("#filtros-pendencias").hidden = !todas.length;
+  $("#kpis-pendencias").hidden = !todas.length;
+  if (!todas.length) {
+    $("#kpis-pendencias").replaceChildren();
+    return alvo.replaceChildren(estadoVazio({ nomeIcone: "check", titulo: P.vazioTitulo, texto: P.vazioTexto }));
+  }
+  const kpi = (rotulo, chave, cor) => el("button", {
+    class: "kpi-grande", type: "button", "aria-pressed": String(filtro === chave),
+    onclick: () => { estado.filtroPendencia = chave; marcarSegmentado("#seg-pendencias", chave); desenharPendencias(); },
+  }, el("span", {}, cor ? el("i", { class: "ponto", style: { background: `var(--${cor})`, boxShadow: "none" } }) : null, rotulo),
+  el("b", {}, String(todas.filter(FILTROS_PENDENCIA[chave]).length)));
+  $("#kpis-pendencias").replaceChildren(
+    kpi(P.kAndamento, "andamento", "programar"),
+    kpi(P.kVencidas, "vencidas", "imediato"),
+    kpi(P.kReinspecao, "reinspecao", "info"),
+    kpi(P.kConcluidas, "concluidas", "normal"));
+  marcarSegmentado("#seg-pendencias", filtro);
+
+  const termo = (estado.buscaPendencia || "").trim().toLowerCase();
+  const itens = todas.filter(FILTROS_PENDENCIA[filtro]).filter((p) => !termo ||
+    [p.equipamento, p.instalacao, p.regiao, p.arquivo, p.ordem_servico, p.responsavel].filter(Boolean).join(" ").toLowerCase().includes(termo));
+  if (!itens.length) {
+    return alvo.replaceChildren(estadoVazio({ nomeIcone: "busca", titulo: P.nadaTitulo, texto: P.nadaTexto, compacto: true }));
+  }
+  const linhas = itens.map((p) => el("tr", { class: `clicavel${p.vencida ? " linha-vencida" : ""}`, tabindex: "0", onclick: () => atualizarPendencia(p), onkeydown: (ev) => { if (ev.key === "Enter") atualizarPendencia(p); } },
+    el("td", {}, el("span", { class: `selo ${p.severidade}` }, T.niveis[p.severidade])),
+    el("td", {}, el("div", { class: "principal-celula" },
+      el("b", {}, p.equipamento || p.arquivo),
+      el("span", { class: "nota" }, [p.instalacao, p.regiao && `${p.regiao} · ${fmt(p.t_max, 1, " °C")}`].filter(Boolean).join(" · ")))),
+    el("td", { class: "num" }, dataCurta(p.detectada_em)),
+    el("td", {}, textoPrazo(p)),
+    el("td", {}, seloStatus(p.status), p.reinspecao && !["verificada", "descartada"].includes(p.status)
+      ? el("small", { class: "dica-reinspecao" }, icone("check"), P.reinspecaoNormal(dataCurta(p.reinspecao.data))) : null),
+    el("td", {}, p.ordem_servico || el("span", { class: "nota" }, T.geral.semValor)),
+    el("td", { class: "celula-acoes" },
+      el("a", { class: "btn btn-sm btn-fantasma", href: `#analise/${p.id}`, onclick: (ev) => ev.stopPropagation(), title: P.abrirInspecao }, icone("analise"), P.ver),
+      el("button", { class: "btn btn-sm", type: "button", onclick: (ev) => { ev.stopPropagation(); atualizarPendencia(p); } }, icone("editar"), P.atualizar))));
+  alvo.replaceChildren(el("div", { class: "cartao cartao-tabela" }, el("div", { class: "tabela-rolagem" }, el("table", { class: "tabela" },
+    el("thead", {}, el("tr", {}, [P.colSeveridade, P.colEquipamento, P.colDetectada, P.colPrazo, P.colSituacao, P.colOs, ""].map((t) => el("th", {}, t)))),
+    el("tbody", {}, animarEntrada(linhas))))));
+}
+
+/** Diálogo único de atualização: situação, prazo, OS, responsável, nota e o histórico. */
+async function atualizarPendencia(p, aoSalvar) {
+  const P = T.pend;
+  const status = el("select", {}, Object.entries(P.status).map(([v, t]) => new Option(t, v)));
+  status.value = p.status;
+  const prazo = el("input", { type: "date", value: p.prazo });
+  const os = el("input", { value: p.ordem_servico || "", placeholder: P.osExemplo, autocomplete: "off" });
+  const resp = el("input", { value: p.responsavel || "", placeholder: P.responsavelExemplo, autocomplete: "off" });
+  const nota = el("textarea", { rows: 2, placeholder: P.notaExemplo });
+  const historico = (p.historico || []).slice().reverse();
+  const escolha = await dialogo({
+    titulo: P.dialogoTitulo(p.equipamento || p.arquivo),
+    conteudo: el("div", { class: "form" },
+      el("div", { class: "resumo-pendencia" }, el("span", { class: `selo ${p.severidade}` }, T.niveis[p.severidade]),
+        el("span", {}, [p.regiao, p.t_max != null && fmt(p.t_max, 1, " °C"), P.detectadaEm(dataCurta(p.detectada_em))].filter(Boolean).join(" · "))),
+      p.reinspecao ? el("p", { class: "nota dica-reinspecao" }, icone("check"), P.reinspecaoTexto(dataCurta(p.reinspecao.data))) : null,
+      el("div", { class: "campos-2" },
+        el("label", {}, P.situacao, status), el("label", {}, P.prazo, prazo),
+        el("label", {}, P.os, os), el("label", {}, P.responsavel, resp)),
+      el("label", {}, P.nota, nota),
+      historico.length ? el("details", { class: "historico-pendencia" }, el("summary", {}, P.historico(historico.length)),
+        el("ol", {}, historico.map((h) => el("li", {}, el("b", {}, `${dataCurta(h.quando)} ${hora(h.quando).slice(0, 5)}`), " ", P.status[h.status] || h.status, h.nota ? el("span", { class: "nota" }, ` · ${h.nota}`) : null)))) : null),
+    acoes: [{ rotulo: T.geral.cancelar, valor: "nao" }, { rotulo: P.salvar, valor: "sim", classe: "btn-primaria" }],
+  });
+  if (escolha !== "sim") return;
+  try {
+    const nova = await api(`/api/analises/${p.id}/acompanhamento`, json("PUT", {
+      status: status.value, prazo: prazo.value, ordem_servico: os.value, responsavel: resp.value, nota: nota.value,
+    }));
+    avisar(P.salva(P.status[nova.status]));
+    if (aoSalvar) aoSalvar(nova);
+    else carregarPendencias();
+  } catch (e) {
+    falhou(e);
+  }
+}
+
+/** Cartão da anomalia na análise aberta: situação, prazo e o botão de atualizar. */
+function desenharAcompanhamento() {
+  const alvo = $("#acompanhamento");
+  const p = estado.analise.pendencia;
+  alvo.hidden = !p;
+  if (!p) return;
+  const P = T.pend;
+  alvo.replaceChildren(
+    el("div", { class: "corpo" },
+      el("span", { class: "rotulo" }, icone("chave"), P.cartaoTitulo),
+      el("div", { class: "linha-acompanhamento" }, seloStatus(p.status), textoPrazo(p), p.ordem_servico ? el("span", { class: "nota" }, P.osCurta(p.ordem_servico)) : null)),
+    el("button", { class: "btn btn-sm", type: "button", onclick: () => atualizarPendencia(p, (nova) => { estado.analise.pendencia = nova; desenharAcompanhamento(); estado.pendencias = null; }) }, icone("editar"), P.atualizar));
 }
 
 // ================================================================= equipamentos (histórico, tendência e próxima inspeção)
@@ -1923,14 +2064,19 @@ function teclaVideo(ev) {
 async function carregarPainel() {
   const corpo = $("#painel-corpo");
   corpo.replaceChildren(esqueleto.kpis(), el("div", { class: "painel-grade" }, esqueleto.tabela(6), esqueleto.bloco()));
-  let lista, status, alertas;
+  let lista, status, alertas, pendencias, equips;
   try {
-    [lista, status, alertas] = await Promise.all([api("/api/analises"), api("/api/status"), api("/api/alertas")]);
+    [lista, status, alertas, pendencias, equips] = await Promise.all([
+      api("/api/analises"), api("/api/status"), api("/api/alertas"), api("/api/pendencias"), api("/api/equipamentos")]);
   } catch (e) {
     return corpo.replaceChildren(estadoErro(T.painel.erroTitulo, e, carregarPainel));
   }
   estado.inspecoes = lista;
+  estado.pendencias = pendencias;
+  estado.equipamentos = equips;
   atualizarContador();
+  atualizarContadorPendencias();
+  preencherSugestoes(equips);
   if (estado.vista !== "painel") return;
 
   const conta = (niveis) => lista.filter((it) => niveis.includes(it.resumo.severidade)).length;
@@ -1941,7 +2087,10 @@ async function carregarPainel() {
   const kpis = el("div", { class: "kpis-grandes" }, animarEntrada([
     kpi(T.painel.kpiInspecoes, lista.length, T.painel.kpiInspecoesNota(lista.filter((it) => it.fonte === "monitoramento").length), irInspecoes("todas")),
     kpi(T.painel.kpiCriticas, criticas, T.painel.kpiCriticasNota, irInspecoes("grave"), criticas ? "critico" : ""),
-    kpi(T.painel.kpiProgramar, conta(["programar"]), T.painel.kpiProgramarNota, irInspecoes("programar")),
+    kpi(T.painel.kpiPendencias, pendencias.filter((p) => p.vencida).length, T.painel.kpiPendenciasNota(pendencias.filter((p) => ["aberta", "programada", "corrigida"].includes(p.status)).length),
+      () => { estado.filtroPendencia = "vencidas"; location.hash = "pendencias"; }, pendencias.some((p) => p.vencida) ? "critico" : ""),
+    kpi(T.painel.kpiVencidas, equips.filter((e) => e.proxima_inspecao && e.proxima_inspecao.vencida).length, T.painel.kpiVencidasNota(equips.filter((e) => e.chave !== SEM_EQUIPAMENTO).length),
+      () => { estado.filtroEquip = "vencida"; location.hash = "equipamentos"; }),
     kpi(T.painel.kpiAlertas, status.alertas_pendentes, T.painel.kpiAlertasNota, () => (location.hash = "monitoramento"), status.alertas_pendentes ? "critico" : ""),
   ]));
 
@@ -1951,7 +2100,23 @@ async function carregarPainel() {
 
   corpo.replaceChildren(kpis, el("div", { class: "painel-grade" },
     cartaoAtencao(lista),
-    el("div", { class: "pilha" }, cartaoDistribuicao(lista), cartaoMonitor(status, alertas))));
+    el("div", { class: "pilha" }, cartaoDistribuicao(lista), cartaoProximas(equips), cartaoMonitor(status, alertas))));
+}
+
+/** Equipamentos pela data da próxima inspeção: os vencidos primeiro. */
+function cartaoProximas(equips) {
+  const P = T.painel;
+  const lista = equips.filter((e) => e.proxima_inspecao).sort((a, b) => a.proxima_inspecao.data.localeCompare(b.proxima_inspecao.data)).slice(0, 5);
+  const corpo = lista.length
+    ? el("ul", { class: "lista-proximas" }, lista.map((e) => el("li", {}, el("a", { href: `#equipamentos/${encodeURIComponent(e.chave)}` },
+      el("span", { class: `ponto-sev`, style: { background: `var(--${e.severidade})` } }),
+      el("span", { class: "nome" }, el("b", {}, e.equipamento), el("small", {}, e.instalacao || "")),
+      el("span", { class: `quando${e.proxima_inspecao.vencida ? " vencida" : ""}` }, dataCurta(e.proxima_inspecao.data),
+        el("small", {}, e.proxima_inspecao.vencida ? P.proximasVencida(-e.proxima_inspecao.dias) : T.equip.emDias(e.proxima_inspecao.dias)))))))
+    : el("p", { class: "nota" }, P.proximasVazio);
+  return el("div", { class: "cartao" },
+    el("div", { class: "cartao-cabeca" }, el("h2", {}, P.proximasTitulo), el("a", { class: "link", href: "#equipamentos" }, P.verEquipamentos)),
+    corpo);
 }
 
 function boasVindas() {
@@ -2269,6 +2434,7 @@ function abrirAnalise(a, recemCriada = false) {
   desenharTermograma();
   desenharCaixas();
   preencherResultado();
+  desenharAcompanhamento();
   preencherMedicoes();
   preencherCondicoes();
   preencherParametros();
@@ -3714,6 +3880,8 @@ function ligarEventos() {
 
   $("#busca").addEventListener("input", (ev) => { estado.busca = ev.target.value; desenharInspecoes(); });
   $("#busca-equip").addEventListener("input", (ev) => { estado.buscaEquip = ev.target.value; desenharEquipamentos(); });
+  $("#busca-pendencias").addEventListener("input", (ev) => { estado.buscaPendencia = ev.target.value; desenharPendencias(); });
+  segmentado("#seg-pendencias", (v) => { estado.filtroPendencia = v; desenharPendencias(); });
   segmentado("#seg-filtro", (v) => { estado.filtro = v; desenharInspecoes(); });
   segmentado("#seg-exibir", (v) => { estado.exibir = v; guardarPreferencia("exibir", v); desenharInspecoes(); });
   $("#ordem").addEventListener("change", (ev) => { estado.ordem = ev.target.value; desenharInspecoes(); });
@@ -3877,6 +4045,7 @@ async function iniciar() {
   sinalDeVida();
   rota();
   api("/api/equipamentos").then((l) => { estado.equipamentos = estado.equipamentos || l; preencherSugestoes(l); }).catch(() => {});
+  api("/api/pendencias").then((l) => { estado.pendencias = estado.pendencias || l; atualizarContadorPendencias(); }).catch(() => {});
   atualizarStatus();
   setInterval(atualizarStatus, 15000);
 }

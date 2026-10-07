@@ -28,10 +28,10 @@ from PIL import Image
 
 from app import avaliacoes as avaliacoes_mod
 from app import equipamentos
-from app import laudo, monitoramento
+from app import laudo, monitoramento, pendencias
 from app import treinos as treinos_mod
 from app import videos as videos_mod
-from app.armazenamento import Armazenamento
+from app.armazenamento import Armazenamento, _destaque
 from nucleo import analise, detectores, entrada, referencias, render, video
 
 VERSAO = "0.6.0"
@@ -331,6 +331,9 @@ def _completa(a: dict) -> dict:
     matriz = armazenamento.matriz(a["id"])
     saida = dict(a)
     saida["equipamento_chave"] = _chave_de(a)
+    if a.get("resumo", {}).get("severidade", "normal") != "normal":
+        item = {**a, "destaque": _destaque(a), "data_captura": (a.get("metadados") or {}).get("data_hora", "")}
+        saida["pendencia"] = pendencias.montar(item)
     if matriz is not None:
         saida["matriz"] = {
             "largura": int(matriz.shape[1]),
@@ -1048,6 +1051,31 @@ def apagar_avaliacao(id_: str) -> dict:
     except KeyError as erro:
         raise HTTPException(404, "Avaliação não encontrada.") from erro
     return {"ok": True}
+
+
+# ---------------------------------------------------------------- rotas: pendências (acompanhamento das anomalias)
+
+
+@app.get("/api/pendencias")
+def listar_pendencias() -> list[dict]:
+    return pendencias.listar(armazenamento.listar())
+
+
+@app.put("/api/analises/{id_}/acompanhamento")
+def acompanhar(id_: str, corpo: dict = Body(...)) -> dict:
+    """Situação da anomalia: aberta, programada (com OS), corrigida, verificada ou descartada."""
+    with _trava:
+        a = armazenamento.obter(id_)
+        if a is None:
+            raise HTTPException(404, "Inspeção não encontrada.")
+        if a["resumo"]["severidade"] == "normal":
+            raise HTTPException(422, "Esta inspeção está normal: não há anomalia para acompanhar.")
+        try:
+            pendencias.atualizar(a, corpo)
+        except ValueError as erro:
+            raise HTTPException(422, str(erro)) from erro
+        armazenamento.salvar(a)
+    return next(p for p in pendencias.listar(armazenamento.listar()) if p["id"] == id_)
 
 
 # ---------------------------------------------------------------- rotas: equipamentos (histórico e tendência)
