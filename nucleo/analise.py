@@ -31,6 +31,8 @@ NIVEIS = {
     "programar": {"ordem": 2, "rotulo": "Programar reparo", "acao": "Agendar a correção e reinspecionar."},
     "urgente": {"ordem": 3, "rotulo": "Urgente", "acao": "Corrigir o mais rápido possível."},
     "imediato": {"ordem": 4, "rotulo": "Imediato", "acao": "Corrigir imediatamente."},
+    # Sem pixel com temperatura (imagem sem dados radiométricos nem escala): não é "normal".
+    "sem_medida": {"ordem": -1, "rotulo": "Sem medida", "acao": "Medir com o JPEG radiométrico ou informar a escala."},
 }
 
 # Faixas brasileiras (NBR 15866 + Infraspection Institute, conforme prática de concessionárias).
@@ -366,7 +368,7 @@ def analisar_regioes(
             niveis={}, criterio_disparo=None,
         )
         if not m:
-            item["severidade"] = "normal"
+            item["severidade"] = "sem_medida"
             continue
         if item["entorno_c"] is not None:
             item["dt_entorno"] = m["t_max"] - item["entorno_c"]
@@ -415,13 +417,18 @@ def analisar_regioes(
         n = NIVEIS[item["severidade"]]
         item["severidade_rotulo"], item["acao"] = n["rotulo"], n["acao"]
         # Indicativa: sem semelhante para comparar e sem projeção para plena carga.
-        item["indicativa"] = "semelhantes" not in item.get("niveis", {}) and item.get("avaliacao_absoluta") in (None, "sem_ambiente")
+        item["indicativa"] = (item["severidade"] != "sem_medida" and "semelhantes" not in item.get("niveis", {})
+                              and item.get("avaliacao_absoluta") in (None, "sem_ambiente"))
 
     validos = temperatura[np.isfinite(temperatura)]
+    if not validos.size:
+        return saida, _resumo_sem_temperatura(saida, crit, fator_carga)
     sev = pior(i["severidade"] for i in saida)
-    criticos = [i for i in saida if i["severidade"] == sev and sev != "normal"]
+    criticos = [i for i in saida if i["severidade"] == sev and sev not in ("normal", "sem_medida")]
     if sev == "normal":
         mensagem = "Nenhuma região acima dos limites do critério."
+    elif sev == "sem_medida":
+        mensagem = "As regiões marcadas não têm pixels com temperatura."
     else:
         mensagem = _mensagem(sev, criticos)
     if saida and ambiente_c is None and any(i["referencia"]["mta_c"] and i["referencia"]["aquecimento"] != "dieletrico" for i in saida):
@@ -462,3 +469,23 @@ def analisar_regioes(
         "criterio": crit["nome"],
     }
     return saida, resumo
+
+
+def _resumo_sem_temperatura(saida: list[dict], crit: dict, fator_carga: float) -> dict:
+    """Resumo de uma imagem sem nenhuma temperatura: os componentes foram achados, a medida não."""
+    return {
+        "ponto_mais_quente": None,
+        "comparacao_componentes": [],
+        "severidade": "sem_medida",
+        "severidade_rotulo": NIVEIS["sem_medida"]["rotulo"],
+        "mensagem": (f"{len(saida)} {'componente identificado' if len(saida) == 1 else 'componentes identificados'}, sem temperatura."
+                     if saida else "Nenhum componente identificado e nenhuma temperatura na imagem."),
+        "regioes": len(saida),
+        "t_max_cena": None,
+        "t_min_cena": None,
+        "maior_pct_mta": None,
+        "fator_carga": fator_carga,
+        "avisos": [],
+        "criterio": crit["nome"],
+        "sem_temperatura": True,
+    }

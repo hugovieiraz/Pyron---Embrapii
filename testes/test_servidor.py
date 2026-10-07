@@ -64,12 +64,45 @@ def test_arquivo_invalido_da_mensagem_clara(cliente) -> None:
     assert "Não consegui abrir" in r.json()["erro"]
 
 
-def test_imagem_sem_escala_e_sem_dados_da_mensagem_clara(cliente) -> None:
+def test_imagem_sem_escala_e_sem_dados_segue_sem_temperatura(cliente) -> None:
+    """Sem dados radiométricos e sem barra: a análise não trava; segue só com os componentes, sem laudo."""
     buf = io.BytesIO()
     Image.new("RGB", (640, 480), (20, 40, 90)).save(buf, format="JPEG")
     r = cliente.post("/api/analises", files={"arquivo": ("comum.jpg", buf.getvalue(), "image/jpeg")})
-    assert r.status_code == 422
-    assert "barra de cores" in r.json()["erro"]
+    assert r.status_code == 200, r.text
+    a = r.json()
+    assert a["sem_temperatura"] is True
+    assert a["resumo"]["severidade"] == "sem_medida"
+    assert "barra de cores" in a["metadados"]["aviso"]
+    assert [e.get("sem_dado", False) for e in a["etapas"]] == [True, False, True]
+    assert cliente.get(f"/api/analises/{a['id']}/miniatura.png").status_code == 200
+    assert cliente.get(f"/api/analises/{a['id']}/imagem.png").status_code == 200
+    laudo = cliente.get(f"/api/analises/{a['id']}/laudo.pdf")
+    assert laudo.status_code == 422 and "sem temperatura" in laudo.json()["erro"]
+    assert cliente.get("/api/equipamentos").status_code == 200
+    e = cliente.post(f"/api/analises/{a['id']}/escala", json={"t_min": 10, "t_max": 50})
+    assert e.status_code == 422 and "barra de cores" in e.json()["erro"]
+
+
+def test_escala_informada_depois_vira_temperatura(cliente, monkeypatch) -> None:
+    """Barra achada, números ilegíveis: entra sem temperatura; com a escala informada, as cores viram °C."""
+    from app import servidor
+    from testes.test_paleta import _cena, _imagem_sintetica
+
+    monkeypatch.setattr(servidor, "ocr", lambda *args, **kw: ([], 0.0))  # OCR que não lê nenhum número
+    buf = io.BytesIO()
+    Image.fromarray(_imagem_sintetica(50.0, 10.0, _cena())).save(buf, format="PNG")
+    r = cliente.post("/api/analises", files={"arquivo": ("tela.png", buf.getvalue(), "image/png")})
+    assert r.status_code == 200, r.text
+    a = r.json()
+    assert a["sem_temperatura"] is True and a["metadados"]["barra_encontrada"] is True
+    assert cliente.post(f"/api/analises/{a['id']}/escala", json={"t_min": 50, "t_max": 10}).status_code == 422
+    e = cliente.post(f"/api/analises/{a['id']}/escala", json={"t_min": 10, "t_max": 50})
+    assert e.status_code == 200, e.text
+    b = e.json()
+    assert "sem_temperatura" not in b and b["resumo"]["severidade"] != "sem_medida"
+    assert b["metadados"]["escala_informada"] is True and b["metadados"]["escala_lida_c"] == [10.0, 50.0]
+    assert 44.0 < b["resumo"]["t_max_cena"] <= 50.5
 
 
 def test_modelos_e_interface(cliente) -> None:

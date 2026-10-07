@@ -35,7 +35,7 @@ from app import videos as videos_mod
 from app.armazenamento import Armazenamento, _destaque
 from nucleo import analise, detectores, entrada, referencias, render, video
 
-VERSAO = "0.7.0"
+VERSAO = "0.7.1"
 RAIZ = Path(__file__).resolve().parents[1]
 PASTA_APP = Path(__file__).resolve().parent
 # PYRON_DADOS (ou app.iniciar --dados) aponta outra pasta: demonstrações e testes sem tocar nas inspeções reais.
@@ -160,7 +160,7 @@ def _validar_criterios(c: dict) -> dict:
     for grupo in ("similares", "dieletrico", "mta_faixas", "ambiente"):
         linhas = []
         for limite, nivel in c.get(grupo, analise.CRITERIOS_PADRAO[grupo]):
-            if nivel not in analise.NIVEIS or nivel == "normal":
+            if nivel not in analise.NIVEIS or nivel in ("normal", "sem_medida"):
                 raise HTTPException(422, f"Nível desconhecido no critério: {nivel}.")
             linhas.append([round(float(limite), 2), nivel])
         linhas.sort(key=lambda linha: linha[0])
@@ -287,7 +287,10 @@ def _nova_analise(dados: bytes, nome: str, modelo: str | None, fonte: str = "man
     t1 = perf_counter()
     det = _detector(modelo)
     try:
-        regioes = _regioes_do_detector(det, img.temperatura_c, img.exibida_rgb)
+        if img.tem_temperatura or getattr(det, "precisa_imagem", False):
+            regioes = _regioes_do_detector(det, img.temperatura_c, img.exibida_rgb)
+        else:
+            regioes = []  # o modelo lê temperatura, que esta imagem não tem
     except ValueError as erro:
         raise HTTPException(422, f"O modelo {det.nome} falhou: {erro}") from erro
     t2 = perf_counter()
@@ -308,6 +311,7 @@ def _nova_analise(dados: bytes, nome: str, modelo: str | None, fonte: str = "man
             **(identificacao or {}),
         },
         "regioes": regioes,
+        **({} if img.tem_temperatura else {"sem_temperatura": True}),
         "tem_foto": img.foto_visivel is not None,
         "matriz_info": {
             "largura": int(img.temperatura_c.shape[1]),
@@ -316,11 +320,14 @@ def _nova_analise(dados: bytes, nome: str, modelo: str | None, fonte: str = "man
         },
     }
     _calcular(a, img.temperatura_c)
+    if not img.tem_temperatura and not getattr(det, "precisa_imagem", False):
+        a["resumo"]["avisos"].append(f"O modelo {det.nome} procura pelo calor; sem temperatura, ele não identifica componentes. "
+                                     "Escolha um modelo que olha a imagem colorida.")
     t3 = perf_counter()
     a["etapas"] = [
-        {"nome": "Leitura da temperatura", "ms": round((t1 - t0) * 1000)},
+        {"nome": "Leitura da temperatura", "ms": round((t1 - t0) * 1000), **({} if img.tem_temperatura else {"sem_dado": True})},
         {"nome": "Detecção", "ms": round((t2 - t1) * 1000)},
-        {"nome": "Medição e severidade", "ms": round((t3 - t2) * 1000)},
+        {"nome": "Medição e severidade", "ms": round((t3 - t2) * 1000), **({} if img.tem_temperatura else {"sem_dado": True})},
     ]
     armazenamento.salvar(a, original=dados, matriz=img.temperatura_c)
     if img.foto_visivel:
@@ -332,7 +339,7 @@ def _completa(a: dict) -> dict:
     matriz = armazenamento.matriz(a["id"])
     saida = dict(a)
     saida["equipamento_chave"] = _chave_de(a)
-    if a.get("resumo", {}).get("severidade", "normal") != "normal":
+    if a.get("resumo", {}).get("severidade", "normal") not in ("normal", "sem_medida"):
         item = {**a, "destaque": _destaque(a), "data_captura": (a.get("metadados") or {}).get("data_hora", "")}
         saida["pendencia"] = pendencias.montar(item)
     if matriz is not None:
@@ -521,6 +528,59 @@ def ajustar_parametros(id_: str, corpo: dict = Body(...)) -> dict:
     return _completa(a)
 
 
+@app.post("/api/analises/{id_}/escala")
+def informar_escala(id_: str, corpo: dict = Body(...)) -> dict:
+    """Mínimo e máximo da barra de cores, quando a leitura automática falhou ou leu errado.
+
+    Vale para imagens sem dados radiométricos que têm a barra: as cores viram temperatura com
+    essa escala. As regiões ficam onde estão e são medidas de novo.
+    """
+    a, _ = _carregar(id_)
+    if a.get("radiometrica"):
+        raise HTTPException(422, "Este termograma é radiométrico: a temperatura vem da câmera, não de uma escala.")
+    try:
+        t_min, t_max = float(corpo.get("t_min")), float(corpo.get("t_max"))
+    except (TypeError, ValueError) as erro:
+        raise HTTPException(422, "Informe o mínimo e o máximo da escala em °C.") from erro
+    if not (-60 <= t_min < t_max <= 2000):
+        raise HTTPException(422, "Escala inválida: o máximo precisa ser maior que o mínimo (de −60 a 2000 °C).")
+    original = armazenamento.original(id_)
+    if original is None:
+        raise HTTPException(422, "O arquivo original desta inspeção não está guardado.")
+    try:
+        img = entrada.carregar(original, ocr=None, limites=(t_min, t_max))
+    except ValueError as erro:
+        raise HTTPException(422, str(erro)) from erro
+    a["metadados"] = {k: v for k, v in {**a.get("metadados", {}), **img.metadados}.items()
+                      if k not in ("sem_temperatura", "barra_encontrada")}
+    a["origem"] = img.origem
+    a.pop("sem_temperatura", None)
+    a["etapas"] = [{k: v for k, v in e.items() if k != "sem_dado"} for e in a.get("etapas", [])]
+    lo, hi = render.faixa_exibicao(img.temperatura_c)
+    a["matriz_info"] = {**a.get("matriz_info", {}), "faixa_exibicao": [lo, hi]}
+    a.pop("exibicao", None)  # a faixa manual antiga não vale para a escala nova
+    with _trava:
+        _calcular(a, img.temperatura_c)
+        armazenamento.salvar(a, matriz=img.temperatura_c)
+    return _completa(a)
+
+
+def _fundo(id_: str, a: dict) -> np.ndarray | None:
+    """Sem temperatura, o fundo das imagens exportadas é a própria imagem enviada."""
+    if not a.get("sem_temperatura"):
+        return None
+    original = armazenamento.original(id_)
+    return entrada.exibida(original) if original else None
+
+
+def _sem_temperatura(itens: list[dict]) -> None:
+    """Laudo termográfico sem temperatura não diz nada: barra antes de gerar."""
+    faltam = [a["arquivo"] for a in itens if a.get("sem_temperatura")]
+    if faltam:
+        raise HTTPException(422, f"{', '.join(faltam[:3])}{'…' if len(faltam) > 3 else ''}: sem temperatura medida. "
+                                 "Informe a escala na inspeção ou use o JPEG radiométrico antes do laudo.")
+
+
 def _nome_exportado(a: dict, sufixo: str) -> str:
     base = re.sub(r"[^\w.-]+", "_", Path(a["arquivo"]).stem, flags=re.UNICODE).strip("_") or "inspecao"
     return f"{base}_{sufixo}"
@@ -533,7 +593,8 @@ def exportar_imagem(id_: str, largura: int = 1280) -> Response:
     _calcular(a, m)
     exib = a.get("exibicao") or {}
     img = render.desenhar(m, a["regioes"], largura=max(320, min(largura, 3840)), nome=exib.get("paleta") or "ferro",
-                          medicoes=a.get("medicoes"), faixa=tuple(exib["faixa"]) if exib.get("faixa") else None)
+                          medicoes=a.get("medicoes"), faixa=tuple(exib["faixa"]) if exib.get("faixa") else None,
+                          fundo=_fundo(id_, a))
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return Response(buf.getvalue(), media_type="image/png",
@@ -587,19 +648,29 @@ def foto(id_: str) -> Response:
     return Response(dados, media_type="image/jpeg")
 
 
+def _tipo_imagem(dados: bytes) -> str:
+    if dados[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if dados[:4] == b"RIFF" and dados[8:12] == b"WEBP":
+        return "image/webp"
+    if dados[:2] == b"BM":
+        return "image/bmp"
+    return "image/jpeg"
+
+
 @app.get("/api/analises/{id_}/original.jpg")
 def original(id_: str) -> Response:
     dados = armazenamento.original(id_)
     if not dados:
         raise HTTPException(404, "Imagem original não encontrada.")
-    return Response(dados, media_type="image/jpeg")
+    return Response(dados, media_type=_tipo_imagem(dados))
 
 
 @app.get("/api/analises/{id_}/miniatura.png")
 def miniatura(id_: str) -> Response:
     a, m = _carregar(id_)
     buf = io.BytesIO()
-    render.desenhar(m, a["regioes"], largura=320).save(buf, format="PNG")
+    render.desenhar(m, a["regioes"], largura=320, fundo=_fundo(id_, a)).save(buf, format="PNG")
     return Response(buf.getvalue(), media_type="image/png")
 
 
@@ -615,6 +686,7 @@ def _escolher_responsavel(id_: str | None, a: dict | None = None) -> dict:
 @app.get("/api/analises/{id_}/laudo.pdf")
 def laudo_pdf(id_: str, responsavel: str | None = None, art: str | None = None) -> Response:
     a, m = _carregar(id_)
+    _sem_temperatura([a])
     resp = _escolher_responsavel(responsavel, a)
     art = (art if art is not None else (a.get("identificacao") or {}).get("art")) or ""
     pdf = laudo.gerar(a, m, armazenamento.foto(id_), VERSAO, empresa=_config()["empresa"], responsavel=resp, art=art[:60],
@@ -635,6 +707,7 @@ def laudo_varias(corpo: dict = Body(...)) -> Response:
     for id_ in dict.fromkeys(str(i) for i in ids):
         a, m = _carregar(id_)
         itens.append((a, m, armazenamento.foto(id_)))
+    _sem_temperatura([a for a, _, _ in itens])
     resp = _escolher_responsavel(corpo.get("responsavel"))
     pdf = laudo.gerar_relatorio(itens, VERSAO, empresa=_config()["empresa"], responsavel=resp,
                                 art=str(corpo.get("art") or "")[:60], criterios=_criterios(), logo=_logo())
@@ -940,8 +1013,7 @@ def previa_mensagem() -> dict:
     itens = armazenamento.listar()
     if not itens:
         return {"mensagem": None}
-    ordem = list(analise.NIVEIS)
-    pior = max(itens, key=lambda it: (ordem.index(it["resumo"]["severidade"]), it["criado_em"]))
+    pior = max(itens, key=lambda it: (analise.NIVEIS.get(it["resumo"]["severidade"], {"ordem": -1})["ordem"], it["criado_em"]))
     a = armazenamento.obter(pior["id"])
     return {"mensagem": monitoramento.mensagem(a, cfg), "arquivo": a["arquivo"]}
 

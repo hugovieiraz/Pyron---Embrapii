@@ -55,6 +55,8 @@
   --programar: #E8751A;  --programar-fundo: #FDEBDC;  --programar-texto: #8C3F06;
   --urgente: #DC3F26;    --urgente-fundo: #FCE6E1;    --urgente-texto: #93220F;
   --imediato: #B0123A;   --imediato-fundo: #FAE3EA;   --imediato-texto: #86082A;
+  /* sem medida: imagem sem temperatura (não é "normal"); neutro, segue o tema pelos tokens de base */
+  --sem_medida: var(--n-500); --sem_medida-fundo: var(--superficie-3); --sem_medida-texto: var(--texto-2);
 
   /* ---------------------------------------------------------------- séries de gráfico (comparação de modelos: dado) */
   --serie-1: var(--azul-600);

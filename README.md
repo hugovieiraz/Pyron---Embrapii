@@ -101,6 +101,24 @@ que verifica a correção. O Painel mostra as pendências vencidas e as próxima
   CSV que abre direto no Excel em português.
 - **Busca rápida (Ctrl+K)** por inspeção, equipamento, tela ou ação, e **?** para os atalhos.
 
+## Imagens sem temperatura
+
+Nem toda imagem térmica traz temperatura. De onde ela sai, em ordem de confiança:
+
+1. **JPEG radiométrico da câmera** (FLIR, bloco FFF): temperatura **medida**, com emissividade e
+   demais parâmetros ajustáveis.
+2. **Imagem colorida com a barra de cores e os números da escala** (print, foto exportada, quadro de
+   vídeo): temperatura **estimada** pelas cores. A escala lida aparece na aba Resultado e pode ser
+   corrigida.
+3. **Sem dados radiométricos e sem escala legível** (imagem da internet, gerada por IA, captura
+   cortada): a análise **não trava**. Os componentes são identificados pela imagem colorida (com um
+   modelo que olha a imagem, como o RF-DETR), as etapas de temperatura ficam marcadas como "sem
+   dado" e a inspeção entra como **Sem medida**: não conta como normal, não vira pendência e não
+   gera laudo. Se a imagem tem a barra de cores, basta informar o mínimo e o máximo dela para
+   estimar a temperatura.
+
+Aceita JPEG, PNG, WebP e BMP.
+
 ## Relatório de inspeção
 
 O relatório segue a estrutura de um documento técnico: identificação, normas citadas (ABNT NBR

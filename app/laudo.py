@@ -297,10 +297,11 @@ def gerar_relatorio(itens: list[tuple[dict, np.ndarray, bytes | None]], versao: 
     ]
     corpo.append(Spacer(1, 2 * mm))
     corpo.append(tabela(["Critério", "Classificação"], linhas_crit, [62 * mm, 114 * mm]))
-    linhas_acao = [[Paragraph(n["rotulo"], est["cel"]), Paragraph(n["acao"], est["cel"])] for n in nucleo_analise.NIVEIS.values()]
+    niveis = [k for k in nucleo_analise.NIVEIS if k != "sem_medida"]  # o laudo só sai com temperatura
+    linhas_acao = [[Paragraph(nucleo_analise.NIVEIS[k]["rotulo"], est["cel"]), Paragraph(nucleo_analise.NIVEIS[k]["acao"], est["cel"])] for k in niveis]
     corpo.append(Spacer(1, 2 * mm))
     corpo.append(tabela(["Classificação", "Recomendação"], linhas_acao, [40 * mm, 136 * mm],
-                        {i: COR_SEV[k] for i, k in enumerate(nucleo_analise.NIVEIS, start=1)}))
+                        {i: COR_SEV[k] for i, k in enumerate(niveis, start=1)}))
 
     # ---------------------------------------------------------------- 3. resumo (várias imagens)
     def rotulo_imagem(a):

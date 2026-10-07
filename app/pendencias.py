@@ -72,7 +72,7 @@ def listar(itens: list[dict], hoje: date | None = None) -> list[dict]:
         por_equipamento.setdefault(k, []).append(it)
     saida = []
     for it in itens:
-        if it["resumo"]["severidade"] == "normal":
+        if it["resumo"]["severidade"] in ("normal", "sem_medida"):
             continue
         k = eq.chave((it.get("identificacao") or {}).get("instalacao"), (it.get("identificacao") or {}).get("equipamento"))
         reinspecao = None

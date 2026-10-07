@@ -7,7 +7,7 @@
 const $ = (s, raiz = document) => raiz.querySelector(s);
 const $$ = (s, raiz = document) => [...raiz.querySelectorAll(s)];
 const T = TEXTOS;
-const VERSAO_INTERFACE = "0.7.0"; // igual a VERSAO em app/servidor.py
+const VERSAO_INTERFACE = "0.7.1"; // igual a VERSAO em app/servidor.py
 
 function el(tag, props = {}, ...filhos) {
   const n = document.createElement(tag);
@@ -2446,7 +2446,7 @@ function valorDestaque(d) {
   if (!d) return "";
   if (d.pct_mta != null) return `${d.nome} · ${T.analise.pctMta(fmt(d.pct_mta, 0))}`;
   if (d.dt != null) return `${d.nome} · ΔT ${fmt(d.dt, 1, " °C")}`;
-  return `${d.nome} · ${fmt(d.t_max, 1, " °C")}`;
+  return d.t_max != null ? `${d.nome} · ${fmt(d.t_max, 1, " °C")}` : d.nome;
 }
 
 function miniaturaSrc(it) {
@@ -2489,7 +2489,8 @@ function cartaoDistribuicao(lista) {
   const total = lista.length;
   const barra = el("div", { class: "barra-empilhada", role: "img", "aria-label": T.painel.distribuicao });
   const legenda = el("ul", { class: "legenda-severidade" });
-  for (const n of [...NIVEIS].reverse()) {
+  const semMedida = lista.some((it) => it.resumo.severidade === "sem_medida") ? ["sem_medida"] : [];
+  for (const n of [...NIVEIS].reverse().concat(semMedida)) {
     const q = lista.filter((it) => it.resumo.severidade === n).length;
     if (q) barra.append(el("i", { style: { width: `${(q / total) * 100}%`, background: `var(--${n})` }, title: `${T.niveis[n]}: ${q}` }));
     legenda.append(el("li", {}, el("span", { class: "ponto", style: { background: `var(--${n})` } }), T.niveis[n], el("b", {}, String(q))));
@@ -2558,7 +2559,7 @@ function anexarDestino(dados, destino) {
 }
 
 async function enviarArquivos(lista) {
-  const arquivos = [...lista].filter((f) => /\.(jpe?g|png)$/i.test(f.name));
+  const arquivos = [...lista].filter((f) => /\.(jpe?g|png|webp|bmp)$/i.test(f.name));
   if (!arquivos.length) return avisar(T.geral.soImagens, { erro: true });
   let destino = estado.vista === "equipamentos" && location.hash.includes("/") ? estado.destinoEquipamento : null;
   const [inst, equip] = [$("#envio-instalacao").value.trim(), $("#envio-equipamento").value.trim()];
@@ -2731,6 +2732,8 @@ function abrirAnalise(a, recemCriada = false) {
   mostrarVista("analise");
   mostrarAnaliseAberta();
   atualizarTrilha();
+  $("#area-analise").classList.toggle("sem-temperatura", !!a.sem_temperatura);
+  if (a.sem_temperatura && ["ponto", "linha"].includes(estado.ferramenta)) definirFerramenta("selecionar");
   if (nova) {
     const area = $("#area-analise");
     area.classList.remove("entra");
@@ -2758,9 +2761,11 @@ function mostrarEtapas(tempos, andando = -1) {
   $("#etapas").replaceChildren(
     ...T.etapas.map((nome, i) => {
       const feita = tempos ? true : i < andando;
-      const classe = feita ? "feita" : i === andando ? "andando" : "";
-      const marcador = el("span", { class: "marcador" }, feita ? icone("check") : String(i + 1));
-      const tempo = el("span", { class: "tempo" }, tempos ? (tempos[i] ? `${tempos[i].ms} ms` : "pronto") : "");
+      // Sem temperatura, as etapas que dependem dela ficam marcadas como puladas (não falharam).
+      const pulada = !!(tempos && (tempos[i]?.sem_dado || (i === 3 && tempos.some((t) => t.sem_dado))));
+      const classe = pulada ? "pulada" : feita ? "feita" : i === andando ? "andando" : "";
+      const marcador = el("span", { class: "marcador" }, pulada ? "–" : feita ? icone("check") : String(i + 1));
+      const tempo = el("span", { class: "tempo" }, tempos ? (pulada ? T.analise.etapaSemDado : tempos[i] ? `${tempos[i].ms} ms` : "pronto") : "");
       return el("li", { class: classe }, marcador, el("span", { class: "nome" }, nome), tempo);
     }),
   );
@@ -2770,9 +2775,11 @@ function preencherCabecalho() {
   const a = estado.analise;
   $("#a-arquivo").textContent = a.arquivo;
   $("#a-arquivo").title = a.arquivo;
-  const e = [el("span", { class: `etiqueta ${a.radiometrica ? "medida" : "estimada"}` }, a.radiometrica ? T.analise.medida : T.analise.estimada)];
+  const e = [a.sem_temperatura
+    ? el("span", { class: "etiqueta sem-medida" }, T.analise.semTemperatura)
+    : el("span", { class: `etiqueta ${a.radiometrica ? "medida" : "estimada"}` }, a.radiometrica ? T.analise.medida : T.analise.estimada)];
   if (a.fonte === "monitoramento") e.push(el("span", { class: "etiqueta info" }, icone("camera"), T.analise.monitor));
-  if (a.metadados.camera) e.push(el("span", { class: "etiqueta" }, a.metadados.camera));
+  if (a.metadados.camera && a.metadados.camera !== "desconhecida") e.push(el("span", { class: "etiqueta" }, a.metadados.camera));
   if (a.metadados.data_hora) e.push(el("span", { class: "etiqueta" }, icone("calendario"), dataHora(a.metadados.data_hora)));
   e.push(el("span", { class: "etiqueta" }, a.modelo.nome));
   if (a.parametros_ajustados && a.parametros_ajustados.length) {
@@ -2794,6 +2801,7 @@ function faixaAtual() {
 
 const fora = document.createElement("canvas");
 function desenharTermograma() {
+  if (estado.analise.sem_temperatura) return desenharSemTemperatura();
   const { largura: W, altura: H, valores } = estado.matriz;
   const [lo, hi] = faixaAtual();
   const lut = estado.paletas[estado.paleta];
@@ -2848,6 +2856,24 @@ function desenharTermograma() {
   $("#escala-ticks").replaceChildren(...[0, 0.25, 0.5, 0.75, 1].map((f) => el("span", { style: { left: `${f * 100}%` } }, fmt(lo + f * (hi - lo), 1, f === 1 ? " °C" : ""))));
 }
 
+/** Sem temperatura, o fundo do palco é a própria imagem enviada; caixas e rótulos continuam por cima. */
+function desenharSemTemperatura() {
+  const { largura: W, altura: H } = estado.matriz;
+  const tela = $("#tela");
+  tela.width = Math.max(1024, W * 2);
+  tela.height = Math.round((tela.width * H) / W);
+  const id = estado.analise.id;
+  const img = new Image();
+  img.onload = () => {
+    if (!estado.analise || estado.analise.id !== id || !estado.analise.sem_temperatura) return;
+    const c = tela.getContext("2d");
+    c.imageSmoothingQuality = "high";
+    c.drawImage(img, 0, 0, tela.width, tela.height);
+    ajustarAlturaImagem();
+  };
+  img.src = `/api/analises/${id}/original.jpg`;
+}
+
 /** Lugares que uma etiqueta pode ocupar em volta da caixa, na ordem de preferência. */
 const POSICOES_ETIQUETA = [
   { bottom: "100%", top: "auto", left: "-2px", right: "auto", marginBottom: "var(--e-1)", marginTop: "0" }, // acima, à esquerda
@@ -2885,9 +2911,9 @@ function desenharCaixas() {
   for (const r of estado.analise.regioes.filter(naCamada)) {
     const [x0, y0, x1, y1] = r.caixa;
     const cor = corNivel(r.severidade);
-    const temperatura = fmt(r.medida && r.medida.t_max, 1, " °C");
-    const completo = `${r.nome} · ${temperatura}`;
-    const etq = el("span", { class: "etq", dataset: { completo, curto: temperatura } }, el("i", { style: { background: cor } }), completo);
+    const temperatura = r.medida ? fmt(r.medida.t_max, 1, " °C") : null;
+    const completo = temperatura ? `${r.nome} · ${temperatura}` : r.nome;
+    const etq = el("span", { class: "etq", dataset: { completo, curto: temperatura || r.nome } }, el("i", { style: { background: cor } }), completo);
     const caixa = el("div", {
       class: `caixa${r.id === estado.selecionada ? " selecionada" : ""}`,
       dataset: { id: r.id, severidade: r.severidade, area: String((x1 - x0) * (y1 - y0)) },
@@ -3039,7 +3065,7 @@ function preencherResultado() {
   const r = a.resumo;
   const v = $("#veredito");
   v.className = `veredito ${r.severidade}`;
-  $("use", v).setAttribute("href", r.severidade === "normal" ? "#i-check" : "#i-alerta");
+  $("use", v).setAttribute("href", r.severidade === "normal" ? "#i-check" : r.severidade === "sem_medida" ? "#i-info" : "#i-alerta");
   const indicativa = a.regioes.some((x) => x.indicativa && x.severidade === r.severidade);
   $("#veredito-titulo").textContent = r.severidade_rotulo + (indicativa && r.severidade !== "normal" ? T.analise.indicativa : "");
   $("#veredito-texto").textContent = r.mensagem;
@@ -3055,6 +3081,7 @@ function preencherResultado() {
   $("#k-regioes").textContent = String(r.regioes);
   $("#avisos").replaceChildren(...(r.avisos || []).map((t) => el("li", {}, icone("info"), el("span", {}, t))));
   $("#criterio-nome").textContent = r.criterio;
+  preencherInformarEscala(a);
   desenharPontoMaisQuente(a);
   desenharComparacaoComponentes(a);
 
@@ -3089,7 +3116,7 @@ function preencherResultado() {
       }
       if (x.ref_tipo === "semelhantes") partes.push(T.analise.dtFases(fmt(x.dt_corrigido, 1, " °C")));
       if (x.carga_limite) partes.push(x.carga_limite.pct_nominal != null ? T.analise.atingeMtaCarga(fmt(x.carga_limite.pct_nominal, 0)) : T.analise.atingeMtaCorrente(fmt(x.carga_limite.vezes_corrente_atual, 1)));
-      if (ref.aquecimento === "dieletrico" && x.ref_tipo !== "semelhantes") partes.push(T.analise.compararFases);
+      if (ref.aquecimento === "dieletrico" && x.ref_tipo !== "semelhantes" && x.medida) partes.push(T.analise.compararFases);
       if (x.classe === "ponto_quente" && "componente" in x) partes.unshift(x.componente ? T.analise.naPeca(x.componente.nome) : T.analise.foraDePeca);
       if (x.confianca != null) partes.push(T.analise.confianca(fmt(x.confianca * 100, 0)));
       const medidaSecundaria = x.pct_mta != null ? T.analise.pctMta(fmt(x.pct_mta, 0)) : x.ref_tipo === "semelhantes" ? `ΔT ${fmt(x.dt_corrigido, 1, " °C")}` : x.dt_entorno != null ? T.analise.noEntorno(fmt(x.dt_entorno, 1)) : "";
@@ -3180,7 +3207,56 @@ function preencherCondicoes() {
   $("#meta").replaceChildren(...pares.map(([k, v]) => el("div", {}, el("dt", {}, k), el("dd", {}, v))));
 }
 
+/**
+ * Imagem sem dados radiométricos: com a barra de cores, o mínimo e o máximo dela bastam para estimar
+ * a temperatura. Sem temperatura, o cartão pede a escala; com a escala lida, ela pode ser corrigida.
+ */
+function preencherInformarEscala(a) {
+  const caixa = $("#escala-informar");
+  const meta = a.metadados || {};
+  const A = T.analise;
+  const lida = meta.escala_lida_c || [];
+  const semBarra = a.sem_temperatura && !meta.barra_encontrada;
+  caixa.hidden = a.radiometrica || (!a.sem_temperatura && lida.length !== 2);
+  if (caixa.hidden) return caixa.replaceChildren();
+  const cabeca = (texto) => el("div", { class: "escala-informar-cabeca" }, icone("info"), el("div", {}, el("b", {}, A.semTemperaturaTitulo), el("p", {}, texto)));
+  if (semBarra) return caixa.replaceChildren(cabeca(A.semTemperaturaSemBarra));
+  const campo = (rotulo, valor) => el("input", { type: "number", step: "0.1", required: true, value: valor ?? "", "aria-label": rotulo });
+  const min = campo(A.escalaMinima, lida[0]);
+  const max = campo(A.escalaMaxima, lida[1]);
+  const botao = el("button", { class: "btn btn-sm btn-primaria", type: "submit" }, icone("escala"), A.calcularTemperatura);
+  const form = el("form", {
+    class: "escala-informar-form",
+    onsubmit: async (ev) => {
+      ev.preventDefault();
+      ocupado(botao, true);
+      try {
+        const b = await api(`/api/analises/${a.id}/escala`, json("POST", { t_min: Number(min.value), t_max: Number(max.value) }));
+        abrirAnalise(b);
+        avisar(A.escalaAplicada);
+      } catch (e) {
+        avisar(e.message, { erro: true });
+      } finally {
+        ocupado(botao, false);
+      }
+    },
+  },
+  el("label", {}, A.escalaMinima, el("div", { class: "campo-unidade campo-curto" }, min, el("span", {}, "°C"))),
+  el("label", {}, A.escalaMaxima, el("div", { class: "campo-unidade campo-curto" }, max, el("span", {}, "°C"))),
+  botao);
+  const nota = el("p", { class: "nota" }, A.escalaNota);
+  if (a.sem_temperatura) return caixa.replaceChildren(cabeca(A.semTemperaturaComBarra), form, nota);
+  caixa.replaceChildren(el("details", {},
+    el("summary", {}, icone("escala"), A.escalaLida(fmt(lida[0], 1), fmt(lida[1], 1)), el("span", { class: "acao-texto" }, A.corrigirEscala)),
+    form, nota));
+}
+
 function preencherLaudo() {
+  const semTemp = !!estado.analise.sem_temperatura;
+  $("#btn-laudo").disabled = $("#btn-laudo-2").disabled = semTemp;
+  $("#btn-laudo").title = semTemp ? T.analise.laudoSemTemperatura : "";
+  $("#laudo-sem-temperatura").hidden = !semTemp;
+  $("#laudo-sem-temperatura span").textContent = T.analise.laudoSemTemperatura;
   const i = estado.analise.identificacao || {};
   $("#i-instalacao").value = i.instalacao || "";
   $("#i-equipamento").value = i.equipamento || "";
@@ -3480,7 +3556,7 @@ function ligarImagem() {
     const larguraQuadro = s.clientWidth;
     leitura.style.left = `${px > larguraQuadro - 110 ? px - 110 : px}px`;
     leitura.style.top = `${py}px`;
-    leitura.hidden = false;
+    leitura.hidden = !!estado.analise.sem_temperatura;
     if (Number.isFinite(v)) {
       const [lo, hi] = faixaAtual();
       marca.style.left = `${Math.min(100, Math.max(0, ((v - lo) / Math.max(hi - lo, 1e-6)) * 100))}%`;
@@ -3724,7 +3800,9 @@ function acoesInspecao(it) {
   const parar = (f) => (ev) => { ev.stopPropagation(); f(); };
   const ident = it.identificacao || {};
   return [
-    el("button", { class: "btn btn-sm", type: "button", title: T.inspecoes.laudoTitulo, onclick: parar(() => emitirRelatorio([it.id], { responsavel: ident.responsavel_id, art: ident.art })) }, icone("laudo"), T.geral.laudo),
+    el("button", { class: "btn btn-sm", type: "button", disabled: it.resumo.severidade === "sem_medida",
+      title: it.resumo.severidade === "sem_medida" ? T.analise.laudoSemTemperatura : T.inspecoes.laudoTitulo,
+      onclick: parar(() => emitirRelatorio([it.id], { responsavel: ident.responsavel_id, art: ident.art })) }, icone("laudo"), T.geral.laudo),
     el("button", { class: "btn btn-sm btn-fantasma btn-icone", type: "button", title: T.geral.apagar, "aria-label": T.inspecoes.rotuloApagar(it.arquivo), onclick: parar(() => apagarInspecao(it)) }, icone("lixo")),
   ];
 }

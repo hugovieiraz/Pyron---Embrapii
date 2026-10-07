@@ -12,7 +12,7 @@ import numpy as np
 
 def _destaque(a: dict) -> dict | None:
     """A região que decide a severidade da inspeção: é o que o Painel mostra."""
-    ordem = ["normal", "atencao", "programar", "urgente", "imediato"]
+    ordem = ["sem_medida", "normal", "atencao", "programar", "urgente", "imediato"]
     regioes = [r for r in a.get("regioes", []) if r.get("severidade")]
     if not regioes:
         return None

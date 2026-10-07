@@ -157,7 +157,7 @@
                 <button class="btn btn-primaria" id="btn-arquivos" type="button"><svg class="ic"><use href="#i-upload"/></svg>Escolher arquivos</button>
                 <span class="atalho">ou <kbd>Ctrl</kbd> + <kbd>O</kbd></span>
               </div>
-              <input type="file" id="arquivos" accept=".jpg,.jpeg,.png" multiple hidden>
+              <input type="file" id="arquivos" accept=".jpg,.jpeg,.png,.webp,.bmp" multiple hidden>
             </div>
             <ol class="fluxo">
               <li><span class="fluxo-n">1</span><div><b>Lê a temperatura</b><small>de cada pixel, com emissividade e distância</small></div></li>
@@ -286,6 +286,7 @@
                   <div class="kpi"><span>Regiões</span><b id="k-regioes" class="num">—</b></div>
                 </div>
                 <ul class="avisos" id="avisos"></ul>
+                <div class="escala-informar" id="escala-informar" hidden></div>
                 <div class="acompanhamento" id="acompanhamento" hidden></div>
                 <div class="comparacao-anterior" id="comparacao-anterior" hidden></div>
                 <div class="ponto-maximo" id="ponto-maximo" hidden></div>
@@ -303,7 +304,7 @@
                   </div>
                 </div>
                 <div class="medicoes" id="medicoes"></div>
-                <p class="nota">Dê a mesma classe às regiões das três fases (por exemplo, três "Terminal superior") para comparar componentes semelhantes, como pede o critério.</p>
+                <p class="nota so-temperatura">Dê a mesma classe às regiões das três fases (por exemplo, três "Terminal superior") para comparar componentes semelhantes, como pede o critério.</p>
               </div>
 
               <div class="painel-aba" data-painel="condicoes" role="tabpanel" hidden>
@@ -366,6 +367,7 @@
                     <button class="btn btn-primaria" type="button" id="btn-laudo-2"><svg class="ic"><use href="#i-laudo"/></svg>Gerar laudo PDF</button>
                   </div>
                 </form>
+                <p class="aviso-laudo" id="laudo-sem-temperatura" hidden><svg class="ic"><use href="#i-info"/></svg><span></span></p>
                 <p class="nota">O responsável vem do cadastro em Configurações, assim como o nome da empresa no cabeçalho. Para um relatório com várias imagens, selecione-as em Inspeções.</p>
               </div>
             </div>

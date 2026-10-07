@@ -211,10 +211,13 @@ label > .segmentado { justify-self: start; }
 .selo.programar { background: var(--programar-fundo); color: var(--programar-texto); }
 .selo.urgente { background: var(--urgente-fundo); color: var(--urgente-texto); }
 .selo.imediato { background: var(--imediato-fundo); color: var(--imediato-texto); }
+.selo.sem_medida { background: var(--sem_medida-fundo); color: var(--sem_medida-texto); }
+.selo.sem_medida::before { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
 .selo.indicativa { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
 .etiqueta { display: inline-flex; align-items: center; gap: var(--e-1); height: var(--e-6); padding: 0 var(--e-2); border-radius: var(--r-p); background: var(--superficie-3); color: var(--texto-2); font-size: var(--t-1); font-weight: var(--p-medio); white-space: nowrap; }
 .etiqueta.medida { background: var(--sucesso-fundo); color: var(--sucesso-texto); }
 .etiqueta.estimada { background: var(--aviso-fundo); color: var(--aviso-texto); }
+.etiqueta.sem-medida { background: var(--sem_medida-fundo); color: var(--sem_medida-texto); box-shadow: inset 0 0 0 1px var(--borda-forte); }
 .etiqueta.info { background: var(--info-fundo); color: var(--info-texto); }
 .etiqueta.disponivel { background: var(--sucesso-fundo); color: var(--sucesso-texto); }
 .etiqueta.breve { background: var(--realce-suave); color: var(--realce); }
@@ -373,6 +376,8 @@ kbd { font: var(--p-medio) var(--t-1) / var(--a-1) var(--fonte-num); padding: 0 
 .etapas .marcador .ic { width: var(--e-3); height: var(--e-3); stroke-width: 2.6; }
 .etapas li.feita { color: var(--texto-2); }
 .etapas li.feita .marcador { background: var(--sucesso); color: var(--branco); }
+.etapas li.pulada { color: var(--texto-3); border-style: dashed; }
+.etapas li.pulada .marcador { background: var(--superficie-3); color: var(--texto-2); }
 .etapas li.andando { border-color: var(--acao); color: var(--texto); }
 .etapas li.andando .marcador { background: var(--acao); color: var(--acao-texto); animation: pulsar 1s var(--ease-padrao) infinite; }
 .etapas .nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--p-medio); }
@@ -450,6 +455,26 @@ kbd { font: var(--p-medio) var(--t-1) / var(--a-1) var(--fonte-num); padding: 0 
 .veredito.programar { background: var(--programar-fundo); color: var(--programar-texto); border-color: var(--programar); }
 .veredito.urgente { background: var(--urgente-fundo); color: var(--urgente-texto); border-color: var(--urgente); }
 .veredito.imediato { background: var(--imediato-fundo); color: var(--imediato-texto); border-color: var(--imediato); }
+.veredito.sem_medida { background: var(--sem_medida-fundo); color: var(--sem_medida-texto); border-color: var(--borda-forte); border-style: dashed; }
+
+/* Imagem sem temperatura: o palco mostra a própria imagem; some o que só faz sentido com temperatura. */
+.area-analise.sem-temperatura :is(#seg-paleta, #seg-faixa, #btn-isoterma, #btn-original, #escala-controle, #isoterma-controle, .escala,
+  #seg-ferramenta [data-valor="ponto"], #seg-ferramenta [data-valor="linha"], .lista-medicoes, #medicoes, .kpis, .so-temperatura) { display: none; }
+.area-analise.sem-temperatura .palco-barra > .divisor:first-of-type { display: none; }
+.escala-informar { display: grid; gap: var(--e-3); padding: var(--e-3) var(--e-4); border: 1px solid var(--borda); border-radius: var(--r-m); background: var(--superficie-2); }
+.escala-informar-cabeca { display: grid; grid-template-columns: var(--ic-g) 1fr; gap: var(--e-3); align-items: start; }
+.escala-informar-cabeca > .ic { width: var(--ic-g); height: var(--ic-g); color: var(--acao); }
+.escala-informar-cabeca b { display: block; margin-bottom: var(--e-1); }
+.escala-informar-cabeca p { margin: 0; color: var(--texto-2); font-size: var(--t-2); }
+.escala-informar-form { display: flex; flex-wrap: wrap; align-items: end; gap: var(--e-3); }
+.escala-informar-form label { display: grid; gap: var(--e-1); font-size: var(--t-1); color: var(--texto-2); font-weight: var(--p-medio); }
+.escala-informar .nota { margin: 0; }
+.escala-informar summary { cursor: pointer; display: flex; align-items: center; gap: var(--e-2); color: var(--texto-2); font-size: var(--t-2); }
+.escala-informar summary .acao-texto { color: var(--acao); font-weight: var(--p-medio); }
+.escala-informar details[open] summary { margin-bottom: var(--e-3); }
+.escala-informar details > :not(summary) + :not(summary) { margin-top: var(--e-3); }
+.aviso-laudo { display: flex; gap: var(--e-2); align-items: start; padding: var(--e-3); border-radius: var(--r-m); background: var(--sem_medida-fundo); color: var(--sem_medida-texto); font-size: var(--t-2); }
+.aviso-laudo .ic { flex: none; margin-top: 2px; }
 .avisos { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--e-2); }
 .avisos li { display: grid; grid-template-columns: var(--ic) 1fr; gap: var(--e-2); font-size: var(--t-1); line-height: var(--a-1); color: var(--info-texto); padding: var(--e-2) var(--e-3); background: var(--info-fundo); border-radius: var(--r-m); }
 .avisos .ic { color: var(--info); margin-top: 0; }

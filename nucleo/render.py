@@ -19,6 +19,7 @@ CORES_SEVERIDADE = {
     "programar": (0xE8, 0x75, 0x1A),
     "urgente": (0xDC, 0x3F, 0x26),
     "imediato": (0xB0, 0x12, 0x3A),
+    "sem_medida": (0x9A, 0xA2, 0xB9),
 }
 
 
@@ -39,6 +40,8 @@ def faixa_exibicao(temperatura: np.ndarray) -> tuple[float, float]:
     from nucleo.analise import mascara_objetos
 
     ok = np.isfinite(temperatura)
+    if not ok.any():  # imagem sem temperatura: qualquer faixa serve, nada é colorido por ela
+        return 0.0, 1.0
     objetos = mascara_objetos(temperatura)
     base = temperatura[objetos] if objetos.sum() >= 30 else temperatura[ok]
     lo = float(np.percentile(base, 1))
@@ -96,17 +99,22 @@ def posicionar_rotulo(largura: float, altura: float, caixa, ocupadas: list, limi
 
 
 def desenhar(temperatura: np.ndarray, regioes: list[dict], largura: int = 960, nome: str = "ferro", numerar: bool = False,
-             medicoes: list[dict] | None = None, faixa: tuple[float, float] | None = None) -> Image.Image:
+             medicoes: list[dict] | None = None, faixa: tuple[float, float] | None = None,
+             fundo: np.ndarray | None = None) -> Image.Image:
     """Termograma ampliado com as caixas e o ponto de máxima de cada região.
 
     ``numerar=True`` (laudo): cada caixa ganha só o número da linha da tabela, num selo da cor da
     severidade. Sem numerar: nome e temperatura máxima. Em qualquer caso, os rótulos não se cobrem;
     sem lugar livre, o rótulo vira só o número (e, em último caso, fica por cima do mais próximo).
+
+    ``fundo`` (RGB) troca o termograma colorido pela imagem como foi gravada: é o que resta numa
+    imagem sem temperatura, em que só os componentes foram identificados.
     """
     h, w = temperatura.shape
     escala = largura / w
     lo, hi = faixa if faixa else (None, None)
-    img = Image.fromarray(colorir(temperatura, lo, hi, nome=nome)).resize((largura, int(h * escala)), Image.BICUBIC)
+    base = fundo if fundo is not None else colorir(temperatura, lo, hi, nome=nome)
+    img = Image.fromarray(np.ascontiguousarray(base)).convert("RGB").resize((largura, int(h * escala)), Image.BICUBIC)
     d = ImageDraw.Draw(img)
     fonte = _fonte(max(12, largura // (48 if numerar else 42)))
     limite = (img.width, img.height)
