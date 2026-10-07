@@ -893,7 +893,7 @@ kbd { display: inline-grid; place-items: center; min-width: var(--e-5); height: 
 .grade-equip-detalhe > :only-child { grid-column: 1 / -1; }
 .tabela-compacta td, .tabela-compacta th { padding: var(--e-2); }
 .grafico-svg .ponto-clicavel { cursor: pointer; }
-.barra-grafico { display: flex; justify-content: flex-end; margin-bottom: var(--e-2); }
+.cabeca-grafico { display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap; }
 .linha-inspecoes { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-1); max-height: var(--altura-lista); overflow-y: auto; }
 .linha-inspecoes a { display: grid; grid-template-columns: var(--e-16) minmax(0, 1fr) auto; align-items: center; gap: var(--e-3); padding: var(--e-2); border-radius: var(--r-m); color: inherit; text-decoration: none; }
 .linha-inspecoes a:hover { background: var(--acao-suave); }
@@ -959,6 +959,52 @@ kbd { display: inline-grid; place-items: center; min-width: var(--e-5); height: 
 .eventos-video button { display: flex; align-items: center; gap: var(--e-2); width: 100%; padding: var(--e-2); border: 1px solid var(--borda); border-radius: var(--r-m); background: var(--superficie); color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .eventos-video button:hover { border-color: var(--acao); background: var(--acao-suave); }
 .eventos-video .nota { margin-left: auto; }
+
+/* ---------------------------------------------------------------- identidade, símbolos e movimento */
+.titulo-pagina { display: flex; align-items: flex-start; gap: var(--e-4); min-width: 0; }
+.icone-pagina { flex: none; display: grid; place-items: center; width: var(--e-12); height: var(--e-12); border-radius: var(--r-g); background: var(--acao-suave); color: var(--acao); box-shadow: inset 0 0 0 1px var(--acao-suave-2); }
+.icone-pagina .ic { width: var(--e-6); height: var(--e-6); }
+.vista.entrando .icone-pagina { animation: surgir-icone var(--dur-lenta) var(--ease-entrada) both; }
+@keyframes surgir-icone { from { opacity: 0; transform: scale(.8) rotate(-8deg); } }
+
+.kpi-grande { position: relative; }
+.kpi-icone { position: absolute; top: var(--e-3); right: var(--e-3); display: grid; place-items: center; width: var(--e-8); height: var(--e-8); border-radius: var(--r-m); background: var(--acao-suave); color: var(--acao); }
+.kpi-icone .ic { width: var(--e-4); height: var(--e-4); }
+.kpi-icone + span { padding-right: var(--e-10); }
+.kpi-icone.erro { background: var(--erro-fundo); color: var(--erro); }
+.kpi-icone.aviso { background: var(--aviso-fundo); color: var(--aviso-texto); }
+.kpi-grande > b { transform-origin: left bottom; }
+
+.titulo-icone { display: flex; align-items: center; gap: var(--e-2); }
+.titulo-icone .ic { flex: none; width: var(--e-5); height: var(--e-5); color: var(--acao); }
+.cartao > .titulo-icone { margin-bottom: var(--e-3); }
+
+/* Cartões clicáveis sobem um pouco ao passar o mouse (só transform). */
+.cartao-equip, .cartao-video, button.kpi-grande, .inspecao.miniatura { transition: transform var(--dur-rapida) var(--ease-padrao), border-color var(--dur-rapida) var(--ease-padrao), box-shadow var(--dur-rapida) var(--ease-padrao); }
+.cartao-equip:hover, .cartao-video:hover, button.kpi-grande:hover, .inspecao.miniatura:hover { transform: translateY(calc(-1 * var(--e-1) / 2)); }
+.cartao-equip:active, .cartao-video:active, button.kpi-grande:active { transform: translateY(0) scale(.99); }
+
+/* Gráficos: linhas entram da esquerda, barras crescem de baixo, a barra de severidade se estende. */
+.recorte-revelar { transform-box: fill-box; transform-origin: left center; animation: revelar-x var(--dur-lenta) var(--ease-entrada) both; }
+@keyframes revelar-x { from { transform: scaleX(0); } }
+.grafico-svg .barra-crescer { transform-box: fill-box; transform-origin: center bottom; animation: crescer-y var(--dur-lenta) var(--ease-entrada) both; }
+@keyframes crescer-y { from { transform: scaleY(0); } }
+.grafico-svg .area { opacity: .1; stroke: none; }
+.barra-empilhada { transform-origin: left center; animation: revelar-x var(--dur-lenta) var(--ease-entrada) both; }
+
+/* Abas, menu e seletores: a escolha nova se anuncia com um movimento curto. */
+.abas button[aria-selected="true"]::after { transform-origin: center; animation: sublinhar var(--dur-media) var(--ease-entrada); }
+@keyframes sublinhar { from { transform: scaleX(0); } }
+.nav a.ativo { animation: ativar-item var(--dur-media) var(--ease-entrada); }
+@keyframes ativar-item { from { transform: scale(.96); opacity: .7; } }
+.nav a .ic { transition: transform var(--dur-rapida) var(--ease-padrao); }
+.nav a:hover .ic { transform: translateX(calc(var(--e-1) / 2)); }
+.segmentado button[aria-pressed="true"] { animation: pressionar var(--dur-rapida) var(--ease-entrada); }
+@keyframes pressionar { from { transform: scale(.94); } }
+
+/* Topo: sombra fina quando o conteúdo passa por baixo. */
+.topo::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; box-shadow: var(--sombra-2); opacity: 0; transition: opacity var(--dur-media) var(--ease-padrao); pointer-events: none; }
+.topo.rolado::after { opacity: 1; }
 
 /* ---------------------------------------------------------------- movimento reduzido, toque e telas menores */
 @media (prefers-reduced-motion: reduce) {

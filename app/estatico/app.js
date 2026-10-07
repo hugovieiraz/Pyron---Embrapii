@@ -181,6 +181,57 @@ function ocupado(botao, ligar) {
 // ================================================================= tema, navegação e barra de status
 
 const midiaEscura = window.matchMedia("(prefers-color-scheme: dark)");
+const reduzirMovimento = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+/** Duração de um token de movimento (tokens.css), em milissegundos. */
+function duracao(token) {
+  return parseFloat(getComputedStyle(document.documentElement).getPropertyValue(`--dur-${token}`)) || 250;
+}
+
+/** Os números inteiros dos indicadores contam até o valor; com movimento reduzido, aparecem prontos. */
+function contarNumeros(raiz) {
+  if (reduzirMovimento.matches || !raiz) return;
+  const dur = duracao("lenta");
+  for (const b of $$(".kpi-grande > b", raiz)) {
+    const alvo = Number(b.textContent);
+    if (!Number.isInteger(alvo) || alvo < 2) continue;
+    const t0 = performance.now();
+    const passo = (t) => {
+      const f = Math.min(1, (t - t0) / dur);
+      b.textContent = String(Math.round(alvo * (1 - (1 - f) ** 3)));
+      if (f < 1) requestAnimationFrame(passo);
+    };
+    b.textContent = "0";
+    requestAnimationFrame(passo);
+  }
+}
+
+let idRecorte = 0;
+/** Linhas e pontos de um gráfico entram da esquerda para a direita (o recorte cresce por transform). */
+function revelarGrafico(svg, largura, altura) {
+  if (reduzirMovimento.matches) return svg;
+  const id = `revelar-${++idRecorte}`;
+  svg.prepend(svgEl("defs", {}, svgEl("clipPath", { id }, svgEl("rect", { x: 0, y: -altura, width: largura, height: altura * 3, class: "recorte-revelar" }))));
+  const g = svgEl("g", { "clip-path": `url(#${id})` });
+  for (const n of $$("path.linha, path.area, line.reta-tendencia, circle", svg)) g.append(n);
+  svg.append(g);
+  return svg;
+}
+
+/** Põe um controle (por exemplo, um seletor) na mesma linha do título do gráfico. */
+function comControle(figura, controle) {
+  if (!figura || !controle) return figura;
+  const legenda = $("figcaption", figura);
+  const cabeca = el("div", { class: "cabeca-grafico" });
+  legenda.replaceWith(cabeca);
+  cabeca.append(legenda, controle);
+  return figura;
+}
+
+/** Título de cartão com o símbolo da seção. */
+function tituloComIcone(nome, texto, nivel = "h2") {
+  return el(nivel, { class: "titulo-icone" }, icone(nome), texto);
+}
 function aplicarTema(tema) {
   const escolhido = tema || "claro";
   const efetivo = escolhido === "sistema" ? (midiaEscura.matches ? "escuro" : "claro") : escolhido;
@@ -699,7 +750,7 @@ function graficoBarras(categorias, series) {
     series.forEach((s, j) => {
       const v = s.valores[i];
       const x = x0 + j * larg;
-      svg.append(svgEl("rect", { x, y: y(v), width: larg - 4, height: m.t + h - y(v), rx: 3, style: `fill: ${corSerie(s.indice)}` },
+      svg.append(svgEl("rect", { x, y: y(v), width: larg - 4, height: m.t + h - y(v), rx: 3, class: "barra-crescer", style: `fill: ${corSerie(s.indice)}; animation-delay: ${(i * series.length + j) * 25}ms` },
         svgEl("title", {}, `${s.nome} · ${c}: ${num2(v)}`)));
       if (v != null) svg.append(svgEl("text", { x: x + (larg - 4) / 2, y: y(v) - 5, class: "valor", "text-anchor": "middle" }, num2(v)));
     });
@@ -736,7 +787,7 @@ function graficoLinhas(titulo, series, { yMax = null, marcas = [] } = {}) {
     const d = validos.map(([a, b], i) => `${i ? "L" : "M"}${x(a).toFixed(1)} ${y(b).toFixed(1)}`).join(" ");
     svg.append(svgEl("path", { d, class: `linha${s.tracejado ? " tracejada" : ""}`, style: `stroke: ${corSerie(s.indice)}` }, svgEl("title", {}, s.nome)));
   }
-  return el("figure", { class: "grafico" }, el("figcaption", {}, titulo), svg, legendaGrafico(series));
+  return el("figure", { class: "grafico" }, el("figcaption", {}, titulo), revelarGrafico(svg, L, A), legendaGrafico(series));
 }
 
 /** Cor da célula: AP50 e revocação são bons a partir de 0,90; o AP50-95 (caixa justa) é naturalmente mais baixo. */
@@ -1164,6 +1215,7 @@ async function carregarPendencias() {
   }
   atualizarContadorPendencias();
   desenharPendencias();
+  contarNumeros($("#kpis-pendencias"));
 }
 
 function atualizarContadorPendencias() {
@@ -1377,7 +1429,7 @@ function sparkline(serie) {
     const ultimo = i === pts.length - 1;
     if (ultimo || p.severidade !== "normal") svg.append(svgEl("circle", { cx: x(ts[i]).toFixed(1), cy: y(p.t_max).toFixed(1), r: ultimo ? 3.5 : 2.5, style: `fill: var(--${p.severidade})` }));
   });
-  return svg;
+  return revelarGrafico(svg, L, A);
 }
 
 /** Séries no tempo (eixo x em datas). series: [{nome, indice, pontos: [{data, valor, severidade, id}]}]. */
@@ -1414,7 +1466,13 @@ function graficoDatas(titulo, series, { aoClicar = null, unidade = " °C", tende
       }
     }
     if (pts.length > 1) {
-      svg.append(svgEl("path", { d: pts.map((p, i) => `${i ? "L" : "M"}${x(Date.parse(p.data)).toFixed(1)} ${y(p.valor).toFixed(1)}`).join(" "), class: "linha", style: `stroke: ${corSerie(s.indice)}` }));
+      const d = pts.map((p, i) => `${i ? "L" : "M"}${x(Date.parse(p.data)).toFixed(1)} ${y(p.valor).toFixed(1)}`).join(" ");
+      if (series.length === 1) {
+        // Área suave sob a linha (cor da série com pouca opacidade, sem gradiente).
+        const base = (A - m.b).toFixed(1);
+        svg.append(svgEl("path", { d: `${d} L${x(Date.parse(pts[pts.length - 1].data)).toFixed(1)} ${base} L${x(Date.parse(pts[0].data)).toFixed(1)} ${base} Z`, class: "area", style: `fill: ${corSerie(s.indice)}` }));
+      }
+      svg.append(svgEl("path", { d, class: "linha", style: `stroke: ${corSerie(s.indice)}` }));
     }
     for (const p of pts) {
       const c = svgEl("circle", {
@@ -1425,7 +1483,7 @@ function graficoDatas(titulo, series, { aoClicar = null, unidade = " °C", tende
       svg.append(c);
     }
   }
-  return el("figure", { class: "grafico" }, el("figcaption", {}, titulo), svg, series.length > 1 ? legendaGrafico(series) : null);
+  return el("figure", { class: "grafico" }, el("figcaption", {}, titulo), revelarGrafico(svg, L, A), series.length > 1 ? legendaGrafico(series) : null);
 }
 
 function preencherSugestoes(equips) {
@@ -1454,6 +1512,7 @@ async function carregarEquipamentos(sub) {
   }
   preencherSugestoes(estado.equipamentos);
   desenharEquipamentos();
+  contarNumeros($("#kpis-equip"));
 }
 
 function desenharEquipamentos() {
@@ -1550,6 +1609,7 @@ function desenharEquipamento(d) {
   const cabecalho = el("header", { class: "cabecalho cabecalho-analise" },
     el("div", { class: "titulo-analise" },
       el("a", { class: "btn btn-fantasma btn-icone", href: "#equipamentos", "aria-label": E.voltar, title: E.voltar }, icone("voltar")),
+      el("span", { class: "icone-pagina", "aria-hidden": "true" }, icone(sem ? "inspecoes" : "ativos")),
       el("div", {},
         el("h1", { class: "nome-arquivo" }, sem ? E.semEquipTitulo(d.inspecoes) : d.equipamento),
         el("div", { class: "etiquetas" },
@@ -1587,7 +1647,7 @@ function desenharEquipamento(d) {
 
   const tabelaPecas = d.componentes.length
     ? el("div", { class: "cartao" },
-      el("h2", { class: "cartao-titulo" }, E.componentes),
+      tituloComIcone("modelos", E.componentes),
       el("table", { class: "tabela tabela-compacta" },
         el("thead", {}, el("tr", {}, [E.colPeca, E.colUltima, E.colDt, E.colTendencia, E.colEstado].map((t) => el("th", {}, t)))),
         el("tbody", {}, d.componentes.map((c) => el("tr", {},
@@ -1599,7 +1659,7 @@ function desenharEquipamento(d) {
     : null;
 
   const historico = el("div", { class: "cartao" },
-    el("h2", { class: "cartao-titulo" }, E.historico),
+    tituloComIcone("inspecoes", E.historico),
     el("ol", { class: "linha-inspecoes" }, d.lista.map((it) => {
       const p = it.destaque;
       return el("li", {}, el("a", { href: `#analise/${it.id}` },
@@ -1612,7 +1672,7 @@ function desenharEquipamento(d) {
 
   $("#equip-detalhe").replaceChildren(...[
     cabecalho, kpis,
-    el("div", { class: "cartao" }, trocaModo ? el("div", { class: "barra-grafico" }, trocaModo) : null, grafico, el("p", { class: "nota" }, E.graficoDica)),
+    el("div", { class: "cartao" }, comControle(grafico, trocaModo), el("p", { class: "nota" }, E.graficoDica)),
     graficoPecas ? el("div", { class: "cartao" }, graficoPecas) : null,
     el("div", { class: "grade-equip-detalhe" }, tabelaPecas, historico),
   ].filter(Boolean));
@@ -2270,17 +2330,19 @@ async function carregarPainel() {
 
   const conta = (niveis) => lista.filter((it) => niveis.includes(it.resumo.severidade)).length;
   const criticas = conta(["urgente", "imediato"]);
-  const kpi = (rotulo, valor, nota, destino, classe = "") =>
-    el("button", { class: `kpi-grande ${classe}`, type: "button", onclick: destino }, el("span", {}, rotulo), el("b", {}, String(valor)), el("small", {}, nota));
+  const kpi = (rotulo, valor, nota, destino, classe = "", ic = null, tom = "") =>
+    el("button", { class: `kpi-grande ${classe}`, type: "button", onclick: destino },
+      ic ? el("span", { class: `kpi-icone ${tom}`, "aria-hidden": "true" }, icone(ic)) : null,
+      el("span", {}, rotulo), el("b", {}, String(valor)), el("small", {}, nota));
   const irInspecoes = (filtro) => () => { estado.filtro = filtro; location.hash = "inspecoes"; };
   const kpis = el("div", { class: "kpis-grandes" }, animarEntrada([
-    kpi(T.painel.kpiInspecoes, lista.length, T.painel.kpiInspecoesNota(lista.filter((it) => it.fonte === "monitoramento").length), irInspecoes("todas")),
-    kpi(T.painel.kpiCriticas, criticas, T.painel.kpiCriticasNota, irInspecoes("grave"), criticas ? "critico" : ""),
+    kpi(T.painel.kpiInspecoes, lista.length, T.painel.kpiInspecoesNota(lista.filter((it) => it.fonte === "monitoramento").length), irInspecoes("todas"), "", "inspecoes"),
+    kpi(T.painel.kpiCriticas, criticas, T.painel.kpiCriticasNota, irInspecoes("grave"), criticas ? "critico" : "", "alerta", criticas ? "erro" : ""),
     kpi(T.painel.kpiPendencias, pendencias.filter((p) => p.vencida).length, T.painel.kpiPendenciasNota(pendencias.filter((p) => ["aberta", "programada", "corrigida"].includes(p.status)).length),
-      () => { estado.filtroPendencia = "vencidas"; location.hash = "pendencias"; }, pendencias.some((p) => p.vencida) ? "critico" : ""),
+      () => { estado.filtroPendencia = "vencidas"; location.hash = "pendencias"; }, pendencias.some((p) => p.vencida) ? "critico" : "", "chave", pendencias.some((p) => p.vencida) ? "erro" : ""),
     kpi(T.painel.kpiVencidas, equips.filter((e) => e.proxima_inspecao && e.proxima_inspecao.vencida).length, T.painel.kpiVencidasNota(equips.filter((e) => e.chave !== SEM_EQUIPAMENTO).length),
-      () => { estado.filtroEquip = "vencida"; location.hash = "equipamentos"; }),
-    kpi(T.painel.kpiAlertas, status.alertas_pendentes, T.painel.kpiAlertasNota, () => (location.hash = "monitoramento"), status.alertas_pendentes ? "critico" : ""),
+      () => { estado.filtroEquip = "vencida"; location.hash = "equipamentos"; }, "", "calendario", "aviso"),
+    kpi(T.painel.kpiAlertas, status.alertas_pendentes, T.painel.kpiAlertasNota, () => (location.hash = "monitoramento"), status.alertas_pendentes ? "critico" : "", "sino", status.alertas_pendentes ? "erro" : ""),
   ]));
 
   if (!lista.length) {
@@ -2290,6 +2352,7 @@ async function carregarPainel() {
   corpo.replaceChildren(...[avisoConfiguracao(), kpis].filter(Boolean), el("div", { class: "painel-grade" },
     cartaoAtencao(lista),
     el("div", { class: "pilha" }, cartaoDistribuicao(lista), cartaoProximas(equips), cartaoMonitor(status, alertas))));
+  contarNumeros(corpo);
 }
 
 /** Equipamentos pela data da próxima inspeção: os vencidos primeiro. */
@@ -2304,7 +2367,7 @@ function cartaoProximas(equips) {
         el("small", {}, e.proxima_inspecao.vencida ? P.proximasVencida(-e.proxima_inspecao.dias) : T.equip.emDias(e.proxima_inspecao.dias)))))))
     : el("p", { class: "nota" }, P.proximasVazio);
   return el("div", { class: "cartao" },
-    el("div", { class: "cartao-cabeca" }, el("h2", {}, P.proximasTitulo), el("a", { class: "link", href: "#equipamentos" }, P.verEquipamentos)),
+    el("div", { class: "cartao-cabeca" }, tituloComIcone("calendario", P.proximasTitulo), el("a", { class: "link", href: "#equipamentos" }, P.verEquipamentos)),
     corpo);
 }
 
@@ -2356,7 +2419,7 @@ function cartaoAtencao(lista) {
       b.criado_em.localeCompare(a.criado_em))
     .slice(0, 8);
   const cabeca = el("div", { class: "cartao-cabeca", style: { padding: "var(--e-5) var(--e-5) 0" } },
-    el("div", {}, el("h2", {}, T.painel.atencaoTitulo), el("p", { class: "nota" }, T.painel.atencaoNota)));
+    el("div", {}, tituloComIcone("alerta", T.painel.atencaoTitulo), el("p", { class: "nota" }, T.painel.atencaoNota)));
   if (!graves.length) {
     return el("div", { class: "cartao" }, estadoVazio({ nomeIcone: "check", titulo: T.painel.tudoCerto, texto: T.painel.tudoCertoTexto, compacto: true }));
   }
@@ -2389,7 +2452,7 @@ function cartaoDistribuicao(lista) {
     legenda.append(el("li", {}, el("span", { class: "ponto", style: { background: `var(--${n})` } }), T.niveis[n], el("b", {}, String(q))));
   }
   return el("div", { class: "cartao distribuicao" },
-    el("div", {}, el("h2", {}, T.painel.distribuicao), el("p", { class: "nota" }, T.painel.distribuicaoNota(total))), barra, legenda);
+    el("div", {}, tituloComIcone("grafico", T.painel.distribuicao), el("p", { class: "nota" }, T.painel.distribuicaoNota(total))), barra, legenda);
 }
 
 function cartaoMonitor(status, alertas) {
@@ -2403,7 +2466,7 @@ function cartaoMonitor(status, alertas) {
   const recentes = alertas.alertas.slice(0, 3).map((a) =>
     el("div", { class: "linha-estado" }, el("span", { class: `selo ${a.severidade}` }, T.niveis[a.severidade]), el("span", { class: "nota" }, `${dataHora(a.criado_em)} · ${a.arquivo}`)));
   return el("div", { class: "cartao resumo-monitor" },
-    el("div", { class: "cartao-cabeca", style: { marginBottom: 0 } }, el("h2", {}, T.painel.monitorTitulo), el("a", { class: "btn btn-sm", href: "#monitoramento" }, m.ativo ? T.painel.verAlertas : T.painel.configurar)),
+    el("div", { class: "cartao-cabeca", style: { marginBottom: 0 } }, tituloComIcone("camera", T.painel.monitorTitulo), el("a", { class: "btn btn-sm", href: "#monitoramento" }, m.ativo ? T.painel.verAlertas : T.painel.configurar)),
     el("div", { class: "linha-estado" }, el("i", { class: `ponto ${classe}` }), rotulo),
     m.erro && m.ativo ? el("p", { class: "nota" }, m.erro) : null,
     pares, recentes);
@@ -3443,6 +3506,7 @@ async function carregarInspecoes() {
   }
   atualizarContador();
   desenharInspecoes();
+  contarNumeros($("#kpis-inspecoes"));
 }
 
 function desenharKpisInspecoes() {
@@ -4314,6 +4378,8 @@ function ligarEventos() {
 
   ligarImagem();
   ligarVideo();
+  const topo = $(".topo");
+  window.addEventListener("scroll", () => topo.classList.toggle("rolado", window.scrollY > 4), { passive: true });
   $("#btn-busca").addEventListener("click", abrirBusca);
   $("#paleta-texto").addEventListener("input", filtrarBusca);
   $("#paleta-texto").addEventListener("keydown", teclaBusca);

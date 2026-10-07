@@ -133,7 +133,7 @@
       <!-- ======================================================= PAINEL -->
       <section class="vista" data-vista="painel" hidden>
         <header class="cabecalho">
-          <div><h1>Painel</h1><p class="sub">Situação dos equipamentos inspecionados neste computador: o que está crítico, o que precisa de reparo programado e o que o monitoramento viu.</p></div>
+          <div class="titulo-pagina"><span class="icone-pagina" aria-hidden="true"><svg class="ic"><use href="#i-painel"/></svg></span><div><h1>Painel</h1><p class="sub">Situação dos equipamentos inspecionados neste computador: o que está crítico, o que precisa de reparo programado e o que o monitoramento viu.</p></div></div>
           <div class="acoes"><a class="btn" href="#inspecoes"><svg class="ic"><use href="#i-inspecoes"/></svg>Ver todas as inspeções</a></div>
         </header>
         <div id="painel-corpo"></div>
@@ -143,10 +143,10 @@
       <section class="vista" data-vista="analise" hidden>
         <div id="analise-vazia">
           <header class="cabecalho">
-            <div>
+            <div class="titulo-pagina"><span class="icone-pagina" aria-hidden="true"><svg class="ic"><use href="#i-analise"/></svg></span><div>
               <h1>Nova análise</h1>
               <p class="sub">Solte um ou vários termogramas. Uma imagem abre direto para revisão; várias são analisadas em lote e vão para Inspeções.</p>
-            </div>
+            </div></div>
           </header>
           <div class="entrada">
             <div class="soltar" id="soltar" tabindex="0" role="button" aria-label="Escolher ou arrastar termogramas">
@@ -377,7 +377,7 @@
       <section class="vista" data-vista="video" hidden>
         <div id="video-inicio">
           <header class="cabecalho">
-            <div><h1>Vídeo ao vivo</h1><p class="sub">Simula a câmera analisando em tempo real: o vídeo é quebrado em quadros e cada um passa pelo detector no ritmo que este computador aguenta, como se chegasse da câmera naquele instante.</p></div>
+            <div class="titulo-pagina"><span class="icone-pagina" aria-hidden="true"><svg class="ic"><use href="#i-video"/></svg></span><div><h1>Vídeo ao vivo</h1><p class="sub">Simula a câmera analisando em tempo real: o vídeo é quebrado em quadros e cada um passa pelo detector no ritmo que este computador aguenta, como se chegasse da câmera naquele instante.</p></div></div>
           </header>
           <div class="video-entrada">
             <div class="soltar" id="soltar-video" tabindex="0" role="button" aria-label="Escolher ou arrastar um vídeo">
@@ -470,7 +470,7 @@
       <!-- ======================================================= INSPEÇÕES -->
       <section class="vista" data-vista="inspecoes" hidden>
         <header class="cabecalho">
-          <div><h1>Inspeções</h1><p class="sub">Todas as imagens analisadas neste computador, com regiões, condições e dados do laudo. Clique numa linha para abrir.</p></div>
+          <div class="titulo-pagina"><span class="icone-pagina" aria-hidden="true"><svg class="ic"><use href="#i-inspecoes"/></svg></span><div><h1>Inspeções</h1><p class="sub">Todas as imagens analisadas neste computador, com regiões, condições e dados do laudo. Clique numa linha para abrir.</p></div></div>
           <div class="acoes">
             <a class="btn" href="/api/inspecoes.csv" download title="Planilha com todas as inspeções (abre no Excel)"><svg class="ic"><use href="#i-baixar"/></svg>Exportar planilha</a>
             <button class="btn btn-primaria" type="button" data-abrir-arquivos><svg class="ic"><use href="#i-upload"/></svg>Analisar imagens</button>
@@ -504,7 +504,7 @@
       <section class="vista" data-vista="equipamentos" hidden>
         <div id="equip-inicio">
           <header class="cabecalho">
-            <div><h1>Equipamentos</h1><p class="sub">Cada equipamento com o histórico das inspeções, a tendência da temperatura e a data da próxima inspeção. É aqui que a termografia vira manutenção preditiva.</p></div>
+            <div class="titulo-pagina"><span class="icone-pagina" aria-hidden="true"><svg class="ic"><use href="#i-ativos"/></svg></span><div><h1>Equipamentos</h1><p class="sub">Cada equipamento com o histórico das inspeções, a tendência da temperatura e a data da próxima inspeção. É aqui que a termografia vira manutenção preditiva.</p></div></div>
             <div class="acoes"><a class="btn" href="#inspecoes"><svg class="ic"><use href="#i-inspecoes"/></svg>Ir para Inspeções</a></div>
           </header>
           <div class="kpis-grandes" id="kpis-equip"></div>
@@ -519,7 +519,7 @@
       <!-- ======================================================= PENDÊNCIAS -->
       <section class="vista" data-vista="pendencias" hidden>
         <header class="cabecalho">
-          <div><h1>Pendências</h1><p class="sub">Cada anomalia encontrada até a correção ser verificada: prazo pela severidade, ordem de serviço, responsável e o histórico do que foi feito.</p></div>
+          <div class="titulo-pagina"><span class="icone-pagina" aria-hidden="true"><svg class="ic"><use href="#i-chave"/></svg></span><div><h1>Pendências</h1><p class="sub">Cada anomalia encontrada até a correção ser verificada: prazo pela severidade, ordem de serviço, responsável e o histórico do que foi feito.</p></div></div>
         </header>
         <div class="kpis-grandes" id="kpis-pendencias"></div>
         <div class="filtros" id="filtros-pendencias">
@@ -538,7 +538,7 @@
       <!-- ======================================================= MONITORAMENTO -->
       <section class="vista" data-vista="monitoramento" hidden>
         <header class="cabecalho">
-          <div><h1>Monitoramento</h1><p class="sub">Análise automática das imagens que chegam da câmera térmica e alerta para o responsável quando algum equipamento passa do limite.</p></div>
+          <div class="titulo-pagina"><span class="icone-pagina" aria-hidden="true"><svg class="ic"><use href="#i-camera"/></svg></span><div><h1>Monitoramento</h1><p class="sub">Análise automática das imagens que chegam da câmera térmica e alerta para o responsável quando algum equipamento passa do limite.</p></div></div>
           <div class="acoes">
             <button class="btn" type="button" id="btn-verificar"><svg class="ic"><use href="#i-refazer"/></svg>Verificar agora</button>
             <button class="btn btn-primaria" type="button" id="btn-ligar-monitor"><svg class="ic"><use href="#i-ligar"/></svg><span>Ligar monitoramento</span></button>
@@ -627,7 +627,7 @@
       <!-- ======================================================= MODELOS -->
       <section class="vista" data-vista="modelos" hidden>
         <header class="cabecalho">
-          <div><h1>Modelos</h1><p class="sub">Escolha o que detectar: só as peças (modelo treinado), só o calor (pontos quentes) ou os dois juntos, que diz em qual peça está cada ponto quente e compara as peças iguais. O escolhido é usado nas próximas análises e no monitoramento.</p></div>
+          <div class="titulo-pagina"><span class="icone-pagina" aria-hidden="true"><svg class="ic"><use href="#i-modelos"/></svg></span><div><h1>Modelos</h1><p class="sub">Escolha o que detectar: só as peças (modelo treinado), só o calor (pontos quentes) ou os dois juntos, que diz em qual peça está cada ponto quente e compara as peças iguais. O escolhido é usado nas próximas análises e no monitoramento.</p></div></div>
           <div class="acoes">
             <button class="btn" type="button" id="btn-instalar-modelo"><svg class="ic"><use href="#i-upload"/></svg>Instalar modelo treinado</button>
             <input type="file" id="arquivo-modelo" accept=".zip" hidden>
@@ -664,7 +664,7 @@
       <!-- ======================================================= AVALIAÇÃO DE MODELOS -->
       <section class="vista" data-vista="avaliacao" hidden>
         <header class="cabecalho">
-          <div><h1>Avaliação de modelos</h1><p class="sub">Compare os detectores treinados no Colab: quanto cada um acerta, quais peças deixa escapar, como aprendeu e onde errou nas fotos de teste.</p></div>
+          <div class="titulo-pagina"><span class="icone-pagina" aria-hidden="true"><svg class="ic"><use href="#i-grafico"/></svg></span><div><h1>Avaliação de modelos</h1><p class="sub">Compare os detectores treinados no Colab: quanto cada um acerta, quais peças deixa escapar, como aprendeu e onde errou nas fotos de teste.</p></div></div>
           <div class="acoes">
             <select id="sel-avaliacao" aria-label="Avaliação exibida" hidden></select>
             <button class="btn btn-primaria" type="button" id="btn-importar-avaliacao"><svg class="ic"><use href="#i-upload"/></svg>Importar do Colab</button>
@@ -677,7 +677,7 @@
       <!-- ======================================================= CONFIGURAÇÕES -->
       <section class="vista" data-vista="configuracoes" hidden>
         <header class="cabecalho">
-          <div><h1>Configurações</h1><p class="sub">Identidade do laudo, critério de severidade, limites de cada componente e aparência.</p></div>
+          <div class="titulo-pagina"><span class="icone-pagina" aria-hidden="true"><svg class="ic"><use href="#i-config"/></svg></span><div><h1>Configurações</h1><p class="sub">Identidade do laudo, critério de severidade, limites de cada componente e aparência.</p></div></div>
         </header>
         <div class="abas abas-pagina" role="tablist" aria-label="Seções de configuração" id="abas-config">
           <button role="tab" type="button" data-aba-config="identidade" aria-selected="true">Empresa e responsável</button>
