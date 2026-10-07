@@ -96,6 +96,53 @@ def medir(temperatura: np.ndarray, caixa: list[float]) -> Medida | None:
     )
 
 
+def medir_ponto(temperatura: np.ndarray, x: float, y: float) -> dict | None:
+    """Temperatura de um pixel da matriz, como o "ponto" (spot) das câmeras."""
+    h, w = temperatura.shape
+    xi, yi = int(np.clip(np.floor(x), 0, w - 1)), int(np.clip(np.floor(y), 0, h - 1))
+    v = temperatura[yi, xi]
+    return {"t": round(float(v), 2), "x": xi, "y": yi} if np.isfinite(v) else None
+
+
+def perfil_linha(temperatura: np.ndarray, x0: float, y0: float, x1: float, y1: float) -> dict | None:
+    """Temperaturas ao longo de uma linha, um valor por pixel percorrido (o "perfil" dos softwares)."""
+    h, w = temperatura.shape
+    n = int(max(abs(x1 - x0), abs(y1 - y0))) + 1
+    n = max(n, 2)
+    xs = np.clip(np.floor(np.linspace(x0, x1, n)).astype(int), 0, w - 1)
+    ys = np.clip(np.floor(np.linspace(y0, y1, n)).astype(int), 0, h - 1)
+    valores = temperatura[ys, xs].astype(float)
+    ok = np.isfinite(valores)
+    if not ok.any():
+        return None
+    i = int(np.nanargmax(valores))
+    return {
+        "t_max": round(float(np.nanmax(valores)), 2),
+        "t_min": round(float(np.nanmin(valores)), 2),
+        "t_med": round(float(np.nanmean(valores)), 2),
+        "x_max": int(xs[i]),
+        "y_max": int(ys[i]),
+        "valores": [round(float(v), 2) if np.isfinite(v) else None for v in valores],
+    }
+
+
+def medir_medicoes(temperatura: np.ndarray, medicoes: list[dict]) -> list[dict]:
+    """Pontos (P1, P2…) e linhas (L1, L2…) do usuário, com os valores na matriz atual."""
+    saida, n = [], {"ponto": 0, "linha": 0}
+    for m in medicoes:
+        tipo = m.get("tipo")
+        if tipo not in n:
+            continue
+        n[tipo] += 1
+        item = {**m, "nome": f"{'P' if tipo == 'ponto' else 'L'}{n[tipo]}"}
+        if tipo == "ponto":
+            item["valor"] = medir_ponto(temperatura, m["x"], m["y"])
+        else:
+            item["valor"] = perfil_linha(temperatura, m["x0"], m["y0"], m["x1"], m["y1"])
+        saida.append(item)
+    return saida
+
+
 def otsu(valores: np.ndarray, caixas: int = 256) -> float:
     """Limiar que melhor separa dois grupos de valores (fundo frio × objetos)."""
     hist, bordas = np.histogram(valores, bins=caixas)

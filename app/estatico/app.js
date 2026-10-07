@@ -2246,6 +2246,8 @@ function abrirAnalise(a, recemCriada = false) {
     $("#quadro-foto").hidden = true;
     $("#palco-imagens").classList.remove("com-foto");
     trocarAba("resultado", false);
+    estado.rascunhoLinha = null;
+    restaurarExibicao(a);
   }
   const destino = `#analise/${a.id}`;
   if (location.hash !== destino) {
@@ -2267,7 +2269,9 @@ function abrirAnalise(a, recemCriada = false) {
   desenharTermograma();
   desenharCaixas();
   preencherResultado();
+  preencherMedicoes();
   preencherCondicoes();
+  preencherParametros();
   preencherLaudo();
   const sel = $("#sel-modelo");
   if ([...sel.options].some((o) => o.value === a.modelo.id)) sel.value = a.modelo.id;
@@ -2294,6 +2298,9 @@ function preencherCabecalho() {
   if (a.metadados.camera) e.push(el("span", { class: "etiqueta" }, a.metadados.camera));
   if (a.metadados.data_hora) e.push(el("span", { class: "etiqueta" }, a.metadados.data_hora));
   e.push(el("span", { class: "etiqueta" }, a.modelo.nome));
+  if (a.parametros_ajustados && a.parametros_ajustados.length) {
+    e.push(el("span", { class: "etiqueta info", title: T.analise.ajustadosTitulo }, T.analise.ajustados(fmt(a.metadados.emissividade, 2))));
+  }
   const ident = a.identificacao || {};
   if (ident.equipamento && a.equipamento_chave) {
     e.unshift(el("a", { class: "etiqueta etiqueta-link", href: `#equipamentos/${encodeURIComponent(a.equipamento_chave)}`, title: T.equip.chipTitulo }, icone("ativos"), T.equip.chip(ident.equipamento)));
@@ -2303,7 +2310,8 @@ function preencherCabecalho() {
 }
 
 function faixaAtual() {
-  if (estado.faixa === "equipamento") return estado.analise.matriz_info.faixa_exibicao;
+  if (estado.faixa === "manual" && estado.faixaManual) return estado.faixaManual;
+  if (estado.faixa === "equipamento" || estado.faixa === "manual") return estado.analise.matriz_info.faixa_exibicao;
   return [estado.matriz.lo, estado.matriz.hi];
 }
 
@@ -2373,6 +2381,14 @@ const POSICOES_ETIQUETA = [
   { bottom: "2px", top: "auto", left: "2px", right: "auto", marginBottom: "0", marginTop: "0" },            // dentro, embaixo
 ];
 
+/** Lugares do rótulo de um ponto ou linha: à direita, à esquerda, acima e abaixo da mira. */
+const POSICOES_MEDICAO = [
+  { left: "calc(100% + var(--e-1))", right: "auto", top: "50%", bottom: "auto", transform: "translateY(-50%)" },
+  { left: "auto", right: "calc(100% + var(--e-1))", top: "50%", bottom: "auto", transform: "translateY(-50%)" },
+  { left: "50%", right: "auto", top: "auto", bottom: "calc(100% + var(--e-1))", transform: "translateX(-50%)" },
+  { left: "50%", right: "auto", top: "calc(100% + var(--e-1))", bottom: "auto", transform: "translateX(-50%)" },
+];
+
 /** Camada à vista no termograma e na lista: tudo, só as peças ou só os pontos quentes. */
 function naCamada(r) {
   return naCamadaDe(estado.camada, r);
@@ -2400,8 +2416,8 @@ function desenharCaixas() {
       dataset: { id: r.id, severidade: r.severidade, area: String((x1 - x0) * (y1 - y0)) },
       title: completo,
       style: { borderColor: cor },
-      onmousedown: (ev) => { if (estado.ferramenta !== "desenhar") ev.stopPropagation(); },
-      onclick: (ev) => { if (estado.ferramenta === "desenhar") return; ev.stopPropagation(); selecionar(r.id); },
+      onmousedown: (ev) => { if (estado.ferramenta === "selecionar") ev.stopPropagation(); },
+      onclick: (ev) => { if (estado.ferramenta !== "selecionar") return; ev.stopPropagation(); selecionar(r.id); },
     }, etq);
     pos(caixa, x0, y0, x1, y1);
     if (r.medida) {
@@ -2425,6 +2441,7 @@ function desenharCaixas() {
     Object.assign(alvo.style, { left: `${((pq.x + 0.5) / W) * 100}%`, top: `${((pq.y + 0.5) / H) * 100}%` });
     s.append(alvo);
   }
+  desenharMedicoes(s);
   evitarColisaoDeEtiquetas(s);
 }
 
@@ -2435,7 +2452,22 @@ function evitarColisaoDeEtiquetas(s) {
   const area = s.getBoundingClientRect();
   const cabe = (r) => r.left >= area.left - 1 && r.right <= area.right + 1 && r.top >= area.top - 1 && r.bottom <= area.bottom + 1;
   const colide = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
-  const ocupadas = $$(".caixa .pico, .alvo-maximo", s).map((p) => p.getBoundingClientRect());
+  const ocupadas = $$(".caixa .pico, .alvo-maximo, .mira, .marca-linha", s).map((p) => p.getBoundingClientRect());
+  // Pontos e linhas foram pedidos pelo usuário: os rótulos deles escolhem lugar primeiro.
+  for (const etq of $$(".etq-med", s)) {
+    etq.hidden = false;
+    let livre = null;
+    for (const posicao of POSICOES_MEDICAO) {
+      Object.assign(etq.style, posicao);
+      const r = etq.getBoundingClientRect();
+      if (cabe(r) && !ocupadas.some((o) => colide(r, o))) {
+        livre = r;
+        break;
+      }
+    }
+    etq.hidden = !livre;
+    if (livre) ocupadas.push(livre);
+  }
   const ordem = (etq) => {
     const c = etq.parentElement;
     return [c.classList.contains("selecionada") ? 0 : 1, -NIVEIS.indexOf(c.dataset.severidade), Number(c.dataset.area)];
@@ -2705,8 +2737,224 @@ function definirFerramenta(nome) {
   estado.ferramenta = nome;
   marcarSegmentado("#seg-ferramenta", nome);
   $("#sobreposicao").classList.toggle("desenhando", nome === "desenhar");
-  $("#dica-desenho").hidden = nome !== "desenhar";
+  $("#sobreposicao").classList.toggle("medindo", nome === "ponto" || nome === "linha");
+  const dica = { desenhar: T.analise.dicaRegiao, ponto: T.analise.dicaPonto, linha: T.analise.dicaLinha }[nome];
+  $("#dica-desenho").hidden = !dica;
+  if (dica) $("#dica-desenho").textContent = dica;
   if (nome !== "desenhar") estado.rascunho = null;
+  if (nome !== "linha" && estado.rascunhoLinha) {
+    estado.rascunhoLinha = null;
+    if (estado.analise && estado.matriz) desenharCaixas();
+  }
+}
+
+// ================================================================= pontos, linhas, escala manual, parâmetros e exportação
+
+/** Paleta e escala manual ficam guardadas na inspeção: o laudo e a imagem exportada saem como a tela. */
+let temporizadorExibicao = null;
+function salvarExibicao() {
+  const a = estado.analise;
+  if (!a) return;
+  const exibicao = { paleta: estado.paleta, faixa: estado.faixa === "manual" ? estado.faixaManual : null };
+  a.exibicao = exibicao;
+  clearTimeout(temporizadorExibicao);
+  const id = a.id;
+  temporizadorExibicao = setTimeout(() => api(`/api/analises/${id}`, json("PUT", { exibicao })).catch(falhou), 700);
+}
+
+function restaurarExibicao(a) {
+  const ex = a.exibicao || {};
+  if (ex.paleta && estado.paletas && estado.paletas[ex.paleta]) estado.paleta = ex.paleta;
+  marcarSegmentado("#seg-paleta", estado.paleta);
+  estado.faixaManual = ex.faixa || null;
+  if (ex.faixa) estado.faixa = "manual";
+  else if (estado.faixa === "manual") estado.faixa = "equipamento";
+  marcarSegmentado("#seg-faixa", estado.faixa);
+  preencherEscalaManual();
+}
+
+function preencherEscalaManual() {
+  $("#escala-controle").hidden = estado.faixa !== "manual";
+  if (estado.faixa !== "manual" || !estado.analise) return;
+  const [lo, hi] = faixaAtual();
+  $("#escala-min").value = Math.round(lo * 10) / 10;
+  $("#escala-max").value = Math.round(hi * 10) / 10;
+}
+
+function trocarFaixa(v) {
+  if (v === "manual" && !estado.faixaManual) {
+    const [lo, hi] = estado.analise.matriz_info.faixa_exibicao;
+    estado.faixaManual = [Math.floor(lo), Math.ceil(hi)];
+  }
+  estado.faixa = v;
+  marcarSegmentado("#seg-faixa", v);
+  preencherEscalaManual();
+  desenharTermograma();
+  preencherResultado();
+  salvarExibicao();
+}
+
+function lerEscalaManual() {
+  const lo = Number($("#escala-min").value), hi = Number($("#escala-max").value);
+  if (!Number.isFinite(lo) || !Number.isFinite(hi) || hi - lo < 0.1) return avisar(T.analise.escalaInvalida, { erro: true });
+  estado.faixaManual = [lo, hi];
+  desenharTermograma();
+  preencherResultado();
+  salvarExibicao();
+}
+
+// ---------------------------------------------------------------- pontos e linhas
+
+function salvarMedicoes(lista) {
+  const envio = lista.map(({ id, tipo, x, y, x0, y0, x1, y1 }) => ({ id, tipo, x, y, x0, y0, x1, y1 }));
+  return api(`/api/analises/${estado.analise.id}`, json("PUT", { medicoes: envio })).then((a) => abrirAnalise(a)).catch(falhou);
+}
+
+function adicionarMedicao(m) {
+  salvarMedicoes([...(estado.analise.medicoes || []), m]);
+}
+
+function removerMedicao(id) {
+  salvarMedicoes((estado.analise.medicoes || []).filter((m) => m.id !== id));
+}
+
+/** Miras dos pontos e linhas sobre o termograma; a linha em SVG estica junto com a imagem. */
+function desenharMedicoes(s) {
+  const { largura: W, altura: H } = estado.matriz;
+  const svg = $("#camada-linhas");
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.replaceChildren();
+  const pct = (v, total) => `${((v + 0.5) / total) * 100}%`;
+  const rotulo = (texto) => el("span", { class: "etq-med" }, texto);
+  for (const m of estado.analise.medicoes || []) {
+    const v = m.valor || {};
+    if (m.tipo === "ponto") {
+      const texto = v.t != null ? `${m.nome} · ${fmt(v.t, 1, " °C")}` : m.nome;
+      s.append(el("div", { class: "mira", title: texto, style: { left: pct(m.x, W), top: pct(m.y, H) }, onclick: (ev) => { ev.stopPropagation(); focarMedicao(m.id); } }, rotulo(texto)));
+    } else {
+      svg.append(svgEl("line", { x1: m.x0 + 0.5, y1: m.y0 + 0.5, x2: m.x1 + 0.5, y2: m.y1 + 0.5, class: "linha-medicao" }));
+      for (const [x, y] of [[m.x0, m.y0], [m.x1, m.y1]]) s.append(el("span", { class: "ponta-linha", style: { left: pct(x, W), top: pct(y, H) } }));
+      const texto = v.t_max != null ? `${m.nome} · máx ${fmt(v.t_max, 1, " °C")}` : m.nome;
+      const mx = v.x_max ?? (m.x0 + m.x1) / 2, my = v.y_max ?? (m.y0 + m.y1) / 2;
+      s.append(el("div", { class: "marca-linha", title: texto, style: { left: pct(mx, W), top: pct(my, H) }, onclick: (ev) => { ev.stopPropagation(); focarMedicao(m.id); } }, rotulo(texto)));
+    }
+  }
+  const r = estado.rascunhoLinha;
+  if (r) svg.append(svgEl("line", { x1: r.x0, y1: r.y0, x2: r.x1, y2: r.y1, class: "linha-medicao rascunho" }));
+}
+
+function focarMedicao(id) {
+  trocarAba("resultado");
+  const n = $(`.medicao[data-id="${id}"]`);
+  if (!n) return;
+  n.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  n.classList.remove("piscar");
+  void n.offsetWidth;
+  n.classList.add("piscar");
+}
+
+/** Perfil da linha: temperatura em cada pixel percorrido, com a máxima marcada. */
+function graficoPerfil(valores) {
+  const pts = (valores || []).map((v, i) => [i, v]).filter(([, v]) => v != null);
+  if (pts.length < 2) return null;
+  const L = 320, A = 84, m = { e: 30, d: 6, t: 8, b: 14 };
+  const vs = pts.map((p) => p[1]);
+  const lo = Math.min(...vs), hi = Math.max(...vs) + 1e-6;
+  const n = valores.length - 1;
+  const x = (i) => m.e + (i / n) * (L - m.e - m.d);
+  const y = (v) => m.t + (1 - (v - lo) / (hi - lo)) * (A - m.t - m.b);
+  const imax = pts.reduce((a, p) => (p[1] > a[1] ? p : a))[0];
+  return svgEl("svg", { viewBox: `0 0 ${L} ${A}`, class: "grafico-svg perfil", role: "img", "aria-label": T.analise.perfilTitulo },
+    svgEl("line", { x1: m.e, x2: L - m.d, y1: y(hi), y2: y(hi), class: "grade" }),
+    svgEl("line", { x1: m.e, x2: L - m.d, y1: y(lo), y2: y(lo), class: "grade" }),
+    svgEl("text", { x: m.e - 4, y: y(hi) + 4, class: "eixo", "text-anchor": "end" }, fmt(hi, 0)),
+    svgEl("text", { x: m.e - 4, y: y(lo) + 4, class: "eixo", "text-anchor": "end" }, fmt(lo, 0)),
+    svgEl("path", { d: pts.map(([i, v], k) => `${k ? "L" : "M"}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(" "), class: "linha", style: "stroke: var(--serie-1)" }),
+    svgEl("circle", { cx: x(imax), cy: y(hi), r: 3.5, style: "fill: var(--imediato)" }));
+}
+
+function preencherMedicoes() {
+  const lista = estado.analise.medicoes || [];
+  const A = T.analise;
+  const alvo = $("#medicoes");
+  if (!lista.length) return alvo.replaceChildren(el("p", { class: "nota" }, A.medVazio));
+  alvo.replaceChildren(...lista.map((m) => {
+    const v = m.valor || {};
+    const remover = el("button", { class: "btn btn-sm btn-fantasma btn-icone", type: "button", title: A.medRemover, "aria-label": `${A.medRemover} ${m.nome}`, onclick: () => removerMedicao(m.id) }, icone("lixo"));
+    if (m.tipo === "ponto") {
+      return el("div", { class: "medicao", dataset: { id: m.id } }, icone("mira"), el("b", {}, m.nome),
+        el("span", { class: "num" }, fmt(v.t, 1, " °C")), remover);
+    }
+    return el("div", { class: "medicao medicao-linha", dataset: { id: m.id } }, icone("linha"), el("b", {}, m.nome),
+      el("span", { class: "num" }, A.medLinha(fmt(v.t_max, 1), fmt(v.t_min, 1), fmt(v.t_med, 1))), remover,
+      graficoPerfil(v.valores));
+  }));
+}
+
+// ---------------------------------------------------------------- parâmetros de medição (radiométrica)
+
+function preencherParametros() {
+  const a = estado.analise;
+  const f = $("#form-parametros");
+  f.hidden = !a.radiometrica;
+  if (!a.radiometrica) return;
+  const m = a.metadados || {};
+  $("#p-emissividade").value = m.emissividade ?? "";
+  $("#p-refletida").value = m.temp_refletida_c ?? "";
+  $("#p-distancia").value = m.distancia_m ?? "";
+  $("#p-umidade").value = m.umidade_relativa != null ? Math.round(m.umidade_relativa * 100) : "";
+  $("#p-ar").value = m.temp_atmosfera_c ?? "";
+  $("#p-material").value = "";
+  $("#btn-parametros-camera").hidden = !(a.parametros_ajustados && a.parametros_ajustados.length);
+}
+
+async function aplicarParametros(corpo, botao, mensagem) {
+  ocupado(botao, true);
+  try {
+    abrirAnalise(await api(`/api/analises/${estado.analise.id}/parametros`, json("POST", corpo)));
+    avisar(mensagem);
+  } catch (e) {
+    falhou(e);
+  } finally {
+    ocupado(botao, false);
+  }
+}
+
+// ---------------------------------------------------------------- menu suspenso (exportar)
+
+function fecharMenu() {
+  const m = $(".menu-suspenso");
+  if (m) m.remove();
+  document.removeEventListener("click", fecharMenuFora, true);
+}
+function fecharMenuFora(ev) {
+  if (!ev.target.closest(".menu-suspenso")) fecharMenu();
+}
+
+/** Menu de ações curto, ancorado num botão. itens: [{rotulo, icone, href?, acao?}] */
+function abrirMenu(botao, itens) {
+  if ($(".menu-suspenso")) return fecharMenu();
+  const menu = el("div", { class: "menu-suspenso", role: "menu" }, itens.map((it) => el(it.href ? "a" : "button", {
+    class: "item-menu", role: "menuitem", href: it.href || null, download: it.href ? "" : null, type: it.href ? null : "button",
+    onclick: () => { setTimeout(fecharMenu); if (it.acao) it.acao(); },
+  }, icone(it.icone), el("span", {}, it.rotulo, it.nota ? el("small", {}, it.nota) : null))));
+  document.body.append(menu);
+  const r = botao.getBoundingClientRect();
+  menu.style.top = `${r.bottom + 6}px`;
+  menu.style.left = `${Math.max(8, Math.min(r.right - menu.offsetWidth, window.innerWidth - menu.offsetWidth - 8))}px`;
+  setTimeout(() => document.addEventListener("click", fecharMenuFora, true));
+  $(".item-menu", menu).focus();
+}
+
+function menuExportar(botao) {
+  const a = estado.analise;
+  const A = T.analise;
+  abrirMenu(botao, [
+    { rotulo: A.exportarImagem, nota: A.exportarImagemNota, icone: "foto", href: `/api/analises/${a.id}/imagem.png` },
+    { rotulo: A.exportarCsv, nota: A.exportarCsvNota, icone: "tabela", href: `/api/analises/${a.id}/temperaturas.csv` },
+    { rotulo: A.exportarLaudo, nota: A.exportarLaudoNota, icone: "laudo", acao: () => $("#btn-laudo").click() },
+  ]);
 }
 
 // ================================================================= edição de regiões
@@ -2765,21 +3013,38 @@ function ligarImagem() {
       estado.rascunho.y1 = y;
       desenharCaixas();
     }
+    if (estado.rascunhoLinha) {
+      estado.rascunhoLinha.x1 = x;
+      estado.rascunhoLinha.y1 = y;
+      desenharMedicoes(s);
+    }
   });
   s.addEventListener("mouseleave", () => {
     leitura.hidden = true;
     marca.hidden = true;
   });
   s.addEventListener("mousedown", (ev) => {
-    if (estado.ferramenta !== "desenhar" || ev.button !== 0) return;
+    if (ev.button !== 0 || !["desenhar", "linha"].includes(estado.ferramenta)) return;
     ev.preventDefault();
     const { x, y } = coordenadas(ev);
-    estado.rascunho = { x0: x, y0: y, x1: x, y1: y };
+    if (estado.ferramenta === "linha") estado.rascunhoLinha = { x0: x, y0: y, x1: x, y1: y };
+    else estado.rascunho = { x0: x, y0: y, x1: x, y1: y };
   });
-  s.addEventListener("click", () => {
+  s.addEventListener("click", (ev) => {
+    if (estado.ferramenta === "ponto" && estado.matriz) {
+      const { x, y } = coordenadas(ev);
+      return adicionarMedicao({ tipo: "ponto", x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 });
+    }
     if (estado.ferramenta === "selecionar" && estado.selecionada) selecionar(estado.selecionada, false);
   });
   window.addEventListener("mouseup", () => {
+    const l = estado.rascunhoLinha;
+    if (l) {
+      estado.rascunhoLinha = null;
+      const arred = (v) => Math.round(v * 100) / 100;
+      if (Math.hypot(l.x1 - l.x0, l.y1 - l.y0) < 2) return desenharMedicoes(s);
+      return adicionarMedicao({ tipo: "linha", x0: arred(l.x0), y0: arred(l.y0), x1: arred(l.x1), y1: arred(l.y1) });
+    }
     const r = estado.rascunho;
     if (!r) return;
     estado.rascunho = null;
@@ -3369,8 +3634,23 @@ function ligarEventos() {
     }
   });
 
-  segmentado("#seg-paleta", (v) => { estado.paleta = v; desenharTermograma(); });
-  segmentado("#seg-faixa", (v) => { estado.faixa = v; desenharTermograma(); preencherResultado(); });
+  segmentado("#seg-paleta", (v) => { estado.paleta = v; desenharTermograma(); salvarExibicao(); });
+  segmentado("#seg-faixa", trocarFaixa);
+  ["#escala-min", "#escala-max"].forEach((id) => $(id).addEventListener("change", lerEscalaManual));
+  $("#btn-escala-auto").addEventListener("click", () => trocarFaixa("equipamento"));
+  $("#btn-novo-ponto").addEventListener("click", () => definirFerramenta("ponto"));
+  $("#btn-nova-linha").addEventListener("click", () => definirFerramenta("linha"));
+  $("#btn-exportar").addEventListener("click", (ev) => menuExportar(ev.currentTarget));
+  $("#p-material").addEventListener("change", (ev) => { if (ev.target.value) $("#p-emissividade").value = ev.target.value; });
+  $("#form-parametros").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const umidade = $("#p-umidade").value;
+    aplicarParametros({
+      emissividade: $("#p-emissividade").value, temp_refletida_c: $("#p-refletida").value, distancia_m: $("#p-distancia").value,
+      umidade_relativa: umidade === "" ? "" : Number(umidade) / 100, temp_atmosfera_c: $("#p-ar").value,
+    }, $("button[type=submit]", ev.currentTarget), T.analise.parametrosAplicados(fmt(Number($("#p-emissividade").value), 2)));
+  });
+  $("#btn-parametros-camera").addEventListener("click", (ev) => aplicarParametros({ restaurar: true }, ev.currentTarget, T.analise.parametrosRestaurados));
   segmentado("#seg-ferramenta", definirFerramenta);
   segmentado("#seg-camada", trocarCamada);
   $("#btn-rotulos").addEventListener("click", alternarRotulos);
@@ -3551,10 +3831,13 @@ function ligarEventos() {
       abrirArquivos();
       return;
     }
+    if (ev.key === "Escape" && $(".menu-suspenso")) return fecharMenu();
     if (digitando || $("#dialogo").open) return;
     if (teclaVideo(ev)) return;
     if (!estado.analise || estado.vista !== "analise" || $("#analise-cheia").hidden) return;
     if (ev.key === "d" || ev.key === "D") definirFerramenta("desenhar");
+    else if (ev.key === "p" || ev.key === "P") definirFerramenta("ponto");
+    else if (ev.key === "l" || ev.key === "L") definirFerramenta("linha");
     else if (ev.key === "r" || ev.key === "R") alternarRotulos();
     else if (ev.key === "s" || ev.key === "S" || ev.key === "v" || ev.key === "V") definirFerramenta("selecionar");
     else if (ev.key === "Escape") {

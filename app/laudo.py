@@ -271,7 +271,11 @@ def gerar_relatorio(itens: list[tuple[dict, np.ndarray, bytes | None]], versao: 
         titulos = [Paragraph("4. Registros termográficos" if n_img > 1 else "3. Registro termográfico", est["h"])] if k == 1 else []
         titulos.append(Paragraph(f"{prefixo}{rotulo_imagem(a)}", est["h2"]))
 
-        termo = render.desenhar(matriz, regioes, largura=1100, numerar=True)
+        exib = a.get("exibicao") or {}
+        faixa_tela = tuple(exib["faixa"]) if exib.get("faixa") else None
+        medicoes = a.get("medicoes") or []
+        termo = render.desenhar(matriz, regioes, largura=1100, numerar=True, nome=exib.get("paleta") or "ferro",
+                                medicoes=medicoes, faixa=faixa_tela)
         if foto:
             visivel = Image.open(io.BytesIO(foto)).convert("RGB")
             imgs = Table([[_imagem(termo, 86), _imagem(visivel, 86)]], colWidths=[88 * mm, 88 * mm])
@@ -281,7 +285,7 @@ def gerar_relatorio(itens: list[tuple[dict, np.ndarray, bytes | None]], versao: 
         else:
             corpo.append(KeepTogether([*titulos, _imagem(termo, 120)]))
             legenda = "Termograma com os pontos numerados."
-        t_lo, t_hi = render.faixa_exibicao(matriz)
+        t_lo, t_hi = faixa_tela or render.faixa_exibicao(matriz)
         corpo.append(Paragraph(f"{legenda} Escala de {_num(t_lo)} °C a {_num(t_hi)} °C.", est["pequeno"]))
         corpo.append(Spacer(1, 2 * mm))
 
@@ -321,6 +325,20 @@ def gerar_relatorio(itens: list[tuple[dict, np.ndarray, bytes | None]], versao: 
         corpo.append(tabela(["Nº", "Ponto", "Tmáx", "Referência", f"{delta}T / % MTA", "Classificação", "Recomendação"], linhas,
                             [9 * mm, 38 * mm, 17 * mm, 30 * mm, 19 * mm, 24 * mm, 39 * mm], faixas))
 
+        if medicoes:
+            linhas_med = []
+            for med in medicoes:
+                v = med.get("valor") or {}
+                if med["tipo"] == "ponto":
+                    linhas_med.append([Paragraph(med["nome"], est["cel"]), Paragraph("Ponto", est["cel"]), Paragraph(_num(v.get("t"), 1, " °C"), est["cel"]),
+                                       Paragraph("–", est["cel"]), Paragraph("–", est["cel"])])
+                else:
+                    linhas_med.append([Paragraph(med["nome"], est["cel"]), Paragraph("Linha (perfil)", est["cel"]), Paragraph(_num(v.get("t_max"), 1, " °C"), est["cel"]),
+                                       Paragraph(_num(v.get("t_min"), 1, " °C"), est["cel"]), Paragraph(_num(v.get("t_med"), 1, " °C"), est["cel"])])
+            corpo.append(Spacer(1, 1.5 * mm))
+            corpo.append(KeepTogether([Paragraph("Pontos e linhas de medição", est["pequeno"]),
+                                       tabela(["Nome", "Tipo", "Máxima", "Mínima", "Média"], linhas_med, [20 * mm, 50 * mm, 35 * mm, 35 * mm, 36 * mm])]))
+
         ponto = resumo.get("ponto_mais_quente")
         if ponto:
             onde = f" em {_esc(ponto['componente']['nome'])}" if ponto.get("componente") else ""
@@ -357,7 +375,8 @@ def gerar_relatorio(itens: list[tuple[dict, np.ndarray, bytes | None]], versao: 
         texto = ("Não foram identificadas anomalias térmicas acima dos limites do critério nos componentes avaliados. "
                  "Recomenda-se manter a periodicidade de inspeção.")
     else:
-        texto = f"Foram identificadas {len(achados)} anomalias térmicas que requerem ação, a mais severa em nível {nucleo_analise.NIVEIS[pior]['rotulo'].lower()}:"
+        quantas = "Foi identificada 1 anomalia térmica que requer ação" if len(achados) == 1 else f"Foram identificadas {len(achados)} anomalias térmicas que requerem ação"
+        texto = f"{quantas}, {'em' if len(achados) == 1 else 'a mais severa em'} nível {nucleo_analise.NIVEIS[pior]['rotulo'].lower()}:"
     conclusao = Table([[Paragraph(f"<b>{_esc(nucleo_analise.NIVEIS[pior]['rotulo'])}.</b> {texto}", est["p"])]], colWidths=[LARGURA_UTIL])
     conclusao.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), FUNDO), ("LINEBEFORE", (0, 0), (0, 0), 4, COR_SEV.get(pior, CINZA)),
                                    ("LEFTPADDING", (0, 0), (-1, -1), 8), ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 6)]))

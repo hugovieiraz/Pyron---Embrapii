@@ -240,7 +240,40 @@ def _calcular(a: dict, matriz: np.ndarray) -> dict:
     a["regioes"], a["resumo"] = analise.analisar_regioes(
         matriz, base, cond.get("ambiente_c"), cond.get("carga_pct"), criterios=_criterios(), componentes=_componentes()
     )
+    campos_med = ("id", "tipo", "x", "y", "x0", "y0", "x1", "y1")
+    a["medicoes"] = analise.medir_medicoes(matriz, [{k: v for k, v in m.items() if k in campos_med} for m in a.get("medicoes", [])])
     return a
+
+
+PALETAS_EXIBICAO = ("ferro", "arco-iris", "cinza")
+PARAMETROS = {  # nome: (mínimo, máximo, rótulo) dos parâmetros de medição que o usuário pode trocar
+    "emissividade": (0.05, 1.0, "Emissividade"),
+    "temp_refletida_c": (-50.0, 300.0, "Temperatura refletida"),
+    "distancia_m": (0.1, 1000.0, "Distância"),
+    "umidade_relativa": (0.0, 1.0, "Umidade relativa"),
+    "temp_atmosfera_c": (-50.0, 60.0, "Temperatura do ar"),
+}
+
+
+def _validar_medicoes(lista, matriz: np.ndarray) -> list[dict]:
+    if not isinstance(lista, list) or len(lista) > 40:
+        raise HTTPException(422, "Até 40 pontos e linhas por imagem.")
+    h, w = matriz.shape
+    saida = []
+    for m in lista:
+        tipo = m.get("tipo")
+        try:
+            if tipo == "ponto":
+                item = {"tipo": "ponto", "x": float(np.clip(float(m["x"]), 0, w - 0.01)), "y": float(np.clip(float(m["y"]), 0, h - 0.01))}
+            elif tipo == "linha":
+                item = {"tipo": "linha", **{k: float(np.clip(float(m[k]), 0, (w if k[0] == "x" else h) - 0.01)) for k in ("x0", "y0", "x1", "y1")}}
+            else:
+                continue
+        except (KeyError, TypeError, ValueError) as erro:
+            raise HTTPException(422, "Ponto ou linha com coordenadas inválidas.") from erro
+        item["id"] = str(m.get("id") or uuid.uuid4().hex[:8])[:12]
+        saida.append(item)
+    return saida
 
 
 def _nova_analise(dados: bytes, nome: str, modelo: str | None, fonte: str = "manual", identificacao: dict | None = None,
@@ -383,6 +416,16 @@ def atualizar(id_: str, corpo: dict = Body(...)) -> dict:
         }
     if "identificacao" in corpo:
         a["identificacao"] = {k: str(v)[:300] for k, v in corpo["identificacao"].items()}
+    if "medicoes" in corpo:
+        a["medicoes"] = _validar_medicoes(corpo["medicoes"], m)
+    if "exibicao" in corpo:  # paleta e escala escolhidas na tela: o laudo e a imagem exportada saem iguais
+        e = corpo["exibicao"] or {}
+        faixa = e.get("faixa")
+        if faixa is not None:
+            faixa = sorted(float(v) for v in faixa)[:2]
+            if len(faixa) != 2 or faixa[1] - faixa[0] < 0.1:
+                raise HTTPException(422, "Escala inválida: o máximo precisa ser maior que o mínimo.")
+        a["exibicao"] = {"paleta": e.get("paleta") if e.get("paleta") in PALETAS_EXIBICAO else "ferro", "faixa": faixa}
     _calcular(a, m)
     armazenamento.salvar(a)
     return _completa(a)
@@ -427,6 +470,102 @@ def detectar_de_novo(id_: str, corpo: dict = Body(default={})) -> dict:
     _calcular(a, m)
     armazenamento.salvar(a)
     return _completa(a)
+
+
+@app.post("/api/analises/{id_}/parametros")
+def ajustar_parametros(id_: str, corpo: dict = Body(...)) -> dict:
+    """Recalcula a temperatura com outra emissividade, distância, temperaturas ou umidade.
+
+    Parte sempre do JPEG radiométrico original, então dá para voltar aos valores da câmera
+    (``{"restaurar": true}``). As regiões ficam onde estão e são medidas de novo.
+    """
+    a, _ = _carregar(id_)
+    if not a.get("radiometrica"):
+        raise HTTPException(422, "Só termogramas radiométricos têm emissividade e distância para ajustar.")
+    original = armazenamento.original(id_)
+    if original is None:
+        raise HTTPException(422, "O arquivo original desta inspeção não está guardado.")
+    ajustes: dict[str, float] = {}
+    if not corpo.get("restaurar"):
+        for nome, (lo, hi, rotulo) in PARAMETROS.items():
+            v = corpo.get(nome)
+            if v in (None, ""):
+                continue
+            try:
+                v = float(v)
+            except (TypeError, ValueError) as erro:
+                raise HTTPException(422, f"{rotulo}: informe um número.") from erro
+            if nome == "umidade_relativa" and v > 1:
+                v /= 100  # aceita em %
+            if not lo <= v <= hi:
+                raise HTTPException(422, f"{rotulo} fora da faixa aceita.")
+            ajustes[nome] = v
+    try:
+        img = entrada.carregar(original, ocr=ocr, ajustes=ajustes)
+    except ValueError as erro:
+        raise HTTPException(422, str(erro)) from erro
+    a["metadados"] = {**a.get("metadados", {}), **img.metadados}
+    if ajustes:
+        a["parametros_ajustados"] = sorted(ajustes)
+    else:
+        a.pop("parametros_ajustados", None)
+    lo, hi = render.faixa_exibicao(img.temperatura_c)
+    a["matriz_info"] = {**a.get("matriz_info", {}), "faixa_exibicao": [lo, hi]}
+    with _trava:
+        _calcular(a, img.temperatura_c)
+        armazenamento.salvar(a, matriz=img.temperatura_c)
+    return _completa(a)
+
+
+def _nome_exportado(a: dict, sufixo: str) -> str:
+    base = re.sub(r"[^\w.-]+", "_", Path(a["arquivo"]).stem, flags=re.UNICODE).strip("_") or "inspecao"
+    return f"{base}_{sufixo}"
+
+
+@app.get("/api/analises/{id_}/imagem.png")
+def exportar_imagem(id_: str, largura: int = 1280) -> Response:
+    """Termograma com as regiões, pontos e linhas, na paleta e na escala escolhidas na tela."""
+    a, m = _carregar(id_)
+    _calcular(a, m)
+    exib = a.get("exibicao") or {}
+    img = render.desenhar(m, a["regioes"], largura=max(320, min(largura, 3840)), nome=exib.get("paleta") or "ferro",
+                          medicoes=a.get("medicoes"), faixa=tuple(exib["faixa"]) if exib.get("faixa") else None)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return Response(buf.getvalue(), media_type="image/png",
+                    headers={"Content-Disposition": f'attachment; filename="{_nome_exportado(a, "termograma.png")}"'})
+
+
+def _csv_excel(linhas: list[list], nome: str) -> Response:
+    """CSV como o Excel em português abre direto: ponto e vírgula, vírgula decimal e BOM."""
+    buf = io.StringIO()
+    escritor = csv.writer(buf, delimiter=";", lineterminator="\r\n")
+    for linha in linhas:
+        escritor.writerow(["" if v is None else (f"{v:.2f}".replace(".", ",") if isinstance(v, float) else v) for v in linha])
+    return Response(("\ufeff" + buf.getvalue()).encode("utf-8"), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="{nome}"'})
+
+
+@app.get("/api/analises/{id_}/temperaturas.csv")
+def exportar_temperaturas(id_: str) -> Response:
+    """A matriz de temperatura inteira (°C), uma linha por linha da imagem."""
+    a, m = _carregar(id_)
+    linhas = [["y / x", *range(m.shape[1])]]
+    linhas += [[y, *(float(v) if np.isfinite(v) else None for v in m[y])] for y in range(m.shape[0])]
+    return _csv_excel(linhas, _nome_exportado(a, "temperaturas.csv"))
+
+
+@app.get("/api/inspecoes.csv")
+def exportar_inspecoes() -> Response:
+    """Lista de inspeções para planilha: equipamento, data, severidade e a região que decide."""
+    linhas = [["Data da captura", "Arquivo", "Instalação", "Equipamento", "Severidade", "Região crítica", "Tmáx (°C)",
+               "% da MTA", "ΔT (°C)", "Temperatura", "Detector"]]
+    for it in armazenamento.listar():
+        d, ident, r = it.get("destaque") or {}, it.get("identificacao") or {}, it["resumo"]
+        linhas.append([it.get("data_captura") or it["criado_em"].replace("T", " "), it["arquivo"], ident.get("instalacao", ""),
+                       ident.get("equipamento", ""), r.get("severidade_rotulo", r["severidade"]), d.get("nome", ""),
+                       d.get("t_max"), d.get("pct_mta"), d.get("dt"), "medida" if it["radiometrica"] else "estimada", it["modelo"]])
+    return _csv_excel(linhas, f"inspecoes_{datetime.now():%Y%m%d}.csv")
 
 
 @app.delete("/api/analises/{id_}")

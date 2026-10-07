@@ -92,11 +92,13 @@ def _reduzir(mapa: np.ndarray, fator: int) -> np.ndarray:
         return np.nanmedian(blocos, axis=2).astype(np.float32)
 
 
-def carregar(dados: bytes, ocr=None, limites: tuple[float, float] | None = None) -> ImagemTermica:
+def carregar(dados: bytes, ocr=None, limites: tuple[float, float] | None = None, ajustes: dict | None = None) -> ImagemTermica:
     """Abre a imagem e devolve a temperatura de cada pixel.
 
     ``ocr`` só é usado quando a imagem não é radiométrica (para ler os limites da escala).
     ``limites`` (mínimo, máximo) já conhecidos da escala dispensam o OCR, como num quadro de vídeo.
+    ``ajustes`` troca parâmetros de medição do termograma radiométrico (emissividade, distância,
+    temperaturas refletida e atmosférica, umidade) antes da conversão, como os softwares das câmeras.
     """
     try:
         img = Image.open(io.BytesIO(dados))
@@ -109,7 +111,7 @@ def carregar(dados: bytes, ocr=None, limites: tuple[float, float] | None = None)
     orientacao = int(img.getexif().get(274, 1) or 1)
 
     try:
-        termo = flir.ler_bytes(dados)
+        termo = flir.ler_bytes(dados, **(ajustes or {}))
     except ValueError:
         termo = None
 

@@ -400,7 +400,7 @@ kbd { font: var(--p-medio) var(--t-1) / var(--a-1) var(--fonte-num); padding: 0 
 .quadro-foto { margin: 0; position: relative; border-radius: var(--r-p); overflow: hidden; }
 .quadro-foto img { display: block; width: 100%; height: auto; }
 .quadro-foto figcaption { position: absolute; left: var(--e-2); bottom: var(--e-2); font-size: var(--t-1); font-weight: var(--p-medio); background: var(--veu); color: var(--branco); padding: 0 var(--e-2); border-radius: var(--r-p); }
-.sobreposicao { position: absolute; inset: 0; cursor: crosshair; }
+.sobreposicao { position: absolute; inset: 0; z-index: 2; cursor: crosshair; }
 .sobreposicao.desenhando { cursor: copy; }
 .caixa { position: absolute; border: 2px solid; border-radius: var(--r-p); cursor: pointer; transition: box-shadow var(--dur-rapida) var(--ease-padrao); }
 .caixa:hover, .caixa.realce { box-shadow: 0 0 0 2px var(--realce-imagem); }
@@ -414,9 +414,9 @@ kbd { font: var(--p-medio) var(--t-1) / var(--a-1) var(--fonte-num); padding: 0 
 .alvo-maximo::before { left: 50%; top: calc(-1 * var(--e-2)); bottom: calc(-1 * var(--e-2)); width: 2px; transform: translateX(-50%); }
 .alvo-maximo::after { top: 50%; left: calc(-1 * var(--e-2)); right: calc(-1 * var(--e-2)); height: 2px; transform: translateY(-50%); }
 .caixa.rascunho { border-style: dashed; border-color: var(--branco); }
-.leitura { position: absolute; pointer-events: none; font: var(--p-medio) var(--t-1) / var(--a-1) var(--fonte-num); color: var(--branco); background: var(--rotulo-imagem);
+.leitura { position: absolute; z-index: 3; pointer-events: none; font: var(--p-medio) var(--t-1) / var(--a-1) var(--fonte-num); color: var(--branco); background: var(--rotulo-imagem);
   padding: var(--e-1) var(--e-2); border-radius: var(--r-p); transform: translate(var(--e-3), var(--e-3)); white-space: nowrap; box-shadow: var(--sombra-2); }
-.dica-desenho { position: absolute; left: 50%; top: var(--e-2); transform: translateX(-50%); font-size: var(--t-1); font-weight: var(--p-medio); background: var(--acao); color: var(--acao-texto); padding: var(--e-1) var(--e-3); border-radius: var(--r-p); pointer-events: none; }
+.dica-desenho { position: absolute; z-index: 3; left: 50%; top: var(--e-2); transform: translateX(-50%); font-size: var(--t-1); font-weight: var(--p-medio); background: var(--acao); color: var(--acao-texto); padding: var(--e-1) var(--e-3); border-radius: var(--r-p); pointer-events: none; }
 .escala { margin-top: var(--e-3); }
 .escala-barra { position: relative; }
 .escala-barra canvas { display: block; width: 100%; height: var(--e-3); border-radius: var(--r-p); }
@@ -715,6 +715,39 @@ section[data-vista="sobre"] .cartao h2 { margin-bottom: var(--e-3); }
 .aviso button:hover { background: var(--hover-claro); }
 @keyframes entrar-aviso { from { opacity: 0; transform: translateY(var(--e-2)); } }
 @keyframes sair-aviso { to { opacity: 0; transform: translateY(var(--e-1)); } }
+
+/* ---------------------------------------------------------------- pontos, linhas, escala manual e menus */
+.sobreposicao.medindo { cursor: crosshair; }
+.camada-linhas { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.camada-linhas .linha-medicao { stroke: var(--branco); stroke-width: 2; vector-effect: non-scaling-stroke; filter: drop-shadow(0 0 1px var(--contorno-imagem)); }
+.camada-linhas .linha-medicao.rascunho { stroke-dasharray: 5 4; }
+.mira { position: absolute; width: var(--e-5); height: var(--e-5); transform: translate(-50%, -50%); cursor: pointer; }
+.mira::before, .mira::after { content: ""; position: absolute; background: var(--branco); box-shadow: 0 0 0 1px var(--contorno-imagem); }
+.mira::before { left: 50%; top: 0; bottom: 0; width: 2px; transform: translateX(-50%); }
+.mira::after { top: 50%; left: 0; right: 0; height: 2px; transform: translateY(-50%); }
+.ponta-linha { position: absolute; width: var(--e-2); height: var(--e-2); border-radius: 50%; background: var(--branco); box-shadow: 0 0 0 1px var(--contorno-imagem); transform: translate(-50%, -50%); pointer-events: none; }
+.marca-linha { position: absolute; width: var(--e-3); height: var(--e-3); border: 2px solid var(--branco); border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 0 1px var(--contorno-imagem); cursor: pointer; }
+.etq-med[hidden] { display: none; }
+.etq-med { position: absolute; left: calc(100% + var(--e-1)); top: 50%; transform: translateY(-50%); white-space: nowrap; padding: 0 var(--e-2); border-radius: var(--r-p); background: var(--veu); color: var(--branco); font-size: var(--t-1); line-height: var(--a-1); font-weight: var(--p-medio); pointer-events: none; }
+.campo-curto { flex: none; width: calc(var(--e-24) + var(--e-6)); }
+#escala-controle .ic { color: var(--palco-texto-2); }
+.lista-medicoes { margin-top: var(--e-5); }
+.lista-medicoes .acoes { gap: var(--e-1); }
+.medicoes { display: grid; gap: var(--e-2); }
+.medicao { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: var(--e-2); padding: var(--e-2) var(--e-3); border: 1px solid var(--borda); border-radius: var(--r-m); background: var(--superficie); }
+.medicao > .ic { color: var(--acao); }
+.medicao .num { font-size: var(--t-1); color: var(--texto-2); }
+.medicao .perfil { grid-column: 1 / -1; }
+.medicao.piscar { animation: piscar-medicao var(--dur-lenta) var(--ease-padrao) 2; }
+@keyframes piscar-medicao { 50% { background: var(--acao-suave); border-color: var(--acao); } }
+.menu-suspenso { position: fixed; z-index: 60; min-width: var(--col-m); padding: var(--e-1); background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--r-m); box-shadow: var(--sombra-3); display: grid; animation: entrar-menu var(--dur-rapida) var(--ease-padrao); }
+@keyframes entrar-menu { from { opacity: 0; transform: translateY(calc(-1 * var(--e-1))); } }
+.item-menu { display: flex; align-items: flex-start; gap: var(--e-3); padding: var(--e-2) var(--e-3); border: 0; border-radius: var(--r-p); background: transparent; color: var(--texto); font: inherit; text-align: left; text-decoration: none; cursor: pointer; }
+.item-menu:hover, .item-menu:focus-visible { background: var(--acao-suave); text-decoration: none; outline: none; }
+.item-menu .ic { color: var(--acao); margin-top: 2px; }
+.item-menu span { display: grid; }
+.item-menu small { font-size: var(--t-1); color: var(--texto-3); }
+.form-parametros { margin-top: var(--e-5); padding-top: var(--e-4); border-top: 1px solid var(--borda); }
 
 /* ---------------------------------------------------------------- equipamentos */
 .grupo-equip { margin-bottom: var(--e-6); }

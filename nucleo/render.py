@@ -95,7 +95,8 @@ def posicionar_rotulo(largura: float, altura: float, caixa, ocupadas: list, limi
     return None
 
 
-def desenhar(temperatura: np.ndarray, regioes: list[dict], largura: int = 960, nome: str = "ferro", numerar: bool = False) -> Image.Image:
+def desenhar(temperatura: np.ndarray, regioes: list[dict], largura: int = 960, nome: str = "ferro", numerar: bool = False,
+             medicoes: list[dict] | None = None, faixa: tuple[float, float] | None = None) -> Image.Image:
     """Termograma ampliado com as caixas e o ponto de máxima de cada região.
 
     ``numerar=True`` (laudo): cada caixa ganha só o número da linha da tabela, num selo da cor da
@@ -104,7 +105,8 @@ def desenhar(temperatura: np.ndarray, regioes: list[dict], largura: int = 960, n
     """
     h, w = temperatura.shape
     escala = largura / w
-    img = Image.fromarray(colorir(temperatura, nome=nome)).resize((largura, int(h * escala)), Image.BICUBIC)
+    lo, hi = faixa if faixa else (None, None)
+    img = Image.fromarray(colorir(temperatura, lo, hi, nome=nome)).resize((largura, int(h * escala)), Image.BICUBIC)
     d = ImageDraw.Draw(img)
     fonte = _fonte(max(12, largura // (48 if numerar else 42)))
     limite = (img.width, img.height)
@@ -138,4 +140,33 @@ def desenhar(temperatura: np.ndarray, regioes: list[dict], largura: int = 960, n
         fundo = cor if numerar or texto == str(i) else (15, 23, 36)
         d.rounded_rectangle(lugar, radius=3, fill=fundo, outline=(255, 255, 255) if numerar else None, width=1)
         d.text((lugar[0] + 5, lugar[1] + 2 - b[1]), texto, fill=(255, 255, 255), font=fonte)
+    _desenhar_medicoes(d, medicoes or [], escala, fonte, ocupadas, limite, traco)
     return img
+
+
+def _desenhar_medicoes(d, medicoes, escala, fonte, ocupadas, limite, traco) -> None:
+    """Pontos (mira) e linhas do usuário, com o nome e o valor (P1 45,2 °C; L1 máx 52,3 °C)."""
+    branco, escuro = (255, 255, 255), (15, 23, 36)
+    for m in medicoes:
+        v = m.get("valor")
+        if m["tipo"] == "ponto":
+            cx, cy = (m["x"] + 0.5) * escala, (m["y"] + 0.5) * escala
+            for cor, largura in ((escuro, traco + 2), (branco, traco)):
+                d.line([cx - 9, cy, cx + 9, cy], fill=cor, width=largura)
+                d.line([cx, cy - 9, cx, cy + 9], fill=cor, width=largura)
+            alvo = (cx - 10, cy - 10, cx + 10, cy + 10)
+            texto = f"{m['nome']}  {v['t']:.1f} °C".replace(".", ",") if v else m["nome"]
+        else:
+            a, b = ((m["x0"] + 0.5) * escala, (m["y0"] + 0.5) * escala), ((m["x1"] + 0.5) * escala, (m["y1"] + 0.5) * escala)
+            d.line([a, b], fill=escuro, width=traco + 2)
+            d.line([a, b], fill=branco, width=traco)
+            for px, py in (a, b):
+                d.ellipse([px - 4, py - 4, px + 4, py + 4], fill=branco, outline=escuro)
+            alvo = (min(a[0], b[0]), min(a[1], b[1]), max(a[0], b[0]), max(a[1], b[1]))
+            texto = f"{m['nome']}  máx {v['t_max']:.1f} °C".replace(".", ",") if v else m["nome"]
+        bb = d.textbbox((0, 0), texto, font=fonte)
+        tw, th = bb[2] - bb[0] + 10, bb[3] - bb[1] + 6
+        lugar = posicionar_rotulo(tw, th, alvo, ocupadas, limite) or (alvo[0], max(0, alvo[1] - th), alvo[0] + tw, max(0, alvo[1] - th) + th)
+        ocupadas.append(lugar)
+        d.rounded_rectangle(lugar, radius=3, fill=escuro, outline=branco, width=1)
+        d.text((lugar[0] + 5, lugar[1] + 2 - bb[1]), texto, fill=branco, font=fonte)

@@ -51,6 +51,11 @@
   <symbol id="i-estavel" viewBox="0 0 24 24"><path d="M4 12h15.5M15 7.5l4.5 4.5-4.5 4.5"/></symbol>
   <symbol id="i-calendario" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/></symbol>
   <symbol id="i-editar" viewBox="0 0 24 24"><path d="M4 20h4.5L19.3 9.2a2.1 2.1 0 0 0-3-3L5.5 17v3z"/><path d="m14.5 8 3 3"/></symbol>
+  <symbol id="i-mira" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.5"/><path d="M12 2.5v5M12 16.5v5M2.5 12h5M16.5 12h5"/></symbol>
+  <symbol id="i-linha" viewBox="0 0 24 24"><path d="M6 18 18 6"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="5" r="2"/></symbol>
+  <symbol id="i-baixar" viewBox="0 0 24 24"><path d="M12 4v11.5M7 10.5l5 5 5-5"/><path d="M4 16.5V18a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1.5"/></symbol>
+  <symbol id="i-mais-opcoes" viewBox="0 0 24 24"><circle cx="5.5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="18.5" cy="12" r="1.3"/></symbol>
+  <symbol id="i-escala" viewBox="0 0 24 24"><rect x="9" y="3.5" width="6" height="17" rx="3"/><path d="M4 7h3M4 12h3M4 17h3M17 9.5h3M17 14.5h3"/></symbol>
   <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.8v14.4a1 1 0 0 0 1.5.9l11.3-7.2a1 1 0 0 0 0-1.8L8.5 3.9A1 1 0 0 0 7 4.8z"/></symbol>
   <symbol id="i-pausa" viewBox="0 0 24 24"><rect x="6" y="4.5" width="4" height="15" rx="1"/><rect x="14" y="4.5" width="4" height="15" rx="1"/></symbol>
   <symbol id="i-video" viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10.5 5-3v9l-5-3z"/></symbol>
@@ -176,6 +181,7 @@
                 <select id="sel-modelo" aria-label="Detector"></select>
                 <button class="btn" id="btn-detectar" type="button"><svg class="ic"><use href="#i-refazer"/></svg>Detectar</button>
               </div>
+              <button class="btn btn-icone" id="btn-exportar" type="button" aria-haspopup="menu" aria-label="Exportar" title="Exportar imagem ou temperaturas"><svg class="ic"><use href="#i-baixar"/></svg></button>
               <button class="btn btn-primaria" id="btn-laudo" type="button"><svg class="ic"><use href="#i-laudo"/></svg>Gerar laudo</button>
             </div>
           </header>
@@ -193,11 +199,14 @@
                 <div class="segmentado" role="group" aria-label="Escala" id="seg-faixa">
                   <button type="button" data-valor="equipamento" aria-pressed="true" title="Realça o equipamento; o céu fica na cor mais escura">Equipamento</button>
                   <button type="button" data-valor="completa" aria-pressed="false" title="Da menor à maior temperatura da cena">Cena</button>
+                  <button type="button" data-valor="manual" aria-pressed="false" title="Escolha o mínimo e o máximo da escala (nível e amplitude)">Manual</button>
                 </div>
                 <span class="divisor"></span>
                 <div class="segmentado" role="group" aria-label="Ferramenta" id="seg-ferramenta">
                   <button type="button" data-valor="selecionar" aria-pressed="true" title="Selecionar (S)" aria-label="Selecionar"><svg class="ic"><use href="#i-cursor"/></svg></button>
                   <button type="button" data-valor="desenhar" aria-pressed="false" title="Desenhar região (D)" aria-label="Desenhar região"><svg class="ic"><use href="#i-desenhar"/></svg></button>
+                  <button type="button" data-valor="ponto" aria-pressed="false" title="Medir um ponto (P)" aria-label="Medir um ponto"><svg class="ic"><use href="#i-mira"/></svg></button>
+                  <button type="button" data-valor="linha" aria-pressed="false" title="Perfil ao longo de uma linha (L)" aria-label="Perfil ao longo de uma linha"><svg class="ic"><use href="#i-linha"/></svg></button>
                 </div>
                 <button type="button" class="btn-palco" id="btn-isoterma" aria-pressed="false" title="Isoterma: destaca tudo acima de uma temperatura"><svg class="ic"><use href="#i-isoterma"/></svg>Isoterma</button>
                 <button type="button" class="btn-palco" id="btn-foto" aria-pressed="false" hidden title="Foto visível da câmera"><svg class="ic"><use href="#i-foto"/></svg>Foto</button>
@@ -208,6 +217,15 @@
                   <button type="button" data-valor="pontos" aria-pressed="false" title="Só os pontos quentes">Pontos quentes</button>
                 </div>
                 <button type="button" class="btn-palco" id="btn-rotulos" aria-pressed="true" title="Nome e temperatura sobre as caixas (R)"><svg class="ic"><use href="#i-etiqueta"/></svg>Rótulos</button>
+              </div>
+              <div class="isoterma-controle" id="escala-controle" hidden>
+                <svg class="ic"><use href="#i-escala"/></svg>
+                <label for="escala-min">Mínimo</label>
+                <div class="campo-unidade campo-curto"><input type="number" id="escala-min" step="0.5"><span>°C</span></div>
+                <label for="escala-max">Máximo</label>
+                <div class="campo-unidade campo-curto"><input type="number" id="escala-max" step="0.5"><span>°C</span></div>
+                <button type="button" class="btn btn-sm btn-fantasma" id="btn-escala-auto" title="Volta a escala para o equipamento">Automática</button>
+                <span class="nota">A escala escolhida vai também para o laudo e a imagem exportada.</span>
               </div>
               <div class="isoterma-controle" id="isoterma-controle" hidden>
                 <label for="isoterma-valor">Acima de</label>
@@ -222,6 +240,7 @@
                     <div class="sobreposicao" id="sobreposicao"></div>
                     <div class="leitura" id="leitura" hidden></div>
                     <div class="dica-desenho" id="dica-desenho" hidden>Arraste para medir uma região · Esc cancela</div>
+                    <svg class="camada-linhas" id="camada-linhas" aria-hidden="true"></svg>
                   </div>
                   <figure class="quadro-foto" id="quadro-foto" hidden><img id="img-foto" alt="Foto visível da câmera"><figcaption>Foto visível</figcaption></figure>
                 </div>
@@ -257,6 +276,14 @@
                   <button class="btn btn-sm btn-fantasma" type="button" id="btn-nova-regiao"><svg class="ic"><use href="#i-mais"/></svg>Desenhar região</button>
                 </div>
                 <div class="regioes" id="regioes"></div>
+                <div class="lista-titulo lista-medicoes">
+                  <h3>Pontos e linhas</h3>
+                  <div class="acoes">
+                    <button class="btn btn-sm btn-fantasma" type="button" id="btn-novo-ponto"><svg class="ic"><use href="#i-mira"/></svg>Ponto</button>
+                    <button class="btn btn-sm btn-fantasma" type="button" id="btn-nova-linha"><svg class="ic"><use href="#i-linha"/></svg>Linha</button>
+                  </div>
+                </div>
+                <div class="medicoes" id="medicoes"></div>
                 <p class="nota">Dê a mesma classe às regiões das três fases (por exemplo, três "Terminal superior") para comparar componentes semelhantes, como pede o critério.</p>
               </div>
 
@@ -268,6 +295,36 @@
                   </div>
                   <p class="nota">Com ambiente e carga, cada região é projetada para plena carga, T<sub>amb</sub> + (T − T<sub>amb</sub>) × (100 / carga)², e comparada com a máxima temperatura admissível (MTA) do componente, como pede a NBR 15866. Abaixo de 40% de carga a projeção fica pouco confiável. Evite medir com vento acima de 4 m/s.</p>
                   <div class="form-acoes"><button class="btn btn-primaria" type="submit"><svg class="ic"><use href="#i-refazer"/></svg>Recalcular</button></div>
+                </form>
+                <form class="form form-parametros" id="form-parametros" hidden>
+                  <h3 class="subtitulo-painel sobrerrotulo">Parâmetros de medição</h3>
+                  <label>Material da superfície
+                    <select id="p-material">
+                      <option value="">Escolha para preencher a emissividade</option>
+                      <option value="0.92">Porcelana vitrificada (0,92)</option>
+                      <option value="0.90">Polímero / borracha de silicone (0,90)</option>
+                      <option value="0.93">Tinta ou verniz fosco (0,93)</option>
+                      <option value="0.95">Fita isolante preta (0,95)</option>
+                      <option value="0.78">Cobre oxidado (0,78)</option>
+                      <option value="0.80">Aço oxidado (0,80)</option>
+                      <option value="0.64">Ferro fundido oxidado (0,64)</option>
+                      <option value="0.28">Aço galvanizado (0,28)</option>
+                      <option value="0.25">Alumínio oxidado (0,25)</option>
+                      <option value="0.92">Concreto (0,92)</option>
+                    </select>
+                  </label>
+                  <div class="campos-2">
+                    <label>Emissividade<input id="p-emissividade" type="number" step="0.01" min="0.05" max="1"></label>
+                    <label>Temperatura refletida<div class="campo-unidade"><input id="p-refletida" type="number" step="0.1"><span>°C</span></div></label>
+                    <label>Distância<div class="campo-unidade"><input id="p-distancia" type="number" step="0.1" min="0.1"><span>m</span></div></label>
+                    <label>Umidade relativa<div class="campo-unidade"><input id="p-umidade" type="number" step="1" min="0" max="100"><span>%</span></div></label>
+                    <label>Temperatura do ar<div class="campo-unidade"><input id="p-ar" type="number" step="0.1"><span>°C</span></div></label>
+                  </div>
+                  <p class="nota">Valores típicos de tabela: metal polido reflete o entorno e não deve ser medido sem fita ou tinta de referência. A temperatura é recalculada a partir do arquivo radiométrico original.</p>
+                  <div class="form-acoes">
+                    <button class="btn btn-fantasma" type="button" id="btn-parametros-camera" hidden>Voltar aos valores da câmera</button>
+                    <button class="btn" type="submit"><svg class="ic"><use href="#i-refazer"/></svg>Aplicar parâmetros</button>
+                  </div>
                 </form>
                 <h3 class="subtitulo-painel sobrerrotulo">Medição da câmera</h3>
                 <dl class="meta" id="meta"></dl>
@@ -396,7 +453,10 @@
       <section class="vista" data-vista="inspecoes" hidden>
         <header class="cabecalho">
           <div><h1>Inspeções</h1><p class="sub">Todas as imagens analisadas neste computador, com regiões, condições e dados do laudo. Clique numa linha para abrir.</p></div>
-          <div class="acoes"><button class="btn btn-primaria" type="button" data-abrir-arquivos><svg class="ic"><use href="#i-upload"/></svg>Analisar imagens</button></div>
+          <div class="acoes">
+            <a class="btn" href="/api/inspecoes.csv" download title="Planilha com todas as inspeções (abre no Excel)"><svg class="ic"><use href="#i-baixar"/></svg>Exportar planilha</a>
+            <button class="btn btn-primaria" type="button" data-abrir-arquivos><svg class="ic"><use href="#i-upload"/></svg>Analisar imagens</button>
+          </div>
         </header>
         <div class="kpis-grandes" id="kpis-inspecoes"></div>
         <div class="filtros" id="filtros-inspecoes">
