@@ -280,7 +280,9 @@ button.kpi-grande[aria-pressed="true"] { border-color: var(--acao); box-shadow: 
 .esq-palco::after { background: linear-gradient(90deg, transparent, var(--brilho-palco), transparent); }
 
 .vazio { display: grid; justify-items: center; gap: var(--e-2); text-align: center; padding: var(--e-12) var(--e-5); border: 1.5px dashed var(--borda-forte); border-radius: var(--r-g); background: var(--superficie); }
-.vazio > .ic { width: var(--e-10); height: var(--e-10); color: var(--acao); padding: var(--e-2); border-radius: var(--r-m); background: var(--acao-suave); }
+.vazio > .ic { width: var(--e-10); height: var(--e-10); color: var(--acao); padding: var(--e-2); border-radius: var(--r-m); background: var(--acao-suave);
+  box-shadow: 0 0 0 var(--e-2) var(--superficie), 0 0 0 calc(var(--e-2) + 1px) var(--acao-suave-2), 0 0 0 var(--e-4) var(--superficie), 0 0 0 calc(var(--e-4) + 1px) var(--borda);
+  margin-bottom: var(--e-3); animation: surgir-icone var(--dur-lenta) var(--ease-entrada) both; }
 .vazio p { color: var(--texto-3); max-width: var(--medida); }
 .vazio .acoes { justify-content: center; margin-top: var(--e-2); }
 .vazio.compacto { padding: var(--e-8) var(--e-4); }
@@ -691,6 +693,9 @@ section[data-vista="sobre"] .cartao h2 { margin-bottom: var(--e-3); }
 .dialogo[open] { animation: entrar-dialogo var(--dur-media) var(--ease-entrada); }
 @keyframes entrar-dialogo { from { opacity: 0; transform: translateY(var(--e-2)) scale(.98); } }
 .dialogo::backdrop { background: var(--veu); }
+.dialogo[open]::backdrop, .paleta[open]::backdrop { animation: aparecer var(--dur-media) var(--ease-padrao); }
+.paleta[open] { animation: entrar-dialogo var(--dur-media) var(--ease-entrada); }
+@keyframes aparecer { from { opacity: 0; } }
 .dialogo-corpo { display: grid; gap: var(--e-4); padding: var(--e-6); }
 .dialogo-corpo p { color: var(--texto-2); }
 .dialogo-corpo .form-acoes { margin-top: var(--e-2); }
@@ -709,6 +714,11 @@ section[data-vista="sobre"] .cartao h2 { margin-bottom: var(--e-3); }
 }
 :root[data-tema="escuro"] .aviso { background: var(--superficie-3); color: var(--texto); }
 .aviso.saindo { animation: sair-aviso var(--dur-rapida) var(--ease-saida) forwards; }
+.aviso { position: relative; overflow: hidden; }
+.aviso::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--sucesso); opacity: .7; transform-origin: left center; animation: tempo-aviso var(--tempo-aviso, 3500ms) linear forwards; }
+.aviso.erro::after { background: var(--erro); }
+.aviso:hover::after { animation-play-state: paused; }
+@keyframes tempo-aviso { to { transform: scaleX(0); } }
 .aviso .ic { color: var(--sucesso); }
 .aviso.erro .ic { color: var(--erro); }
 .aviso button { margin-left: var(--e-1); height: var(--alvo-sm); padding: 0 var(--e-3); border: 1px solid var(--linha-clara); background: transparent; color: inherit; border-radius: var(--r-p); font: var(--p-medio) var(--t-1) / var(--a-1) var(--fonte); cursor: pointer; }

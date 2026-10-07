@@ -112,15 +112,28 @@ function mostrarOffline(ligar) {
 
 // ================================================================= avisos, diálogos e estados
 
+/** Aviso rápido no canto. Uma barra fina mostra o tempo até sumir; com o mouse em cima, o tempo para. */
 function avisar(texto, { erro = false, acao = null, duracao } = {}) {
+  const tempo = duracao || (erro ? 8000 : acao ? 7000 : 3500);
   const a = el("div", { class: `aviso${erro ? " erro" : ""}`, role: erro ? "alert" : "status" }, icone(erro ? "alerta" : "check"), el("span", {}, texto));
+  a.style.setProperty("--tempo-aviso", `${tempo}ms`);
+  let restante = tempo;
+  let inicio = 0;
+  let relogio = null;
   const sair = () => {
+    clearTimeout(relogio);
     a.classList.add("saindo");
-    setTimeout(() => a.remove(), 160);
+    setTimeout(() => a.remove(), duracaoToken("rapida"));
   };
+  const contar = () => {
+    inicio = performance.now();
+    relogio = setTimeout(sair, restante);
+  };
+  a.addEventListener("mouseenter", () => { clearTimeout(relogio); restante -= performance.now() - inicio; });
+  a.addEventListener("mouseleave", contar);
   if (acao) a.append(el("button", { type: "button", onclick: () => { acao.executar(); sair(); } }, acao.rotulo));
   $("#toasts").append(a);
-  setTimeout(sair, duracao || (erro ? 8000 : acao ? 7000 : 3500));
+  contar();
 }
 const falhou = (e) => avisar(e.message, { erro: true });
 
@@ -184,14 +197,14 @@ const midiaEscura = window.matchMedia("(prefers-color-scheme: dark)");
 const reduzirMovimento = window.matchMedia("(prefers-reduced-motion: reduce)");
 
 /** Duração de um token de movimento (tokens.css), em milissegundos. */
-function duracao(token) {
+function duracaoToken(token) {
   return parseFloat(getComputedStyle(document.documentElement).getPropertyValue(`--dur-${token}`)) || 250;
 }
 
 /** Os números inteiros dos indicadores contam até o valor; com movimento reduzido, aparecem prontos. */
 function contarNumeros(raiz) {
   if (reduzirMovimento.matches || !raiz) return;
-  const dur = duracao("lenta");
+  const dur = duracaoToken("lenta");
   for (const b of $$(".kpi-grande > b", raiz)) {
     const alvo = Number(b.textContent);
     if (!Number.isInteger(alvo) || alvo < 2) continue;
