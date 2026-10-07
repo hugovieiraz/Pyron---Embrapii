@@ -135,6 +135,7 @@
   --e-10: 40px;
   --e-12: 48px;
   --e-16: 64px;
+  --e-24: 96px;
 
   /* ---------------------------------------------------------------- tamanhos */
   --alvo: 40px;         /* altura de botão e campo */
@@ -158,6 +159,7 @@
   --dialogo: 520px;
   --lista-max: 288px;        /* lista rolável dentro de diálogo */
   --medida: 68ch;            /* comprimento de linha para texto corrido */
+  --altura-lista: 480px;     /* listas longas dentro de um cartão rolam por dentro */
 
   /* ---------------------------------------------------------------- raio (3 valores) */
   --r-p: 6px;

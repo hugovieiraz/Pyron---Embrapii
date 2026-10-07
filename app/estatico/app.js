@@ -188,7 +188,7 @@ midiaEscura.addEventListener("change", () => {
   if (document.documentElement.dataset.temaEscolhido === "sistema") aplicarTema("sistema");
 });
 
-const VISTAS = ["painel", "analise", "video", "inspecoes", "monitoramento", "modelos", "avaliacao", "configuracoes", "sobre"];
+const VISTAS = ["painel", "analise", "video", "inspecoes", "equipamentos", "monitoramento", "modelos", "avaliacao", "configuracoes", "sobre"];
 
 function mostrarVista(vista) {
   const trocou = estado.vista !== vista;
@@ -225,6 +225,10 @@ function atualizarTrilha() {
     link = "#inspecoes";
   } else if (aberta) {
     partes = [...T.rotas.analise, estado.processando.nome];
+  } else if (vista === "equipamentos" && estado.equipamentoAberto && location.hash.includes("/")) {
+    const d = estado.equipamentoAberto;
+    partes = [...T.rotas.equipamentos, d.equipamento || T.equip.semEquipTitulo(d.inspecoes)];
+    link = "#equipamentos";
   } else if (vista === "video" && vid.id && vid.dados) {
     partes = [...T.rotas.video, vid.dados.arquivo];
     link = "#video";
@@ -262,6 +266,10 @@ function rota() {
   }
   if (vista === "avaliacao") carregarAvaliacoes();
   if (vista === "configuracoes") carregarConfiguracoes(sub);
+  if (vista === "equipamentos") {
+    estado.equipamentoAberto = null;
+    carregarEquipamentos(sub);
+  }
   if (vista === "video") {
     if (sub) abrirVideo(sub);
     else mostrarInicioVideo();
@@ -1001,6 +1009,310 @@ function cartaoDadosAvaliacao(d) {
     blocoModelo,
     el("dl", { class: "dados-avaliacao" }, linhas.flatMap(([k, v]) => [el("dt", {}, k), el("dd", {}, v)])),
     el("div", { class: "cartao-rodape" }, apagar));
+}
+
+// ================================================================= equipamentos (histórico, tendência e próxima inspeção)
+
+const SEM_EQUIPAMENTO = "sem-equipamento";
+const LIMIAR_ESQUENTANDO = 0.5; // °C por mês
+
+/** "2023-07-23T17:23:00" vira "23/07/2023". */
+function dataCurta(iso) {
+  if (!iso) return T.geral.semValor;
+  const [a, m, d] = String(iso).slice(0, 10).split("-");
+  return d && m && a ? `${d}/${m}/${a}` : T.geral.semValor;
+}
+
+/** Sobe, desce ou estável, com o valor em °C por mês e a explicação no balão. */
+function selotendencia(t) {
+  const E = T.equip;
+  if (!t) return el("span", { class: "tendencia sem", title: E.semTendenciaDica }, icone("estavel"), E.semTendencia);
+  const v = t.por_mes;
+  const tipo = v > LIMIAR_ESQUENTANDO ? "sobe" : v < -LIMIAR_ESQUENTANDO ? "desce" : "estavel";
+  const titulo = E.tendenciaTitulo(fmt(t.r2, 2), t.n) + (t.r2 < 0.3 ? E.tendenciaInstavel : "");
+  return el("span", { class: `tendencia ${tipo}`, title: titulo }, icone(tipo), E.tendencia(`${v > 0 ? "+" : ""}${fmt(v, 1)}`));
+}
+
+function seloProxima(p) {
+  if (!p) return null;
+  const E = T.equip;
+  return el("span", { class: `proxima${p.vencida ? " vencida" : ""}` }, icone("calendario"),
+    p.vencida ? E.vencidaHa(-p.dias) : E.proxima(`${dataCurta(p.data)} (${E.emDias(p.dias)})`));
+}
+
+/** Linha pequena da máxima ao longo das inspeções, com a última bolinha na cor da severidade. */
+function sparkline(serie) {
+  const pts = serie.filter((p) => p.t_max != null);
+  const L = 160, A = 36, m = 4;
+  const svg = svgEl("svg", { viewBox: `0 0 ${L} ${A}`, class: "sparkline", preserveAspectRatio: "xMinYMid meet", "aria-hidden": "true" });
+  if (!pts.length) return svg;
+  const ts = pts.map((p) => Date.parse(p.data));
+  const vs = pts.map((p) => p.t_max);
+  const [t0, t1] = [Math.min(...ts), Math.max(...ts)];
+  const [v0, v1] = [Math.min(...vs), Math.max(...vs)];
+  const x = (t) => (t1 > t0 ? m + ((t - t0) / (t1 - t0)) * (L - 2 * m) : L / 2);
+  const y = (v) => (v1 > v0 ? A - m - ((v - v0) / (v1 - v0)) * (A - 2 * m) : A / 2);
+  if (pts.length > 1) svg.append(svgEl("path", { d: pts.map((p, i) => `${i ? "L" : "M"}${x(ts[i]).toFixed(1)} ${y(p.t_max).toFixed(1)}`).join(" "), class: "linha" }));
+  pts.forEach((p, i) => {
+    const ultimo = i === pts.length - 1;
+    if (ultimo || p.severidade !== "normal") svg.append(svgEl("circle", { cx: x(ts[i]).toFixed(1), cy: y(p.t_max).toFixed(1), r: ultimo ? 3.5 : 2.5, style: `fill: var(--${p.severidade})` }));
+  });
+  return svg;
+}
+
+/** Séries no tempo (eixo x em datas). series: [{nome, indice, pontos: [{data, valor, severidade, id}]}]. */
+function graficoDatas(titulo, series, { aoClicar = null, unidade = " °C", tendencia = false } = {}) {
+  const todos = series.flatMap((s) => s.pontos).filter((p) => p.valor != null);
+  if (!todos.length) return null;
+  const L = 1080, A = 280, m = { e: 44, d: 14, t: 12, b: 30 };
+  const ts = todos.map((p) => Date.parse(p.data));
+  let [t0, t1] = [Math.min(...ts), Math.max(...ts)];
+  if (t1 - t0 < 864e5) { t0 -= 864e5; t1 += 864e5; } // uma data só: abre um dia para cada lado
+  const vs = todos.map((p) => p.valor);
+  const folga = Math.max(1, (Math.max(...vs) - Math.min(...vs)) * 0.15);
+  const lo = Math.floor(Math.min(...vs) - folga), hi = Math.ceil(Math.max(...vs) + folga);
+  const x = (t) => m.e + ((t - t0) / (t1 - t0)) * (L - m.e - m.d);
+  const y = (v) => m.t + (1 - (v - lo) / (hi - lo)) * (A - m.t - m.b);
+  const svg = svgEl("svg", { viewBox: `0 0 ${L} ${A}`, class: "grafico-svg", role: "img", "aria-label": titulo });
+  for (const v of [lo, (lo + hi) / 2, hi]) {
+    svg.append(svgEl("line", { x1: m.e, x2: L - m.d, y1: y(v), y2: y(v), class: "grade" }),
+      svgEl("text", { x: m.e - 6, y: y(v) + 4, class: "eixo", "text-anchor": "end" }, fmt(v, 0)));
+  }
+  [[t0, "start"], [(t0 + t1) / 2, "middle"], [t1, "end"]].forEach(([t, ancora]) =>
+    svg.append(svgEl("text", { x: x(t), y: A - 8, class: "eixo", "text-anchor": ancora }, dataCurta(new Date(t).toISOString()))));
+  for (const s of series) {
+    const pts = s.pontos.filter((p) => p.valor != null).sort((a, b) => Date.parse(a.data) - Date.parse(b.data));
+    if (tendencia && pts.length >= 3) {
+      // Reta de mínimos quadrados, tracejada: a mesma conta do servidor, só para desenhar.
+      const xs = pts.map((p) => Date.parse(p.data)), ys = pts.map((p) => p.valor);
+      const mx = xs.reduce((a, b) => a + b) / xs.length, my = ys.reduce((a, b) => a + b) / ys.length;
+      const sxx = xs.reduce((a, x) => a + (x - mx) ** 2, 0);
+      if (sxx > 0) {
+        const k = xs.reduce((a, x, i) => a + (x - mx) * (ys[i] - my), 0) / sxx;
+        const f = (t) => my + k * (t - mx);
+        svg.append(svgEl("line", { x1: x(xs[0]), y1: y(f(xs[0])), x2: x(xs[xs.length - 1]), y2: y(f(xs[xs.length - 1])), class: "reta-tendencia" }));
+      }
+    }
+    if (pts.length > 1) {
+      svg.append(svgEl("path", { d: pts.map((p, i) => `${i ? "L" : "M"}${x(Date.parse(p.data)).toFixed(1)} ${y(p.valor).toFixed(1)}`).join(" "), class: "linha", style: `stroke: ${corSerie(s.indice)}` }));
+    }
+    for (const p of pts) {
+      const c = svgEl("circle", {
+        cx: x(Date.parse(p.data)).toFixed(1), cy: y(p.valor).toFixed(1), r: 4.5, class: aoClicar && p.id ? "ponto-clicavel" : null,
+        style: `fill: ${p.severidade ? `var(--${p.severidade})` : corSerie(s.indice)}; stroke: var(--superficie); stroke-width: 1.5`,
+      }, svgEl("title", {}, `${s.nome} · ${dataCurta(p.data)} · ${fmt(p.valor, 1, unidade)}${p.severidade ? ` · ${T.niveis[p.severidade]}` : ""}`));
+      if (aoClicar && p.id) c.addEventListener("click", () => aoClicar(p));
+      svg.append(c);
+    }
+  }
+  return el("figure", { class: "grafico" }, el("figcaption", {}, titulo), svg, series.length > 1 ? legendaGrafico(series) : null);
+}
+
+function preencherSugestoes(equips) {
+  const inst = [...new Set(equips.map((e) => e.instalacao).filter(Boolean))].sort();
+  const eqs = [...new Set(equips.map((e) => e.equipamento).filter(Boolean))].sort();
+  $("#dl-instalacoes").replaceChildren(...inst.map((v) => el("option", { value: v })));
+  $("#dl-equipamentos").replaceChildren(...eqs.map((v) => el("option", { value: v })));
+  const vencidas = equips.filter((e) => e.proxima_inspecao && e.proxima_inspecao.vencida).length;
+  const c = $("#contador-vencidas");
+  c.hidden = !vencidas;
+  c.textContent = String(vencidas);
+}
+
+async function carregarEquipamentos(sub) {
+  $("#equip-inicio").hidden = !!sub;
+  $("#equip-detalhe").hidden = !sub;
+  if (sub) return abrirEquipamento(decodeURIComponent(sub));
+  const alvo = $("#lista-equip");
+  $("#kpis-equip").replaceChildren(...esqueleto.kpis(4).children);
+  if (!estado.equipamentos) alvo.replaceChildren(esqueleto.tabela(4));
+  try {
+    estado.equipamentos = await api("/api/equipamentos");
+  } catch (e) {
+    $("#kpis-equip").replaceChildren();
+    return alvo.replaceChildren(estadoErro(T.equip.erroTitulo, e, () => carregarEquipamentos()));
+  }
+  preencherSugestoes(estado.equipamentos);
+  desenharEquipamentos();
+}
+
+function desenharEquipamentos() {
+  const E = T.equip;
+  const todos = estado.equipamentos || [];
+  const reais = todos.filter((e) => e.chave !== SEM_EQUIPAMENTO);
+  const sem = todos.find((e) => e.chave === SEM_EQUIPAMENTO);
+  const alvo = $("#lista-equip");
+  $("#filtros-equip").hidden = !reais.length;
+  $("#kpis-equip").hidden = !reais.length;
+  if (!reais.length) {
+    $("#kpis-equip").replaceChildren();
+    return alvo.replaceChildren(estadoVazio({
+      nomeIcone: "ativos", titulo: E.vazioTitulo, texto: E.vazioTexto,
+      acoes: [el("a", { class: "btn btn-primaria", href: "#inspecoes" }, icone("editar"), E.vazioAcao)],
+    }));
+  }
+  const filtros = {
+    todos: () => true,
+    anomalia: (e) => e.severidade !== "normal",
+    vencida: (e) => e.proxima_inspecao && e.proxima_inspecao.vencida,
+    esquentando: (e) => e.tendencia && e.tendencia.por_mes > LIMIAR_ESQUENTANDO,
+  };
+  const filtro = estado.filtroEquip || "todos";
+  const kpi = (rotulo, chave, nota, cor) => el("button", {
+    class: "kpi-grande", type: "button", "aria-pressed": String(filtro === chave),
+    onclick: () => { estado.filtroEquip = filtro === chave ? "todos" : chave; desenharEquipamentos(); },
+  }, el("span", {}, cor ? el("i", { class: "ponto", style: { background: `var(--${cor})`, boxShadow: "none" } }) : null, rotulo),
+  el("b", {}, String(reais.filter(filtros[chave]).length)), nota ? el("small", {}, nota) : null);
+  $("#kpis-equip").replaceChildren(
+    kpi(E.kTotal, "todos"),
+    kpi(E.kAnomalia, "anomalia", null, "programar"),
+    kpi(E.kVencida, "vencida", null, "imediato"),
+    kpi(E.kEsquentando, "esquentando", E.kEsquentandoNota, "urgente"));
+
+  const termo = (estado.buscaEquip || "").trim().toLowerCase();
+  const visiveis = reais.filter(filtros[filtro]).filter((e) => !termo || `${e.instalacao} ${e.equipamento}`.toLowerCase().includes(termo));
+  if (!visiveis.length) {
+    alvo.replaceChildren(estadoVazio({ nomeIcone: "busca", titulo: E.nadaTitulo, texto: E.nadaTexto, compacto: true }));
+  } else {
+    const grupos = new Map();
+    for (const e of visiveis) {
+      const nome = e.instalacao || E.semInstalacao;
+      if (!grupos.has(nome)) grupos.set(nome, []);
+      grupos.get(nome).push(e);
+    }
+    alvo.replaceChildren(...[...grupos].map(([nome, lista]) => el("section", { class: "grupo-equip" },
+      el("h2", { class: "grupo-titulo" }, icone("ativos"), nome, el("span", { class: "nota" }, String(lista.length))),
+      el("div", { class: "grade-equip" }, animarEntrada(lista.map(cartaoEquipamento))))));
+  }
+  if (sem && filtro === "todos" && !termo) {
+    alvo.append(el("div", { class: "aviso-sem-equip" }, icone("info"),
+      el("div", {}, el("b", {}, E.semEquipTitulo(sem.inspecoes)), el("p", { class: "nota" }, E.semEquipTexto)),
+      el("a", { class: "btn btn-sm", href: "#inspecoes" }, icone("editar"), E.vazioAcao)));
+  }
+}
+
+function cartaoEquipamento(e) {
+  const E = T.equip;
+  const abrir = () => { location.hash = `equipamentos/${encodeURIComponent(e.chave)}`; };
+  return el("article", { class: "cartao-equip", tabindex: "0", onclick: abrir, onkeydown: (ev) => { if (ev.key === "Enter") abrir(); } },
+    el("img", { class: "cartao-equip-img", src: `/api/analises/${e.ultima_id}/miniatura.png`, alt: "", loading: "lazy" }),
+    el("div", { class: "cartao-equip-corpo" },
+      el("div", { class: "cartao-equip-topo" },
+        el("b", { class: "cartao-equip-nome", title: e.equipamento }, e.equipamento),
+        el("span", { class: `selo ${e.severidade}` }, T.niveis[e.severidade])),
+      el("span", { class: "nota" }, `${E.inspecoes(e.inspecoes)} · ${E.ultima(dataCurta(e.ultima))}`),
+      el("div", { class: "cartao-equip-serie" }, sparkline(e.serie), el("b", { class: "num" }, fmt(e.t_max, 1, " °C"))),
+      el("div", { class: "cartao-equip-rodape" }, selotendencia(e.tendencia), seloProxima(e.proxima_inspecao))));
+}
+
+async function abrirEquipamento(chave) {
+  const alvo = $("#equip-detalhe");
+  alvo.replaceChildren(esqueleto.kpis(4), esqueleto.bloco(), esqueleto.tabela(4));
+  let d;
+  try {
+    d = await api(`/api/equipamentos/${encodeURIComponent(chave)}`);
+  } catch (e) {
+    return alvo.replaceChildren(estadoErro(T.equip.erroTitulo, e, () => abrirEquipamento(chave)));
+  }
+  estado.equipamentoAberto = d;
+  atualizarTrilha();
+  desenharEquipamento(d);
+}
+
+function desenharEquipamento(d) {
+  const E = T.equip;
+  const sem = d.chave === SEM_EQUIPAMENTO;
+  const ids = d.lista.map((it) => it.id);
+  const adicionar = () => {
+    estado.destinoEquipamento = { instalacao: d.instalacao, equipamento: d.equipamento, chave: d.chave };
+    abrirArquivos();
+  };
+  const cabecalho = el("header", { class: "cabecalho cabecalho-analise" },
+    el("div", { class: "titulo-analise" },
+      el("a", { class: "btn btn-fantasma btn-icone", href: "#equipamentos", "aria-label": E.voltar, title: E.voltar }, icone("voltar")),
+      el("div", {},
+        el("h1", { class: "nome-arquivo" }, sem ? E.semEquipTitulo(d.inspecoes) : d.equipamento),
+        el("div", { class: "etiquetas" },
+          d.instalacao ? el("span", { class: "etiqueta" }, icone("ativos"), d.instalacao) : null,
+          el("span", { class: `selo ${d.severidade}` }, T.niveis[d.severidade]),
+          el("span", { class: "etiqueta" }, `${E.inspecoes(d.inspecoes)} · ${E.desde(dataCurta(d.primeira))}`)))),
+    el("div", { class: "acoes" },
+      sem ? null : el("button", { class: "btn", type: "button", title: E.adicionarTitulo, onclick: adicionar }, icone("upload"), E.adicionar),
+      el("button", { class: "btn btn-primaria", type: "button", onclick: () => emitirRelatorio(d.lista.slice().reverse().map((it) => it.id)) }, icone("laudo"), E.relatorio)));
+
+  const kpi = (rotulo, valor, nota) => el("div", { class: "kpi-grande" }, el("span", {}, rotulo), valor, nota ? el("small", {}, nota) : null);
+  const prox = d.proxima_inspecao;
+  const kpis = el("div", { class: "kpis-grandes" },
+    kpi(E.estadoAtual, el("b", {}, el("span", { class: `selo selo-grande ${d.severidade}` }, T.niveis[d.severidade])), E.ultima(dataCurta(d.ultima))),
+    kpi(E.tmaxUltima, el("b", { class: "num" }, fmt(d.t_max, 1, " °C")), d.serie[d.serie.length - 1].regiao || null),
+    kpi(E.tendenciaRotulo, el("b", {}, selotendencia(d.tendencia)), d.projecao_mta ? E.estimativaMta(dataCurta(d.projecao_mta.data)) + (d.projecao_mta.confiavel ? "" : E.estimativaFraca) : null),
+    prox ? kpi(E.proximaRotulo, el("b", { class: prox.vencida ? "texto-erro" : "" }, dataCurta(prox.data)), prox.vencida ? E.vencidaHa(-prox.dias) : E.prazo(prox.prazo_dias)) : null);
+
+  const abrirPonto = (p) => { location.hash = `analise/${p.id}`; };
+  const grafico = graficoDatas(E.graficoTitulo, [{ nome: d.equipamento || E.semInstalacao, indice: 0, pontos: d.serie.map((p) => ({ ...p, valor: p.t_max })) }], { aoClicar: abrirPonto, tendencia: !!d.tendencia });
+  const pecas = d.componentes.filter((c) => c.classe !== "ponto_quente");
+  const graficoPecas = pecas.length > 1
+    ? graficoDatas(E.graficoPecasTitulo, pecas.slice(0, 4).map((c, i) => ({ nome: nomeClasse(c.classe), indice: i, pontos: c.pontos.map((p) => ({ ...p, valor: p.t_max, severidade: null })) })), { aoClicar: abrirPonto })
+    : null;
+
+  const tabelaPecas = d.componentes.length
+    ? el("div", { class: "cartao" },
+      el("h2", { class: "cartao-titulo" }, E.componentes),
+      el("table", { class: "tabela tabela-compacta" },
+        el("thead", {}, el("tr", {}, [E.colPeca, E.colUltima, E.colDt, E.colTendencia, E.colEstado].map((t) => el("th", {}, t)))),
+        el("tbody", {}, d.componentes.map((c) => el("tr", {},
+          el("td", {}, nomeClasse(c.classe)),
+          el("td", { class: "num" }, fmt(c.t_max, 1, " °C")),
+          el("td", { class: "num" }, c.pontos[c.pontos.length - 1].dt != null ? fmt(c.pontos[c.pontos.length - 1].dt, 1, " °C") : T.geral.semValor),
+          el("td", {}, selotendencia(c.tendencia)),
+          el("td", {}, el("span", { class: `selo ${c.severidade}` }, T.niveis[c.severidade])))))))
+    : null;
+
+  const historico = el("div", { class: "cartao" },
+    el("h2", { class: "cartao-titulo" }, E.historico),
+    el("ol", { class: "linha-inspecoes" }, d.lista.map((it) => {
+      const p = it.destaque;
+      return el("li", {}, el("a", { href: `#analise/${it.id}` },
+        el("img", { src: miniaturaSrc(it), alt: "", loading: "lazy" }),
+        el("div", { class: "linha-inspecoes-texto" },
+          el("b", {}, dataCurta(it.data_captura || it.criado_em)),
+          el("span", { class: "nota" }, p ? `${p.nome} · ${fmt(p.t_max, 1, " °C")}` : it.arquivo)),
+        el("span", { class: `selo ${it.resumo.severidade}` }, T.niveis[it.resumo.severidade])));
+    })));
+
+  $("#equip-detalhe").replaceChildren(...[
+    cabecalho, kpis,
+    el("div", { class: "cartao" }, grafico, el("p", { class: "nota" }, E.graficoDica)),
+    graficoPecas ? el("div", { class: "cartao" }, graficoPecas) : null,
+    el("div", { class: "grade-equip-detalhe" }, tabelaPecas, historico),
+  ].filter(Boolean));
+}
+
+/** Instalação e equipamento de várias inspeções de uma vez (Inspeções › seleção). */
+async function definirEquipamento(ids) {
+  const E = T.equip;
+  const primeira = estado.inspecoes.find((it) => it.id === ids[0]);
+  const ident = (primeira && primeira.identificacao) || {};
+  const inst = el("input", { value: ident.instalacao || "", list: "dl-instalacoes", autocomplete: "off", placeholder: "SE Campina Grande II" });
+  const equip = el("input", { value: ident.equipamento || "", list: "dl-equipamentos", autocomplete: "off", placeholder: "TR-01 69/13,8 kV" });
+  if (!estado.equipamentos) api("/api/equipamentos").then((l) => { estado.equipamentos = l; preencherSugestoes(l); }).catch(() => {});
+  const escolha = await dialogo({
+    titulo: E.definirTitulo(ids.length),
+    conteudo: el("div", { class: "form" }, el("p", { class: "nota" }, E.definirTexto),
+      el("label", {}, E.instalacao, inst), el("label", {}, E.equipamento, equip)),
+    acoes: [{ rotulo: T.geral.cancelar, valor: "nao" }, { rotulo: E.salvar, valor: "sim", classe: "btn-primaria" }],
+  });
+  if (escolha !== "sim") return;
+  if (!equip.value.trim()) return avisar(E.obrigatorio, { erro: true });
+  try {
+    const r = await api("/api/analises/identificacao", json("POST", { ids, instalacao: inst.value, equipamento: equip.value }));
+    estado.selecao.clear();
+    estado.equipamentos = null;
+    avisar(E.definido(r.atualizadas, equip.value.trim()), { acao: { rotulo: E.verEquipamento, executar: () => { location.hash = `equipamentos/${encodeURIComponent(r.chave)}`; } } });
+    carregarInspecoes();
+  } catch (e) {
+    falhou(e);
+  }
 }
 
 // ================================================================= vídeo ao vivo (simulação da câmera)
@@ -1764,18 +2076,27 @@ function abrirArquivos() {
   $("#arquivos").click();
 }
 
+/** Na página de um equipamento, "Adicionar imagens" já manda instalação e equipamento junto. */
+function anexarDestino(dados, destino) {
+  if (!destino) return;
+  dados.append("instalacao", destino.instalacao || "");
+  dados.append("equipamento", destino.equipamento || "");
+}
+
 async function enviarArquivos(lista) {
   const arquivos = [...lista].filter((f) => /\.(jpe?g|png)$/i.test(f.name));
   if (!arquivos.length) return avisar(T.geral.soImagens, { erro: true });
-  if (arquivos.length === 1) return analisarArquivo(arquivos[0]);
-  return analisarLote(arquivos);
+  const destino = estado.vista === "equipamentos" && location.hash.includes("/") ? estado.destinoEquipamento : null;
+  if (arquivos.length === 1) return analisarArquivo(arquivos[0], destino);
+  return analisarLote(arquivos, destino);
 }
 
-function analisarArquivo(arquivo) {
+function analisarArquivo(arquivo, destino = null) {
   const tarefa = () => {
     const dados = new FormData();
     dados.append("arquivo", arquivo);
     dados.append("modelo", estado.ativo || "");
+    anexarDestino(dados, destino);
     return api("/api/analises", { method: "POST", body: dados });
   };
   return processarAnalise(arquivo.name, tarefa);
@@ -1821,7 +2142,7 @@ async function processarAnalise(nome, tarefa) {
   }
 }
 
-async function analisarLote(arquivos) {
+async function analisarLote(arquivos, destino = null) {
   const barra = el("i");
   const itens = arquivos.map((f) => el("li", {}, el("span", {}, f.name), el("span", { class: "nota" }, T.analise.loteFila)));
   const texto = el("p", {}, T.analise.loteProgresso(0, arquivos.length));
@@ -1838,6 +2159,7 @@ async function analisarLote(arquivos) {
     const dados = new FormData();
     dados.append("arquivo", arquivos[i]);
     dados.append("modelo", estado.ativo || "");
+    anexarDestino(dados, destino);
     try {
       const a = await api("/api/analises", { method: "POST", body: dados });
       status.replaceChildren(el("span", { class: `selo ${a.resumo.severidade}` }, T.niveis[a.resumo.severidade]));
@@ -1852,10 +2174,11 @@ async function analisarLote(arquivos) {
   texto.textContent = T.analise.loteFim(ok, arquivos.length);
   $("#dialogo-acoes").replaceChildren(
     el("button", { class: "btn", value: "fechar", type: "submit" }, T.geral.fechar),
-    el("button", { class: "btn btn-primaria", value: "ver", type: "submit" }, T.analise.verInspecoes),
+    el("button", { class: "btn btn-primaria", value: "ver", type: "submit" }, destino ? T.equip.verEquipamento : T.analise.verInspecoes),
   );
   const escolha = await new Promise((r) => (d.onclose = () => r(d.returnValue)));
-  if (escolha === "ver") location.hash = "inspecoes";
+  estado.equipamentos = null;
+  if (escolha === "ver") location.hash = destino ? `equipamentos/${encodeURIComponent(destino.chave)}` : "inspecoes";
   else rota();
 }
 
@@ -1971,6 +2294,10 @@ function preencherCabecalho() {
   if (a.metadados.camera) e.push(el("span", { class: "etiqueta" }, a.metadados.camera));
   if (a.metadados.data_hora) e.push(el("span", { class: "etiqueta" }, a.metadados.data_hora));
   e.push(el("span", { class: "etiqueta" }, a.modelo.nome));
+  const ident = a.identificacao || {};
+  if (ident.equipamento && a.equipamento_chave) {
+    e.unshift(el("a", { class: "etiqueta etiqueta-link", href: `#equipamentos/${encodeURIComponent(a.equipamento_chave)}`, title: T.equip.chipTitulo }, icone("ativos"), T.equip.chip(ident.equipamento)));
+  }
   $("#a-etiquetas").replaceChildren(...e);
   $("#btn-foto").hidden = !a.tem_foto;
 }
@@ -2635,6 +2962,7 @@ function desenharBarraSelecao() {
     el("span", { class: "contagem" }, icone("check"), T.inspecoes.selecionadas(n)),
     el("div", { class: "acoes" },
       el("button", { class: "btn btn-fantasma btn-sm", type: "button", onclick: () => { estado.selecao.clear(); desenharInspecoes(); } }, T.inspecoes.limparSelecao),
+      el("button", { class: "btn btn-sm", type: "button", onclick: () => definirEquipamento(ids) }, icone("ativos"), T.equip.definir),
       el("button", { class: "btn btn-primaria btn-sm", type: "button", onclick: () => emitirRelatorio(ids) }, icone("laudo"), T.inspecoes.gerarRelatorio(n))));
 }
 
@@ -3097,6 +3425,7 @@ function ligarEventos() {
     };
     try {
       abrirAnalise(await api(`/api/analises/${estado.analise.id}`, json("PUT", { identificacao })));
+      estado.equipamentos = null;
       avisar(T.analise.laudoSalvo);
     } catch (e) {
       falhou(e);
@@ -3104,6 +3433,7 @@ function ligarEventos() {
   });
 
   $("#busca").addEventListener("input", (ev) => { estado.busca = ev.target.value; desenharInspecoes(); });
+  $("#busca-equip").addEventListener("input", (ev) => { estado.buscaEquip = ev.target.value; desenharEquipamentos(); });
   segmentado("#seg-filtro", (v) => { estado.filtro = v; desenharInspecoes(); });
   segmentado("#seg-exibir", (v) => { estado.exibir = v; guardarPreferencia("exibir", v); desenharInspecoes(); });
   $("#ordem").addEventListener("change", (ev) => { estado.ordem = ev.target.value; desenharInspecoes(); });
@@ -3263,6 +3593,7 @@ async function iniciar() {
   }
   sinalDeVida();
   rota();
+  api("/api/equipamentos").then((l) => { estado.equipamentos = estado.equipamentos || l; preencherSugestoes(l); }).catch(() => {});
   atualizarStatus();
   setInterval(atualizarStatus, 15000);
 }

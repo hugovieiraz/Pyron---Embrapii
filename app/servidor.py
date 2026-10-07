@@ -27,6 +27,7 @@ from fastapi.staticfiles import StaticFiles
 from PIL import Image
 
 from app import avaliacoes as avaliacoes_mod
+from app import equipamentos
 from app import laudo, monitoramento
 from app import treinos as treinos_mod
 from app import videos as videos_mod
@@ -296,6 +297,7 @@ def _nova_analise(dados: bytes, nome: str, modelo: str | None, fonte: str = "man
 def _completa(a: dict) -> dict:
     matriz = armazenamento.matriz(a["id"])
     saida = dict(a)
+    saida["equipamento_chave"] = _chave_de(a)
     if matriz is not None:
         saida["matriz"] = {
             "largura": int(matriz.shape[1]),
@@ -322,17 +324,28 @@ def saude() -> dict:
 
 
 @app.post("/api/analises")
-async def criar(arquivo: UploadFile = File(...), modelo: str | None = Form(None)) -> dict:
+async def criar(arquivo: UploadFile = File(...), modelo: str | None = Form(None),
+                instalacao: str | None = Form(None), equipamento: str | None = Form(None)) -> dict:
+    """Analisa uma imagem; com instalação e equipamento, ela já entra no histórico dele."""
     dados = await arquivo.read()
     if not dados:
         raise HTTPException(422, "O arquivo está vazio.")
+    ident = {k: v.strip()[:120] for k, v in (("instalacao", instalacao), ("equipamento", equipamento)) if v and v.strip()}
     with _trava:
-        return _completa(_nova_analise(dados, arquivo.filename or "imagem.jpg", modelo))
+        return _completa(_nova_analise(dados, arquivo.filename or "imagem.jpg", modelo, identificacao=ident))
+
+
+def _chave_de(a: dict) -> str:
+    ident = a.get("identificacao") or {}
+    return equipamentos.chave(ident.get("instalacao"), ident.get("equipamento"))
 
 
 @app.get("/api/analises")
 def listar() -> list[dict]:
-    return armazenamento.listar()
+    itens = armazenamento.listar()
+    for it in itens:
+        it["equipamento_chave"] = _chave_de(it)
+    return itens
 
 
 @app.get("/api/analises/{id_}")
@@ -373,6 +386,26 @@ def atualizar(id_: str, corpo: dict = Body(...)) -> dict:
     _calcular(a, m)
     armazenamento.salvar(a)
     return _completa(a)
+
+
+@app.post("/api/analises/identificacao")
+def identificar_varias(corpo: dict = Body(...)) -> dict:
+    """Define instalação e equipamento de várias inspeções de uma vez (o resto da identificação fica)."""
+    ids = corpo.get("ids") or []
+    if not isinstance(ids, list) or not ids or len(ids) > 500:
+        raise HTTPException(422, "Selecione de 1 a 500 inspeções.")
+    instalacao = str(corpo.get("instalacao") or "").strip()[:120]
+    equipamento = str(corpo.get("equipamento") or "").strip()[:120]
+    if not equipamento:
+        raise HTTPException(422, "Informe o equipamento.")
+    with _trava:
+        analises = [armazenamento.obter(str(i)) for i in ids]
+        if any(a is None for a in analises):
+            raise HTTPException(404, "Alguma inspeção selecionada não existe mais.")
+        for a in analises:
+            a["identificacao"] = {**(a.get("identificacao") or {}), "instalacao": instalacao, "equipamento": equipamento}
+            armazenamento.salvar(a)
+    return {"atualizadas": len(analises), "chave": equipamentos.chave(instalacao, equipamento)}
 
 
 @app.post("/api/analises/{id_}/detectar")
@@ -876,6 +909,26 @@ def apagar_avaliacao(id_: str) -> dict:
     except KeyError as erro:
         raise HTTPException(404, "Avaliação não encontrada.") from erro
     return {"ok": True}
+
+
+# ---------------------------------------------------------------- rotas: equipamentos (histórico e tendência)
+
+
+@app.get("/api/equipamentos")
+def listar_equipamentos() -> list[dict]:
+    return equipamentos.listar(armazenamento.listar())
+
+
+@app.get("/api/equipamentos/{chave}")
+def obter_equipamento(chave: str) -> dict:
+    itens = [it for it in armazenamento.listar() if _chave_de(it) == chave]
+    if not itens:
+        raise HTTPException(404, "Equipamento não encontrado.")
+    resumo = next(e for e in equipamentos.listar(itens))
+    completas = [a for a in (armazenamento.obter(it["id"]) for it in itens) if a]
+    return {**resumo, "componentes": equipamentos.componentes(completas),
+            "lista": sorted(itens, key=lambda it: equipamentos.ponto(it)["data"], reverse=True),
+            "prazos_dias": equipamentos.PRAZO_DIAS}
 
 
 # ---------------------------------------------------------------- rotas: vídeo (simulação de câmera ao vivo)
