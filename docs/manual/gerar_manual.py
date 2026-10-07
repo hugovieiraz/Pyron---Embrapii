@@ -32,7 +32,7 @@ IMAGENS = AQUI / "imagens"
 LOGO = PROJETO / "app" / "estatico" / "marca" / "logo.png"
 SIMBOLO = PROJETO / "app" / "estatico" / "marca" / "simbolo.png"
 SAIDA = PROJETO / "docs" / "Pyron_Funcionalidades.pdf"
-VERSAO = "0.2.0"
+VERSAO = "0.7.0"
 
 # Cores dos tokens da interface (app/estatico/tokens.css).
 TINTA = colors.HexColor("#171B33")
@@ -210,6 +210,7 @@ class Documento(BaseDocTemplate):
 
 def conteudo() -> list:
     c: list = [NextPageTemplate("miolo"), PageBreak()]
+    mono = lambda t: f"<font name='Pyron-Mono'>{t}</font>"  # noqa: E731
 
     # sumário
     toc = TableOfContents()
@@ -223,32 +224,35 @@ def conteudo() -> list:
         p("O Pyron é um software de <b>manutenção preditiva por termografia</b> para transformadores e equipamentos de subestação. "
           "Ele lê a temperatura de cada ponto da imagem da câmera térmica, encontra os pontos quentes e os componentes, compara cada um "
           "com o <b>limite do próprio componente</b> e com as <b>outras fases</b>, classifica a severidade pela NBR 15866 e entrega o laudo em PDF. "
-          "Com o monitoramento, analisa sozinho as imagens que chegam da câmera e prepara o aviso para o responsável."),
+          "Depois disso, acompanha cada equipamento ao longo do tempo: <b>histórico, tendência da temperatura, próxima inspeção</b> e as "
+          "<b>pendências</b> até a correção ser verificada."),
         p("Saber o ponto mais quente não basta: 55 °C numa conexão é normal ou grave dependendo do quanto ela aguenta, da carga no momento "
           "e de como estão as outras fases. Por isso cada região é comparada com uma referência, e o laudo mostra de onde veio cada número."),
         p("Para quem", "h2"),
         lista([
             "Equipes de manutenção de concessionárias, indústrias e subestações próprias.",
             "Empresas de termografia que inspecionam e emitem laudos para clientes.",
-            "Engenharia de ativos, que precisa de histórico e prioridade de reparo.",
+            "Engenharia de ativos, que precisa de histórico, tendência e prioridade de reparo.",
         ]),
         p("Princípios", "h2"),
         lista([
             "<b>Tudo local.</b> Imagens, inspeções e laudos ficam neste computador. Nada é enviado para a internet sem o usuário mandar.",
-            "<b>Critério explícito.</b> Os limites vêm de normas e podem ser conferidos e ajustados em Configurações.",
-            "<b>O laudo é um rascunho técnico.</b> O responsável habilitado revisa e assina (NR-10), o Pyron poupa o trabalho repetitivo.",
+            "<b>Critério explícito.</b> Os limites vêm de normas (ABNT NBR 15572, 15866 e 15424) e podem ser conferidos e ajustados.",
+            "<b>O responsável assina.</b> O laudo sai pronto para revisar; o profissional habilitado revisa e assina com a ART.",
             "<b>Interface industrial e clara.</b> Fundo claro, azul nas ações, cor forte só para os dados: termograma e severidade.",
         ]),
         p("Mapa das funcionalidades", "h2"),
         tabela(["Área", "O que faz"], [
-            ["<b>Painel</b>", "Situação dos equipamentos: críticos, reparos a programar, alertas e distribuição por severidade."],
-            ["<b>Nova análise</b>", "Recebe um ou vários termogramas, mede, detecta, classifica e abre o resultado para revisão."],
-            ["<b>Análise</b>", "Visualizador térmico, regiões editáveis, severidade por região, condições de medição e dados do laudo."],
-            ["<b>Laudo PDF</b>", "Documento com identificação, termograma, resultados, conclusão, referências e responsabilidade técnica."],
-            ["<b>Inspeções</b>", "Histórico com busca, filtros, ordenação, tabela ou miniaturas, laudo e exclusão."],
-            ["<b>Monitoramento</b>", "Pasta vigiada da câmera, análise automática, regra de alerta e mensagem pronta para o WhatsApp."],
-            ["<b>Modelos</b>", "Detector em uso, modelos de IA instalados e o caminho para treinar novos."],
-            ["<b>Configurações</b>", "Empresa, responsável, critério de severidade, limites por componente, aparência e dados."],
+            ["<b>Painel</b>", "Críticas, pendências e inspeções vencidas, distribuição por severidade, próximas inspeções e monitoramento."],
+            ["<b>Nova análise</b>", "Recebe um ou vários termogramas, já associados a um equipamento se quiser, e abre o resultado."],
+            ["<b>Análise</b>", "Visualizador térmico, regiões, ponto e linha de medição, escala manual, emissividade, comparação com a inspeção anterior."],
+            ["<b>Vídeo ao vivo</b>", "Analisa o vídeo da câmera quadro a quadro, como se estivesse ao vivo, e mede o ritmo do detector."],
+            ["<b>Inspeções</b>", "Histórico com filtros, seleção de várias imagens, relatório conjunto, equipamento em lote e planilha."],
+            ["<b>Equipamentos</b>", "Histórico de cada equipamento, tendência em °C por mês, projeção até o limite e próxima inspeção."],
+            ["<b>Pendências</b>", "Cada anomalia com prazo, ordem de serviço, responsável e histórico até a correção verificada."],
+            ["<b>Monitoramento</b>", "Pasta vigiada da câmera (ou uma subpasta por equipamento), análise automática e alerta para o WhatsApp."],
+            ["<b>Modelos e Avaliação</b>", "Detectores instalados (regra, IA e combinado), treino e comparação de modelos."],
+            ["<b>Configurações</b>", "Empresa, logotipo, responsáveis, critério, limites por componente, aparência, dados e backup."],
         ], [38, LARGURA / mm - 38]),
     ]
 
@@ -260,8 +264,8 @@ def conteudo() -> list:
             "em poucos segundos a interface abre numa janela própria, sem barra de endereço.",
             "Um novo clique com o Pyron aberto só abre outra janela; os dados são os mesmos.",
             "Para fechar, feche a janela. O servidor interno desliga sozinho quando a última janela é fechada.",
-            "Diagnóstico: <font name='Pyron-Mono'>Pyron.exe --verificar</font> sobe o servidor escondido, confere se respondeu e desliga. "
-            "O resultado fica em <font name='Pyron-Mono'>app/dados_app/verificacao.txt</font>.",
+            f"Diagnóstico: {mono('Pyron.exe --verificar')} sobe o servidor escondido, confere se respondeu e desliga. "
+            f"O resultado fica em {mono('app/dados_app/verificacao.txt')}.",
         ]),
     ]
     c += figura("m_abertura.png", "Tela de abertura do Pyron.exe enquanto o motor de análise carrega.", 110 * mm)
@@ -269,118 +273,125 @@ def conteudo() -> list:
         p("Requisitos", "h2"),
         lista([
             "Windows 10 ou 11 com Microsoft Edge (a janela do aplicativo usa o Edge em modo aplicativo).",
-            "O ambiente Python do projeto (pasta <font name='Pyron-Mono'>.venv</font>), criado pela instalação descrita no README.",
-            "Para treinar modelos de IA: placa de vídeo NVIDIA (testado com RTX 3050, 4 GB).",
+            f"O ambiente Python do projeto (pasta {mono('.venv')}), criado pela instalação descrita no README.",
+            "Para treinar modelos de IA: placa de vídeo NVIDIA (testado com RTX 3050, 4 GB). Para usar um modelo pronto, não precisa.",
         ]),
     ]
 
     # 3
     c += secao(3, "A interface", "Como está organizada")
     c += [
-        p("Todas as telas têm a mesma estrutura: a <b>barra lateral azul</b> à esquerda, a <b>barra de status</b> no topo e o conteúdo no centro "
-          "(veja a imagem da seção 4)."),
+        p("Todas as telas têm a mesma estrutura: a <b>barra lateral azul</b> à esquerda, a <b>barra superior</b> com a busca e o estado, e o conteúdo no centro."),
         p("Barra lateral", "h2"),
         lista([
-            "<b>Operação:</b> Painel, Nova análise, Inspeções (com a quantidade) e Monitoramento (com o ponto de estado e os alertas pendentes).",
-            "<b>Sistema:</b> Modelos e Configurações.",
-            "No rodapé, o detector em uso e o acesso à página Sobre, com a versão.",
+            "<b>Operação:</b> Painel, Nova análise, Vídeo ao vivo, Inspeções (com a quantidade), Equipamentos (com as inspeções vencidas), "
+            "Pendências (com as de prazo vencido) e Monitoramento (com o ponto de estado e os alertas pendentes).",
+            "<b>Sistema:</b> Modelos, Avaliação e Configurações. No rodapé, o detector em uso e a página Sobre, com a versão.",
         ]),
-        p("Barra superior", "h2"),
+        p("Barra superior e busca rápida", "h2"),
         lista([
-            "Trilha de navegação: onde você está (por exemplo, Operação › Inspeções › FLIR0158.jpg).",
-            "Estado do servidor local e do monitoramento; clique no monitoramento para abrir a tela dele.",
-            "Sino de alertas com a quantidade pendente. Quando chega um alerta novo, aparece um aviso com o botão Ver.",
-            "Botão <b>Nova análise</b>, sempre à mão (some só na própria tela de nova análise).",
+            "Trilha de navegação: onde você está (por exemplo, Operação › Equipamentos › TR-01).",
+            "<b>Buscar</b> (ou Ctrl + K): acha inspeções pelo arquivo, equipamento, instalação, data ou severidade, equipamentos, telas e ações "
+            "como exportar a planilha ou trocar o tema. Setas para escolher, Enter para abrir.",
+            "Estado do servidor local e do monitoramento, sino de alertas e o botão <b>Nova análise</b>.",
+            "A tecla <b>?</b> mostra todos os atalhos de teclado.",
         ]),
+    ]
+    c += figura("m_busca.png", "Busca rápida (Ctrl + K) com o equipamento TR-01 digitado: telas, equipamentos e inspeções no mesmo lugar.")
+    c += [
         p("Comportamento de todas as telas", "h2"),
         lista([
             "<b>Carregando:</b> a tela mostra a forma do conteúdo (esqueleto) enquanto os dados chegam.",
             "<b>Vazio:</b> uma explicação do que vai aparecer ali e o botão da próxima ação.",
-            "<b>Erro:</b> o que aconteceu e o botão Tentar de novo.",
-            "<b>Sem conexão:</b> uma faixa vermelha no topo, com Tentar de novo, se o servidor parar de responder.",
-            "Avisos rápidos no canto inferior direito confirmam cada ação; alguns têm Desfazer.",
-            "Tema claro (padrão) ou escuro, em Configurações › Aparência. O termograma fica sempre sobre fundo índigo escuro.",
+            "<b>Erro:</b> o que aconteceu e o botão Tentar de novo. <b>Sem conexão:</b> uma faixa no topo, se o servidor parar de responder.",
+            "Avisos rápidos no canto inferior direito confirmam cada ação; alguns têm Desfazer ou um atalho (Abrir, Ver equipamento).",
+            "Tema claro (padrão) ou escuro, em Configurações › Aparência ou pela busca. O termograma fica sempre sobre fundo índigo escuro.",
         ]),
     ]
 
     # 4
     c += secao(4, "Painel", "Operação")
-    c += figura("m_painel.png", "Painel com indicadores, inspeções mais graves, distribuição por severidade e monitoramento.")
+    c += figura("m_painel.png", "Painel com indicadores, inspeções mais graves, distribuição por severidade e próximas inspeções.")
     c += [
         lista([
-            "<b>Indicadores:</b> total de inspeções (e quantas vieram do monitoramento), críticas (urgente ou imediato), reparos a programar "
-            "e alertas pendentes. Cada indicador é um atalho para a lista já filtrada.",
-            "<b>Atenção agora:</b> as inspeções mais graves, da pior para a menos grave, com o equipamento, a região crítica e o valor "
-            "que decidiu (por exemplo, 98% da MTA ou ΔT de 12 °C entre fases). Clique na linha para abrir.",
+            "<b>Indicadores:</b> inspeções, críticas (urgente ou imediato), <b>pendências vencidas</b>, <b>inspeções vencidas</b> por equipamento e "
+            "alertas pendentes do monitoramento. Cada indicador leva à lista já filtrada.",
+            "<b>Atenção agora:</b> as inspeções mais graves, com o equipamento, a região crítica e o valor que decidiu (por exemplo, 79% da MTA).",
             "<b>Distribuição por severidade:</b> barra empilhada e contagem de cada nível.",
-            "<b>Monitoramento:</b> estado, pasta vigiada, última verificação, última imagem e os alertas mais recentes.",
-            "Na primeira vez, sem inspeções, o Painel mostra um roteiro de três passos: analisar uma imagem, configurar a empresa e ligar o monitoramento.",
+            "<b>Próximas inspeções:</b> os equipamentos pela data da próxima inspeção, vencidos primeiro.",
+            "<b>Monitoramento:</b> estado, pasta vigiada, última verificação e os alertas mais recentes.",
         ]),
     ]
 
     # 5
     c += secao(5, "Nova análise", "Operação")
-    c += figura("m_nova.png", "Área para soltar os termogramas, o fluxo da análise, as inspeções recentes e os exemplos.")
+    c += figura("m_nova.png", "Área para soltar os termogramas, o fluxo da análise, a instalação e o equipamento opcionais e as inspeções recentes.")
     c += [
         lista([
-            "Arraste as imagens para a área tracejada, ou use <b>Escolher arquivos</b> (atalho Ctrl + O, que funciona em qualquer tela). "
-            "Também é possível soltar imagens em qualquer lugar da janela.",
-            "<b>Uma imagem</b> abre direto para revisão. Enquanto processa, a tela mostra as etapas andando e a forma do resultado.",
-            "<b>Várias imagens</b> são analisadas em lote, com barra de progresso e a severidade de cada uma; no fim, dá para ir às Inspeções.",
-            "<b>Exemplos:</b> imagens de uma subestação de 132 kV (dataset de estudo) para experimentar sem câmera.",
+            "Arraste as imagens para a área tracejada ou use <b>Escolher arquivos</b> (Ctrl + O, em qualquer tela). Também dá para soltar "
+            "imagens em qualquer lugar da janela; um vídeo solto vai para o Vídeo ao vivo.",
+            "<b>Já sabe de onde são as imagens?</b> Preencha a instalação e o equipamento (com sugestões dos nomes já usados) e as imagens "
+            "entram direto no histórico daquele equipamento.",
+            "<b>Uma imagem</b> abre direto para revisão; <b>várias</b> são analisadas em lote, com a severidade de cada uma.",
         ]),
         p("Dois tipos de imagem", "h2"),
         tabela(["Tipo", "Como o Pyron lê", "Como aparece"], [
             ["JPEG radiométrico (FLIR)", "Lê os dados brutos da câmera e converte em temperatura com emissividade, distância, temperatura refletida, "
              "umidade e as constantes da própria câmera.", "Etiqueta verde <b>Temperatura medida</b>."],
-            ["Imagem colorida com escala", "Lê os números da escala por OCR e converte cada cor na temperatura correspondente da paleta. "
+            ["Imagem colorida com escala", "Lê os números da escala por OCR e converte cada cor na temperatura da paleta. "
              "Testado em 893 imagens: erro mediano de 0,5 °C e escala lida em 100% delas.", "Etiqueta amarela <b>Temperatura estimada pelas cores</b>."],
         ], [38, 90, LARGURA / mm - 128]),
-        Spacer(1, 6),
-        p("Etapas mostradas no topo da análise: leitura da temperatura, detecção, medição e severidade, e laudo, com o tempo de cada uma.", "nota"),
     ]
 
     # 6
     c += secao(6, "Análise de uma imagem", "Operação")
-    c += figura("m_analise.png", "Análise aberta: visualizador térmico à esquerda e o inspetor com resultado, condições e laudo à direita.")
+    c += figura("m_analise.png", "Análise aberta: termograma com regiões, ponto P2, linha L1 e escala manual; à direita o resultado, "
+                                 "o acompanhamento da anomalia e a comparação com a inspeção anterior.")
     c += [
         p("Visualizador térmico", "h2"),
         lista([
-            "<b>Paletas:</b> Ferro, Arco-íris e Cinza.",
-            "<b>Escala:</b> Equipamento (realça o equipamento e deixa o céu na cor mais escura) ou Cena (da menor à maior temperatura).",
-            "<b>Temperatura sob o cursor:</b> passe o mouse sobre a imagem; a posição também aparece marcada na barra de cores.",
-            "<b>Isoterma:</b> destaca tudo acima de uma temperatura e mostra a porcentagem da imagem nessa faixa.",
-            "<b>Foto:</b> mostra a foto visível da câmera ao lado do termograma, quando a câmera grava.",
-            "<b>Regiões:</b> cada uma com a cor da severidade, o nome, a temperatura máxima e o ponto de máxima; as etiquetas desviam umas das outras.",
+            "<b>Paletas:</b> Ferro, Arco-íris e Cinza. <b>Escala:</b> Equipamento (realça o equipamento), Cena (da menor à maior temperatura) "
+            "ou <b>Manual</b> (você escolhe o mínimo e o máximo). A paleta e a escala ficam guardadas e o laudo sai igual à tela.",
+            "<b>Temperatura sob o cursor</b>, marcada também na barra de cores. <b>Isoterma:</b> destaca tudo acima de uma temperatura. "
+            "<b>Foto:</b> mostra a foto visível da câmera ao lado.",
+            "<b>Camadas:</b> com peças (modelo de IA) e pontos quentes juntos, escolha Tudo, Peças ou Pontos quentes. "
+            "<b>Rótulos</b> (tecla R) liga e desliga os nomes; eles nunca se sobrepõem.",
         ]),
+        p("Ferramentas de medição", "h2"),
+        tabela(["Ferramenta", "Tecla", "O que faz"], [
+            ["Selecionar", "S", "Escolhe uma região na imagem ou na lista."],
+            ["Região", "D", "Arraste uma caixa: a região é medida e classificada como as do detector."],
+            ["Ponto", "P", "Clique: lê a temperatura daquele pixel (P1, P2...)."],
+            ["Linha", "L", "Arraste: mostra o perfil de temperatura ao longo da linha, com máxima, mínima e média (L1, L2...)."],
+        ], [30, 16, LARGURA / mm - 46]),
+        Spacer(1, 6),
+        p("Pontos e linhas ficam guardados na inspeção, aparecem na lista Pontos e linhas (com o gráfico do perfil) e vão para o laudo.", "nota"),
     ]
-    c += figura("m_isoterma.png", "Isoterma ligada acima de 50,2 °C, com a paleta Arco-íris: 19,3% da imagem está nessa faixa.")
+    c += figura("m_camadas.png", "Para-raios analisados pelo modelo de IA combinado com a regra de pontos quentes, mostrando só a camada Peças.")
+    c += figura("m_isoterma.png", "Isoterma ligada: tudo abaixo da temperatura escolhida fica cinza.")
     c += [
-        p("Regiões", "h2"),
-        lista([
-            "Vêm do detector em uso ou são desenhadas à mão: <b>Desenhar região</b> (tecla D) e arraste sobre a imagem.",
-            "Cada região pode ser renomeada e ter a <b>classe</b> trocada (conexão, bucha, terminal, para-raio, cabo, radiador...). "
-            "A classe define o limite de temperatura (MTA) e como ela é comparada.",
-            "Dê a mesma classe às regiões das três fases para comparar componentes semelhantes (ΔT entre fases).",
-            "Remover: botão da lixeira ou tecla Delete, com <b>Desfazer</b>. Selecione na imagem ou na lista; Esc cancela.",
-        ]),
         p("Resultado", "h2"),
         lista([
-            "<b>Veredito:</b> o nível mais grave, onde está, por qual critério e o que fazer (por exemplo: corrigir o mais rápido possível).",
+            "<b>Veredito:</b> o nível mais grave, onde está, por qual critério e o que fazer.",
             "<b>Indicadores:</b> máxima da cena, a região mais perto do limite (% da MTA) ou o maior ΔT entre fases, e a quantidade de regiões.",
-            "<b>Avisos:</b> o que falta para a avaliação completa, como a temperatura ambiente e a carga.",
-            "<b>Cartão de cada região:</b> temperatura máxima, % da MTA, temperatura projetada para plena carga, ΔT entre fases, "
-            "com quanto de carga o componente atinge a MTA, confiança do modelo e uma barra até o limite.",
+            "<b>Ponto mais quente nas peças</b> e a <b>comparação entre peças iguais</b> das três fases.",
+            "<b>Acompanhamento da anomalia:</b> situação, prazo e ordem de serviço (veja Pendências).",
+            "<b>Inspeção anterior deste equipamento:</b> quanto a máxima mudou desde a última e o botão <b>Lado a lado</b>.",
+            "<b>Setas no cabeçalho</b> (por exemplo, 5 de 7) para andar pelas inspeções do mesmo equipamento.",
         ]),
     ]
-    c += figura("m_condicoes.png", "Aba Condições: temperatura ambiente e carga no momento, dados de medição da câmera e o critério em uso.")
+    c += figura("m_lado_a_lado.png", "Lado a lado: a inspeção anterior e a atual do mesmo equipamento, cada uma com a severidade e a máxima.")
+    c += figura("m_condicoes.png", "Aba Condições: ambiente e carga, parâmetros de medição com a tabela de materiais e os dados da câmera.")
     c += [
         lista([
-            "<b>Condições:</b> com a temperatura ambiente e a carga no momento, cada região é projetada para plena carga e comparada com a MTA. "
-            "Recalcular aplica na hora.",
-            "<b>Medição da câmera:</b> emissividade, distância, temperatura refletida, umidade, sensor e escala lida.",
-            "<b>Laudo:</b> instalação, equipamento, responsável técnico, registro/ART e observações. O responsável padrão já vem preenchido.",
-            "<b>Detectar de novo:</b> escolha outro detector no topo e clique em Detectar; as regiões desenhadas à mão são mantidas.",
+            "<b>Condições:</b> com a temperatura ambiente e a carga no momento, cada região é projetada para plena carga e comparada com a MTA.",
+            "<b>Parâmetros de medição</b> (só termograma radiométrico): emissividade (com uma tabela de materiais: porcelana, polímero, cobre "
+            "oxidado, aço galvanizado...), temperatura refletida, distância, umidade e temperatura do ar. A temperatura é recalculada a partir "
+            "do arquivo original; <b>Voltar aos valores da câmera</b> desfaz.",
+            "<b>Laudo:</b> instalação, equipamento, responsável (do cadastro), ART e observações.",
+            "<b>Exportar</b> (botão com a seta para baixo): imagem PNG com regiões, pontos e linhas; temperaturas de todos os pixels em CSV "
+            "(abre no Excel); ou o laudo.",
+            "<b>Detectar de novo:</b> escolha outro detector no topo; as regiões desenhadas à mão são mantidas.",
         ]),
     ]
 
@@ -390,7 +401,7 @@ def conteudo() -> list:
         p("Temperatura sozinha não diz nada. A NBR 15866 pede que cada ponto quente seja comparado com uma referência. "
           "O Pyron usa duas referências e fica com a <b>pior</b> das duas:"),
         destaque("1. Máxima temperatura admissível (MTA) do componente",
-                 "A temperatura medida é projetada para plena carga: <font name='Pyron-Mono'>T_proj = T_amb + (T − T_amb) × (100 / carga)²</font>. "
+                 f"A temperatura medida é projetada para plena carga: {mono('T_proj = T_amb + (T − T_amb) × (100 / carga)²')}. "
                  "O resultado é comparado com quanto o componente aguenta."),
         Spacer(1, 6),
         destaque("2. ΔT entre componentes semelhantes",
@@ -398,16 +409,16 @@ def conteudo() -> list:
                  VIOLETA, VIOLETA_50),
         p("Faixas de prioridade (modelo brasileiro)", "h2"),
         tabela(["Nível", "% da MTA", "ΔT entre fases (condutores)", "Para-raios e isoladores", "O que fazer"], [
-            [selo("Atenção"), "acima de 60%", "5 a 10 °C", "2 a 5 °C", "Acompanhar na próxima rota."],
-            [selo("Programar"), "acima de 70%", "acima de 10 a 20 °C", "5 a 10 °C", "Reparo com data marcada."],
+            [selo("Atenção"), "acima de 60%", "5 a 10 °C", "2 a 5 °C", "Corrigir na próxima manutenção."],
+            [selo("Programar"), "acima de 70%", "acima de 10 a 20 °C", "5 a 10 °C", "Agendar a correção e reinspecionar."],
             [selo("Urgente"), "acima de 80%", "acima de 20 a 40 °C", "acima de 10 °C", "Corrigir o mais rápido possível."],
-            [selo("Imediato"), "acima de 100%", "acima de 40 °C", "–", "Intervenção imediata."],
+            [selo("Imediato"), "acima de 100%", "acima de 40 °C", "–", "Corrigir imediatamente."],
         ], [26, 24, 42, 36, LARGURA / mm - 128]),
         Spacer(1, 6),
         lista([
             "<b>Para-raios e isoladores</b> aquecem por corrente de fuga, não por carga: têm faixas próprias e não recebem a correção de carga.",
-            "<b>Carga limite:</b> o Pyron calcula com quanto de carga o componente chega à MTA (por exemplo, 102% da carga nominal).",
-            "<b>Classificação indicativa:</b> sem ambiente, sem carga e sem fase semelhante para comparar, o nível aparece marcado como indicativo.",
+            "<b>Carga limite:</b> o Pyron calcula com quanto de carga o componente chega à MTA.",
+            "<b>Classificação indicativa:</b> sem ambiente, sem carga e sem fase semelhante, o nível aparece marcado como indicativo.",
             "<b>NETA MTS:</b> o critério americano (ΔT sobre o ar ambiente) pode ser carregado como modelo em Configurações.",
             "Mudou o critério ou a biblioteca? Todas as inspeções salvas são recalculadas.",
         ]),
@@ -424,135 +435,173 @@ def conteudo() -> list:
     ]
 
     # 8
-    c += secao(8, "Laudo em PDF", "Documento técnico")
+    c += secao(8, "Relatório de inspeção (PDF)", "Documento técnico")
     c += [
-        p("<b>Gerar laudo</b> (no topo da análise ou na aba Laudo) abre o PDF pronto para revisar, imprimir e assinar. Ele traz:"),
+        p("<b>Gerar laudo</b> (na análise) ou <b>Gerar relatório</b> (com várias inspeções marcadas, ou o relatório do equipamento) pede o "
+          "<b>responsável técnico do cadastro</b> e a ART, e abre o PDF pronto para revisar, imprimir e assinar. Ele traz:"),
         lista([
-            "Cabeçalho com o nome e o subtítulo da empresa (Configurações), número do laudo e data de emissão.",
-            "1. Identificação: instalação, equipamento, arquivo, data da captura e câmera.",
-            "2. Condições de medição: origem da temperatura, emissividade, distância, temperatura refletida, ambiente e carga.",
-            "3. Termograma com as regiões e, ao lado, a foto visível; escala de cores e detector usado.",
-            "4. Resultados por região: temperatura medida e projetada, MTA, % da MTA, ΔT entre fases, severidade (com o critério) e ação.",
-            "5. Conclusão, 6. Referências e critério (normas, fórmula e MTAs usadas), 7. Responsabilidade técnica com assinatura e ART.",
+            "Cabeçalho com o <b>logotipo</b>, o nome e o subtítulo da empresa, o número do relatório (RT-AAAAMMDD-XXXX) e a data de emissão.",
+            "1. Identificação: instalação, equipamentos, período das inspeções, termovisor e responsável.",
+            "2. Normas e critério: ABNT NBR 15572:2013, NBR 15866:2010 e NBR 15424, o método, as faixas e a recomendação de cada nível.",
+            "3. Resumo dos resultados (com várias imagens) e, quando todas são do mesmo equipamento, o <b>histórico</b> com o gráfico da máxima "
+            "por inspeção e a tendência em °C por mês.",
+            "4. Um registro por imagem: termograma numerado na paleta e escala escolhidas, foto visível, condições de medição, tabela de pontos, "
+            "pontos e linhas de medição, comparação entre peças semelhantes e observações.",
+            "Conclusão com as anomalias, referências de temperatura e o bloco do responsável técnico com registro, ART, local, data e assinatura.",
         ]),
     ]
-    c += figura("m_laudo1.png", "Primeira página de um laudo gerado pelo Pyron (dados de demonstração).", 104 * mm)
+    c += figura("m_laudo1.png", "Primeira página do relatório do equipamento TR-01 (dados de demonstração).", 120 * mm)
+    c += figura("m_laudo_historico.png", "Resumo e histórico do equipamento: a máxima de cada inspeção, na cor da severidade, com a tendência.", 120 * mm)
+    c += figura("m_laudo2.png", "Registro de uma imagem: termograma numerado, foto visível, condições, pontos e comparação entre peças.", 120 * mm)
 
     # 9
     c += secao(9, "Inspeções", "Operação")
-    c += figura("m_inspecoes.png", "Lista de inspeções em tabela, com indicadores que filtram, busca, filtro de severidade e ordenação.")
+    c += figura("m_inspecoes.png", "Lista de inspeções com três marcadas: a barra de seleção oferece definir o equipamento e gerar o relatório.")
     c += [
         lista([
-            "<b>Tabela</b> (padrão) ou <b>miniaturas</b>: o botão à direita dos filtros troca a forma e a escolha fica lembrada.",
-            "Colunas: termograma, arquivo, data e regiões, local (instalação e equipamento), região crítica, máxima da cena e severidade.",
-            "<b>Indicadores clicáveis:</b> Críticas, Programar reparo, Atenção e Normais filtram a lista.",
-            "<b>Busca</b> por arquivo, instalação ou equipamento; <b>ordem</b> por mais recentes, mais graves ou nome.",
-            "Em cada linha: abrir (clique na linha ou Enter), gerar o laudo e apagar (com confirmação).",
-            "As imagens que vieram do monitoramento aparecem marcadas como Monitor.",
+            "<b>Tabela</b> (padrão) ou <b>miniaturas</b>; colunas com termograma, arquivo, data da captura, equipamento (link para a página "
+            "dele), região crítica, máxima e severidade.",
+            "<b>Indicadores clicáveis</b> filtram por severidade; <b>busca</b> por arquivo, instalação ou equipamento; <b>ordem</b> por data da captura, "
+            "gravidade ou nome.",
+            "<b>Marque várias</b> (caixa de seleção) para <b>Definir equipamento</b> de todas de uma vez ou <b>Gerar relatório</b> com todas.",
+            "<b>Exportar planilha</b>: todas as inspeções em CSV que abre direto no Excel.",
         ]),
     ]
 
     # 10
-    c += secao(10, "Monitoramento e alertas", "Operação")
-    c += [p("O monitoramento transforma o Pyron num vigia: as imagens que a câmera grava numa pasta são analisadas sozinhas e, "
-            "quando algum equipamento passa do limite, nasce um alerta com a mensagem pronta para o WhatsApp do responsável.")]
-    c += figura("m_monitor.png", "Estado do monitoramento, fonte das imagens, responsáveis e a prévia da mensagem.")
+    c += secao(10, "Equipamentos", "Histórico e tendência")
+    c += figura("m_equipamentos.png", "Equipamentos agrupados por instalação, com a máxima ao longo do tempo, a tendência e a próxima inspeção.")
     c += [
-        p("Configuração em quatro passos", "h2"),
+        p("Cada imagem pode pertencer a uma instalação e a um equipamento (no envio, na aba Laudo da análise ou em Inspeções). "
+          "A partir daí o Pyron monta, para cada equipamento:"),
         lista([
-            "<b>1. Fonte das imagens.</b> Disponível: <b>pasta monitorada</b>, onde a câmera, o cartão sincronizado, o FTP da câmera fixa "
-            "ou o FLIR Thermal Studio gravam os JPEG. Ao ligar, o que já estava na pasta fica de fora; só o que chegar depois é analisado. "
-            "Instalação e equipamento informados aqui vão para as análises e para a mensagem.",
-            "<b>2. Regra de alerta.</b> Severidade mínima (Atenção, Programar, Urgente ou Imediato) e o intervalo para não repetir o mesmo nível. "
-            "Se o nível piorar, o alerta sai na hora.",
-            "<b>3. Responsáveis.</b> Nome e WhatsApp com DDI e DDD (por exemplo, +55 83 99999-0000).",
-            "<b>4. Envio da mensagem.</b> Disponível: <b>manual</b>. O Pyron prepara o texto e um clique abre o WhatsApp (celular ou computador) "
-            "com a mensagem pronta para o responsável enviar. A prévia mostra como a mensagem vai chegar.",
+            "<b>Histórico:</b> a máxima de cada inspeção pela data da captura, na cor da severidade; clique num ponto para abrir a inspeção.",
+            "<b>Tendência em °C por mês</b>, por mínimos quadrados, a partir de 3 inspeções espalhadas por pelo menos um mês (em poucos dias, "
+            "a diferença é de carga e horário, não de desgaste). A reta aparece tracejada no gráfico.",
+            "<b>A plena carga:</b> quando as inspeções têm temperatura ambiente e carga, a série pode ser vista como a elevação sobre o ambiente "
+            f"projetada para plena carga, {mono('ΔT × (100 / carga)²')}, que compara inspeções feitas com cargas diferentes.",
+            "<b>Projeção até a MTA:</b> se o % da MTA sobe, em quanto tempo chegaria a 100% mantida a tendência (estimativa, até 5 anos).",
+            "<b>Próxima inspeção</b> pela severidade atual: 1 ano quando normal (a NFPA 70B pede ao menos uma vez por ano), 90 dias em atenção, "
+            "30 em programar, 7 em urgente e 1 em imediato. O menu mostra quantas estão vencidas.",
+            "<b>Peças:</b> a máxima de cada tipo de peça ao longo do tempo, para ver qual está esquentando.",
+            "<b>Adicionar imagens</b> analisa imagens novas já como inspeções do equipamento; <b>Relatório do equipamento</b> junta todas.",
         ]),
-        p("Ligar monitoramento começa a vigiar a pasta; Verificar agora faz uma passada na hora.", "nota"),
     ]
-    c += figura("m_monitor_alertas.png", "Lista de alertas com severidade, resumo e situação, e o que ainda está em desenvolvimento.")
-    c += [
-        p("Alertas", "h2"),
-        lista([
-            "Cada alerta tem data, imagem, local, severidade, resumo e situação: <b>pendente</b>, <b>enviado</b> ou <b>resolvido</b>.",
-            "<b>WhatsApp</b> abre a lista de responsáveis com o botão Abrir WhatsApp e a opção de copiar a mensagem; ao abrir, o alerta passa a enviado.",
-            "<b>Abrir</b> leva à análise da imagem; <b>Resolver</b> fecha o alerta.",
-            "O sino do topo e o menu mostram quantos alertas estão pendentes, em qualquer tela.",
-            "O monitoramento funciona enquanto o Pyron estiver aberto e volta sozinho ao abrir o programa.",
-        ]),
-        p("Em desenvolvimento (backlog)", "h2"),
-        tabela(["Item", "O que vai fazer"], [
-            ["Conexão direta com a câmera", "RTSP/ONVIF e FLIR Atlas SDK, sem depender de pasta."],
-            ["WhatsApp automático", "Envio pela API oficial do WhatsApp Business, com confirmação de leitura."],
-            ["Aviso no celular", "Aplicativo ou página instalável com notificação e acesso ao laudo."],
-            ["Serviço do Windows", "Monitoramento rodando mesmo com a janela do Pyron fechada."],
-            ["Escalonamento", "Se ninguém responder em X minutos, avisa o próximo da lista."],
-        ], [52, LARGURA / mm - 52]),
-    ]
+    c += figura("m_equipamento.png", "Página do equipamento TR-01: estado, máxima, tendência a plena carga, próxima inspeção, gráfico, peças e histórico.")
 
     # 11
-    c += secao(11, "Modelos", "Sistema")
-    c += figura("m_modelos.png", "Detectores disponíveis e o passo a passo para treinar e instalar um modelo novo.")
+    c += secao(11, "Pendências", "Da anomalia à correção")
+    c += figura("m_pendencias.png", "Pendências com severidade, equipamento, data, prazo, situação e ordem de serviço.")
     c += [
-        lista([
-            "<b>Pontos quentes (regra):</b> detector embutido, sem IA. Aponta trechos mais quentes que o equipamento em volta. "
-            "É a base até o primeiro modelo treinado; não identifica o tipo de componente.",
-            "<b>Modelos treinados (IA):</b> cada pasta em <font name='Pyron-Mono'>modelos/</font> com <font name='Pyron-Mono'>cartao.json</font> e "
-            "<font name='Pyron-Mono'>modelo.onnx</font> aparece aqui, com classes, desempenho e limitações. <b>Usar este modelo</b> o torna o padrão.",
-            "<b>Treino:</b> rotule com caixas no CVAT (por exemplo: para-raio inteiro, terminal superior, parte isoladora, terminal inferior), "
-            "exporte em COCO 1.0 e rode o comando mostrado. A rede aprende com a temperatura verdadeira de cada imagem, é avaliada em "
-            "sessões que não viu (AP50 e erro da temperatura máxima) e é instalada sozinha.",
-        ]),
+        p("Toda inspeção fora do normal vira uma pendência. O fluxo é o de uma equipe de manutenção:"),
+        tabela(["Situação", "Quando usar"], [
+            ["<b>Aberta</b>", "Acabou de ser encontrada. O prazo sai da severidade (1, 7, 30 ou 90 dias depois da captura) e pode ser trocado."],
+            ["<b>Programada</b>", "O reparo tem data e número de ordem de serviço."],
+            ["<b>Corrigida</b>", "O reparo foi feito; aguarda a reinspeção."],
+            ["<b>Verificada</b>", "A reinspeção mostrou o componente normal. Uma inspeção normal posterior do mesmo equipamento é sugerida."],
+            ["<b>Descartada</b>", "Falso alarme (reflexo do sol, por exemplo) ou peça já substituída."],
+        ], [32, LARGURA / mm - 32]),
+        Spacer(1, 6),
+        p("Cada mudança vai para o histórico, com data e nota. As pendências vencidas aparecem no Painel e no menu.", "nota"),
     ]
+    c += figura("m_pendencia_dialogo.png", "Atualizar uma pendência: situação, prazo, ordem de serviço, responsável, nota e o histórico.", 130 * mm)
 
     # 12
-    c += secao(12, "Configurações", "Sistema")
-    c += figura("m_criterio.png", "Critério de severidade em quatro grupos, com os modelos Brasil (NBR 15866) e NETA MTS.")
+    c += secao(12, "Vídeo ao vivo", "Simulação de câmera")
+    c += figura("m_video.png", "Vídeo analisado quadro a quadro: caixas sobre a imagem, ritmo real, tempo por quadro, gráfico da máxima e anomalias.")
     c += [
-        tabela(["Aba", "O que dá para ajustar"], [
-            ["Empresa e responsável", "Nome e subtítulo da empresa no cabeçalho dos laudos; responsável técnico e registro que vêm preenchidos em cada análise."],
-            ["Critério de severidade", "Limites de % da MTA, ΔT entre semelhantes (condutores e dielétricos) e ΔT sobre o ambiente (NETA, opcional); "
-             "expoente da correção de carga e carga mínima confiável; modelos Brasil e NETA; restaurar o padrão."],
-            ["Biblioteca de componentes", "MTA de cada classe de componente, com a fonte do valor. Campos alterados ficam destacados em azul."],
-            ["Aparência", "Tema claro (padrão), escuro ou seguir o Windows."],
-            ["Dados e sistema", "Onde ficam as inspeções, os alertas, as configurações e os modelos; versão."],
-        ], [44, LARGURA / mm - 44]),
-        Spacer(1, 6),
-        p("A biblioteca de componentes mostra, para cada classe, o tipo de aquecimento, a MTA editável e a fonte do valor "
-          "(a mesma tabela da seção 7).", "nota"),
+        lista([
+            "Envie a gravação da tela da câmera (MP4, AVI, MOV ou MKV, com a barra de escala visível). Cada quadro passa pelo mesmo caminho "
+            "de uma foto: escala, temperatura, detector, medição e severidade.",
+            "<b>Ao vivo:</b> o vídeo corre no relógio, como a câmera; enquanto o detector trabalha, os quadros que passam se perdem. "
+            "Mostra o que o sistema acompanharia de verdade neste computador. <b>Um quadro a cada intervalo:</b> analisa sem perder nenhum.",
+            "Depois, reproduza no ritmo em que os quadros foram analisados (espaço, setas), pule pelo gráfico ou pelos momentos com anomalia "
+            "e use <b>Salvar quadro como inspeção</b> para ter o laudo daquele instante.",
+            "Os números da escala só passam pelo OCR quando mudam; com a escala travada na câmera, informe os limites e a leitura fica exata.",
+        ]),
     ]
 
     # 13
-    c += secao(13, "Dados, privacidade e instalação", "Sistema")
+    c += secao(13, "Monitoramento e alertas", "Operação")
+    c += figura("m_monitor.png", "Estado do monitoramento, fonte das imagens, regra de alerta, responsáveis e a prévia da mensagem.")
     c += [
         lista([
-            "Inspeções, imagens, alertas e configurações ficam em <font name='Pyron-Mono'>app/dados_app</font>, na pasta do projeto. "
-            "Para fazer cópia de segurança, copie essa pasta.",
-            "O Pyron não envia nada para a internet. A única saída é quando o usuário clica em Abrir WhatsApp.",
-            "Instalação do zero, atualização e geração do executável: README do projeto.",
-            "O lançador Pyron.exe é pequeno e não é assinado digitalmente. Para distribuir a clientes, o caminho é assinar o executável.",
-            "Código-fonte: github.com/hugovieiraz/Pyron---Embrapii.",
+            "<b>Fonte das imagens:</b> a pasta onde a câmera, o cartão sincronizado, o FTP da câmera fixa ou o FLIR Thermal Studio gravam. "
+            "Ao ligar, o que já estava na pasta fica de fora.",
+            "<b>Cada subpasta é um equipamento:</b> com a opção marcada, uma imagem em Entrada\\TR-01 entra no histórico do TR-01. "
+            "Bom para câmeras fixas, uma pasta por câmera.",
+            "<b>Regra de alerta:</b> severidade mínima e intervalo para não repetir o mesmo nível; se piorar, o alerta sai na hora.",
+            "<b>Responsáveis:</b> nome e WhatsApp. O Pyron prepara a mensagem e um clique abre o WhatsApp com ela pronta.",
+            "Os alertas ficam com a situação pendente, enviado ou resolvido; o sino do topo mostra os pendentes.",
         ]),
+        p("Em desenvolvimento", "h2"),
+        tabela(["Item", "O que vai fazer"], [
+            ["Conexão direta com a câmera", "RTSP/ONVIF e FLIR Atlas SDK, sem depender de pasta."],
+            ["WhatsApp automático", "Envio pela API oficial do WhatsApp Business."],
+            ["Serviço do Windows", "Monitoramento rodando mesmo com a janela do Pyron fechada."],
+        ], [52, LARGURA / mm - 52]),
     ]
 
     # 14
-    c += secao(14, "Limitações e próximos passos", "Roteiro", nova_pagina=False)
+    c += secao(14, "Modelos e avaliação", "Sistema")
+    c += figura("m_modelos.png", "Detectores disponíveis: a regra de pontos quentes, o modelo de para-raios e o combinado dos dois.")
+    c += [
+        lista([
+            "<b>Pontos quentes (regra):</b> embutido, sem IA. Aponta trechos mais quentes que o equipamento em volta.",
+            "<b>Modelos treinados (IA):</b> por exemplo, o RF-DETR de para-raios (terminal superior, aletas isoladoras, terminal inferior), "
+            "com mAP50 de 0,89 no teste. <b>Modelo + pontos quentes</b> junta os dois: diz em qual peça está o calor e compara as fases.",
+            "<b>Treino:</b> rotule com caixas no CVAT, exporte em COCO 1.0 e siga o passo a passo da tela, aqui (com placa NVIDIA) ou no Colab.",
+        ]),
+    ]
+    c += figura("m_avaliacao.png", "Avaliação: comparação dos detectores treinados (acertos, peças perdidas, curvas de treino e exemplos).")
+
+    # 15
+    c += secao(15, "Configurações", "Sistema")
+    c += figura("m_identidade.png", "Empresa, logotipo e responsáveis técnicos cadastrados.")
+    c += [
+        tabela(["Aba", "O que dá para ajustar"], [
+            ["Empresa e responsáveis", "Nome, subtítulo e <b>logotipo</b> no cabeçalho dos laudos; <b>responsáveis técnicos</b> (nome, função, registro). "
+             "O laudo só sai com um responsável deste cadastro, para o nome e o registro nunca saírem digitados errado."],
+            ["Critério de severidade", "Limites de % da MTA, ΔT entre semelhantes (condutores e dielétricos), ΔT sobre o ambiente (NETA, opcional), "
+             "expoente da correção de carga e carga mínima; modelos Brasil e NETA."],
+            ["Biblioteca de componentes", "MTA de cada classe de componente, com a fonte do valor."],
+            ["Aparência", "Tema claro (padrão), escuro ou seguir o Windows."],
+            ["Dados e sistema", "Onde ficam os dados, espaço ocupado, <b>backup</b> e restauração."],
+        ], [44, LARGURA / mm - 44]),
+    ]
+    c += figura("m_criterio.png", "Critério de severidade em quatro grupos, com os modelos Brasil (NBR 15866) e NETA MTS.")
+    c += figura("m_componentes.png", "Biblioteca de componentes: tipo de aquecimento, MTA editável e a fonte de cada valor.")
+
+    # 16
+    c += secao(16, "Dados, backup e instalação", "Sistema")
+    c += figura("m_dados.png", "Dados e sistema: pastas, espaço ocupado, versão e o backup.")
+    c += [
+        lista([
+            f"Inspeções, imagens, equipamentos, pendências, alertas e configurações ficam em {mono('app/dados_app')}, na pasta do projeto.",
+            "<b>Baixar backup:</b> um .zip com tudo isso (vídeos enviados e treinos ficam de fora). Guarde fora do computador.",
+            "<b>Restaurar backup:</b> troca os dados atuais pelos do .zip. Antes, uma cópia do que existe hoje fica na pasta de dados, em backups.",
+            "O Pyron não envia nada para a internet. A única saída é quando o usuário clica em Abrir WhatsApp.",
+            "Instalação do zero, atualização e geração do executável: README do projeto. Código: github.com/hugovieiraz/Pyron---Embrapii.",
+        ]),
+    ]
+
+    # 17
+    c += secao(17, "Limitações e próximos passos", "Roteiro", nova_pagina=False)
     c += [
         p("Limitações desta versão", "h2"),
         lista([
-            "O detector de componentes com IA ainda está sendo treinado com rótulos reais; até lá, a regra de pontos quentes dá uma classificação indicativa.",
-            "As máximas admissíveis e faixas de severidade precisam ser conferidas na edição vigente da NBR 15866, com os fabricantes e com termografista certificado.",
-            "Na imagem só colorida, o ponto quente precisa estar dentro da escala de cores; acima do topo da escala, a foto não mostra a temperatura real.",
+            "Detector de IA só para para-raios; para os outros equipamentos, a regra de pontos quentes dá uma classificação indicativa.",
+            "As máximas admissíveis e as faixas precisam ser conferidas na edição vigente da NBR 15866, com os fabricantes e com termografista certificado.",
+            "A tendência só é confiável comparando inspeções em condições parecidas, ou com ambiente e carga informados (série a plena carga).",
+            "Na imagem só colorida, o ponto quente precisa estar dentro da escala de cores.",
             "O monitoramento depende do Pyron aberto e o envio do WhatsApp é manual.",
         ]),
         p("Próximos passos", "h2"),
         lista([
-            "<b>Previsão:</b> tendência de cada componente ao longo das inspeções e tempo estimado até ficar crítico.",
-            "<b>Câmeras fixas:</b> conexão direta RTSP/ONVIF e FLIR Atlas SDK.",
-            "<b>Avisos:</b> WhatsApp Business automático, aviso no celular e escalonamento.",
+            "<b>Previsão com carga e clima</b> integrados (histórico de carga do SCADA) e tempo até ficar crítico com intervalo de confiança.",
+            "<b>Detectores</b> para transformador, disjuntor e seccionadora.",
+            "<b>Câmeras fixas:</b> conexão direta RTSP/ONVIF e FLIR Atlas SDK; <b>avisos</b> automáticos no WhatsApp e no celular.",
             "<b>Gêmeo térmico do transformador</b> (IEC 60076-7) e perda de vida da isolação.",
-            "<b>Assistente de laudo</b> com linguagem natural, a partir dos resultados medidos.",
         ]),
     ]
 
@@ -562,21 +611,27 @@ def conteudo() -> list:
     cab.toc = "Apêndice: atalhos e glossário"
     c += [cab,
           tabela(["Atalho", "Onde", "O que faz"], [
+              ["Ctrl + K", "Qualquer tela", "Busca rápida: inspeções, equipamentos, telas e ações."],
               ["Ctrl + O", "Qualquer tela", "Escolher imagens para analisar."],
-              ["D", "Análise aberta", "Desenhar região: arraste sobre a imagem."],
-              ["S ou V", "Análise aberta", "Voltar para a ferramenta de seleção."],
-              ["Esc", "Análise aberta", "Cancelar o desenho e tirar a seleção."],
+              ["?", "Qualquer tela", "Lista de atalhos."],
+              ["S, D, P, L", "Análise aberta", "Selecionar, desenhar região, medir ponto, traçar linha."],
+              ["R", "Análise e vídeo", "Rótulos sobre as caixas."],
+              ["Esc", "Análise aberta", "Cancelar e voltar à seleção."],
               ["Delete", "Análise aberta", "Remover a região selecionada (com Desfazer)."],
-              ["Enter", "Inspeções", "Abrir a inspeção da linha em foco."],
+              ["Espaço, ← →", "Vídeo", "Reproduzir ou pausar; quadro anterior e seguinte."],
           ], [28, 34, LARGURA / mm - 62]),
           Spacer(1, 10),
           tabela(["Termo", "Significado"], [
               ["MTA", "Máxima temperatura admissível: quanto o componente aguenta em operação contínua."],
               ["ΔT", "Diferença de temperatura: entre fases semelhantes ou sobre o ar ambiente."],
+              ["Plena carga", "Corrente nominal do equipamento; a projeção leva a medição feita com carga menor até ela."],
+              ["Tendência", "Quanto a temperatura sobe ou desce por mês, ajustada às inspeções do equipamento."],
               ["Radiométrico", "Imagem que guarda a temperatura de cada pixel, não só as cores."],
               ["Emissividade", "Quanto a superfície emite de radiação térmica; afeta a temperatura calculada."],
+              ["Perfil", "Temperatura ao longo de uma linha traçada sobre o termograma."],
               ["Isoterma", "Destaque de tudo o que está acima de uma temperatura escolhida."],
-              ["Plena carga", "Corrente nominal do equipamento; a projeção leva a medição feita com carga menor até ela."],
+              ["Pendência", "Anomalia em acompanhamento, com prazo, ordem de serviço e situação."],
+              ["OS", "Ordem de serviço da manutenção que vai corrigir a anomalia."],
               ["Indicativa", "Classificação sem referência completa (ambiente, carga ou fase semelhante)."],
           ], [32, LARGURA / mm - 32])]
     return c
