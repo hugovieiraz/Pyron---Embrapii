@@ -231,6 +231,35 @@ function revelarGrafico(svg, largura, altura) {
   return svg;
 }
 
+/** Ao lado do termograma: a foto visível que a câmera gravou junto, a imagem original da câmera ou nada. */
+function mostrarAoLado(tipo) {
+  $("#btn-foto").setAttribute("aria-pressed", String(tipo === "foto"));
+  $("#btn-original").setAttribute("aria-pressed", String(tipo === "original"));
+  $("#quadro-foto").hidden = !tipo;
+  $("#palco-imagens").classList.toggle("com-foto", !!tipo);
+  if (tipo && estado.analise) {
+    $("#img-foto").src = `/api/analises/${estado.analise.id}/${tipo === "foto" ? "foto" : "original"}.jpg`;
+    $("#img-foto").alt = $("#legenda-foto").textContent = tipo === "foto" ? T.analise.legendaFoto : T.analise.legendaOriginal;
+  }
+  ajustarAlturaImagem();
+}
+
+/**
+ * A coluna do termograma fica presa na tela: a imagem ganha a altura que sobra depois da barra de
+ * ferramentas e da escala, para aparecer sempre inteira enquanto o painel da direita rola sozinho.
+ */
+function ajustarAlturaImagem() {
+  const palco = $("#area-analise .palco");
+  const tela = $("#tela");
+  if (!palco || !tela || palco.offsetParent === null) return;
+  const topo = $(".topo").getBoundingClientRect().height;
+  // Mesma conta do max-height do .palco: topo, a folga de cima e o espaço de baixo do conteúdo (--e-16).
+  const folga = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--e-16")) || 64;
+  const disponivel = window.innerHeight - topo - folga;
+  const outros = palco.scrollHeight - $("#palco-imagens").getBoundingClientRect().height;
+  document.documentElement.style.setProperty("--altura-imagem", `${Math.max(240, Math.floor(disponivel - outros))}px`);
+}
+
 /** Põe um controle (por exemplo, um seletor) na mesma linha do título do gráfico. */
 function comControle(figura, controle) {
   if (!figura || !controle) return figura;
@@ -1971,6 +2000,7 @@ function desenharCabecalhoVideo() {
   $("i", barra).style.transform = `scaleX(${d.progresso || 0})`;
   $("#btn-video-salvar").disabled = !vid.quadros.length;
   $("#quadro-video").style.aspectRatio = `${d.info.largura} / ${d.info.altura}`;
+  $("#quadro-video").style.setProperty("--proporcao", String(d.info.largura / d.info.altura));
   atualizarTrilha();
 }
 
@@ -2688,9 +2718,7 @@ function abrirAnalise(a, recemCriada = false) {
     $("#btn-isoterma").setAttribute("aria-pressed", "false");
     $("#isoterma-controle").hidden = true;
     definirFerramenta("selecionar");
-    $("#btn-foto").setAttribute("aria-pressed", "false");
-    $("#quadro-foto").hidden = true;
-    $("#palco-imagens").classList.remove("com-foto");
+    mostrarAoLado(null);
     trocarAba("resultado", false);
     estado.rascunhoLinha = null;
     restaurarExibicao(a);
@@ -2713,6 +2741,7 @@ function abrirAnalise(a, recemCriada = false) {
   mostrarEtapas(a.etapas);
   prepararCamadas();
   desenharTermograma();
+  ajustarAlturaImagem();
   desenharCaixas();
   preencherResultado();
   desenharAcompanhamento();
@@ -3223,6 +3252,7 @@ function restaurarExibicao(a) {
 
 function preencherEscalaManual() {
   $("#escala-controle").hidden = estado.faixa !== "manual";
+  ajustarAlturaImagem();
   if (estado.faixa !== "manual" || !estado.analise) return;
   const [lo, hi] = faixaAtual();
   $("#escala-min").value = Math.round(lo * 10) / 10;
@@ -4167,6 +4197,7 @@ function ligarEventos() {
     $("#isoterma-saida").textContent = fmt(estado.isoterma.valor, 1, " °C");
     estado.isoterma.ligada = ligar;
     $("#isoterma-controle").hidden = !ligar;
+    ajustarAlturaImagem();
     desenharTermograma();
   });
   $("#isoterma-valor").addEventListener("input", (ev) => {
@@ -4174,13 +4205,9 @@ function ligarEventos() {
     $("#isoterma-saida").textContent = fmt(estado.isoterma.valor, 1, " °C");
     desenharTermograma();
   });
-  $("#btn-foto").addEventListener("click", (ev) => {
-    const ligar = ev.currentTarget.getAttribute("aria-pressed") !== "true";
-    ev.currentTarget.setAttribute("aria-pressed", String(ligar));
-    $("#quadro-foto").hidden = !ligar;
-    $("#palco-imagens").classList.toggle("com-foto", ligar);
-    if (ligar) $("#img-foto").src = `/api/analises/${estado.analise.id}/foto.jpg`;
-  });
+  $("#btn-foto").addEventListener("click", (ev) => mostrarAoLado(ev.currentTarget.getAttribute("aria-pressed") === "true" ? null : "foto"));
+  $("#btn-original").addEventListener("click", (ev) => mostrarAoLado(ev.currentTarget.getAttribute("aria-pressed") === "true" ? null : "original"));
+  window.addEventListener("resize", ajustarAlturaImagem);
   $$(".inspetor .abas [role=tab]").forEach((b) => b.addEventListener("click", () => trocarAba(b.dataset.aba)));
 
   $("#form-condicoes").addEventListener("submit", async (ev) => {

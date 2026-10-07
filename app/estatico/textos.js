@@ -117,6 +117,8 @@ const TEXTOS = {
     maiorDt: "Maior ΔT entre fases",
     indicativa: " (indicativa)",
     semMedida: "sem medida",
+    legendaFoto: "Foto visível (gravada junto pela câmera)",
+    legendaOriginal: "Original: como a câmera gravou",
     dicaRegiao: "Arraste para medir uma região · Esc cancela",
     dicaPonto: "Clique para medir um ponto · Esc volta à seleção",
     dicaLinha: "Arraste para traçar uma linha e ver o perfil · Esc volta à seleção",

@@ -225,7 +225,8 @@
                   <button type="button" data-valor="linha" aria-pressed="false" title="Perfil ao longo de uma linha (L)" aria-label="Perfil ao longo de uma linha"><svg class="ic"><use href="#i-linha"/></svg></button>
                 </div>
                 <button type="button" class="btn-palco" id="btn-isoterma" aria-pressed="false" title="Isoterma: destaca tudo acima de uma temperatura"><svg class="ic"><use href="#i-isoterma"/></svg>Isoterma</button>
-                <button type="button" class="btn-palco" id="btn-foto" aria-pressed="false" hidden title="Foto visível da câmera"><svg class="ic"><use href="#i-foto"/></svg>Foto</button>
+                <button type="button" class="btn-palco" id="btn-foto" aria-pressed="false" hidden title="Foto visível que a câmera gravou junto"><svg class="ic"><use href="#i-foto"/></svg>Foto</button>
+                <button type="button" class="btn-palco" id="btn-original" aria-pressed="false" title="A imagem como a câmera gravou (paleta e bordas da câmera)"><svg class="ic"><use href="#i-camera"/></svg>Original</button>
                 <span class="divisor" id="divisor-camada" hidden></span>
                 <div class="segmentado" role="group" aria-label="Mostrar" id="seg-camada" hidden>
                   <button type="button" data-valor="tudo" aria-pressed="true" title="Peças e pontos quentes">Tudo</button>
@@ -258,7 +259,7 @@
                     <div class="dica-desenho" id="dica-desenho" hidden>Arraste para medir uma região · Esc cancela</div>
                     <svg class="camada-linhas" id="camada-linhas" aria-hidden="true"></svg>
                   </div>
-                  <figure class="quadro-foto" id="quadro-foto" hidden><img id="img-foto" alt="Foto visível da câmera"><figcaption>Foto visível</figcaption></figure>
+                  <figure class="quadro-foto" id="quadro-foto" hidden><img id="img-foto" alt="Foto visível da câmera"><figcaption id="legenda-foto">Foto visível</figcaption></figure>
                 </div>
                 <div class="escala">
                   <div class="escala-barra"><canvas id="barra-cores" width="256" height="1"></canvas><span class="escala-marca" id="escala-marca" hidden></span></div>

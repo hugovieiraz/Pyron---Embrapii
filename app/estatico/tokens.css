@@ -162,6 +162,7 @@
   --altura-lista: 480px;     /* listas longas dentro de um cartão rolam por dentro */
   --largura-paleta: 640px;   /* busca rápida (Ctrl+K) */
   --largura-lado: 1180px;    /* diálogo lado a lado (antes e agora) */
+  --folga-imagem: 340px;     /* altura fora do termograma (topo, ferramentas, escala), antes de medir de verdade */
   --altura-paleta: 560px;
 
   /* ---------------------------------------------------------------- raio (3 valores) */
