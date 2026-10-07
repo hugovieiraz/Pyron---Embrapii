@@ -413,6 +413,21 @@ const TEXTOS = {
     selecione: "Escolha o responsável",
   },
 
+  comparar: {
+    titulo: "Inspeção anterior deste equipamento",
+    anterior: (d) => `${d} `,
+    delta: (d, antes, agora) => `${d} °C na máxima (${antes} → ${agora} °C)`,
+    ladoALado: "Lado a lado",
+    abrir: "Abrir",
+    ladoALadoTitulo: (equip) => `${equip}: antes e agora`,
+    antes: "Antes",
+    agora: "Agora",
+    maxima: "Máxima",
+    anteriorTitulo: "Inspeção anterior do equipamento",
+    seguinteTitulo: "Próxima inspeção do equipamento",
+    posicao: (i, n) => `${i} de ${n}`,
+  },
+
   busca: {
     grupoTelas: "Telas",
     grupoAcoes: "Ações",
@@ -472,7 +487,7 @@ const TEXTOS = {
     prazo: "Prazo para corrigir",
     os: "Ordem de serviço",
     osExemplo: "OS 2026-0142",
-    osCurta: (os) => `OS ${os}`,
+    osCurta: (os) => (/^os\b/i.test(os) ? os : `OS ${os}`),
     responsavel: "Responsável pela correção",
     responsavelExemplo: "Equipe de manutenção",
     nota: "Nota (vai para o histórico)",

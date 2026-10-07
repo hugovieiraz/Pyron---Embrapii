@@ -1257,6 +1257,66 @@ async function atualizarPendencia(p, aoSalvar) {
   }
 }
 
+/** Inspeção anterior do mesmo equipamento: variação da máxima, lado a lado e setas para navegar. */
+async function carregarVizinhas() {
+  const a = estado.analise;
+  const alvo = $("#comparacao-anterior");
+  alvo.hidden = true;
+  estado.vizinhas = null;
+  if (!a.identificacao || !a.identificacao.equipamento) return desenharNavegacaoEquipamento();
+  let v;
+  try {
+    v = await api(`/api/analises/${a.id}/vizinhas`);
+  } catch {
+    return;
+  }
+  if (!estado.analise || estado.analise.id !== a.id) return;
+  estado.vizinhas = v;
+  desenharNavegacaoEquipamento();
+  const ant = v.anterior;
+  if (!ant) return;
+  const E = T.comparar;
+  const agora = v.atual;
+  const delta = agora.t_max != null && ant.t_max != null ? agora.t_max - ant.t_max : null;
+  const tipo = delta == null ? "" : delta > 2 ? "sobe" : delta < -2 ? "desce" : "estavel";
+  alvo.hidden = false;
+  alvo.replaceChildren(
+    el("img", { src: `/api/analises/${ant.id}/miniatura.png`, alt: "", loading: "lazy" }),
+    el("div", { class: "corpo" },
+      el("span", { class: "rotulo" }, E.titulo),
+      el("b", {}, E.anterior(dataCurta(ant.data)), el("span", { class: `selo ${ant.severidade}` }, T.niveis[ant.severidade])),
+      delta != null ? el("span", { class: `tendencia ${tipo}` }, icone(tipo || "estavel"), E.delta(`${delta > 0 ? "+" : ""}${fmt(delta, 1)}`, fmt(ant.t_max, 1), fmt(agora.t_max, 1))) : null),
+    el("div", { class: "acoes" },
+      el("button", { class: "btn btn-sm", type: "button", onclick: () => ladoALado(ant, agora) }, E.ladoALado),
+      el("a", { class: "btn btn-sm btn-fantasma", href: `#analise/${ant.id}` }, E.abrir)));
+}
+
+function desenharNavegacaoEquipamento() {
+  const v = estado.vizinhas;
+  const alvo = $("#nav-equipamento");
+  if (!v || !v.total || v.total < 2) return alvo.replaceChildren();
+  const E = T.comparar;
+  const seta = (item, nome, titulo) => item
+    ? el("a", { class: "btn btn-sm btn-fantasma btn-icone", href: `#analise/${item.id}`, title: `${titulo} · ${dataCurta(item.data)}`, "aria-label": titulo }, icone(nome))
+    : el("span", { class: "btn btn-sm btn-fantasma btn-icone desativado", "aria-hidden": "true" }, icone(nome));
+  alvo.replaceChildren(seta(v.anterior, "voltar", E.anteriorTitulo), el("span", { class: "nota num" }, E.posicao(v.posicao, v.total)), seta(v.seguinte, "seta", E.seguinteTitulo));
+}
+
+function ladoALado(ant, agora) {
+  const E = T.comparar;
+  const lado = (it, titulo) => el("figure", { class: "lado" },
+    el("img", { src: `/api/analises/${it.id}/imagem.png?largura=900`, alt: it.arquivo }),
+    el("figcaption", {}, el("b", {}, `${titulo} · ${dataCurta(it.data)}`), el("span", { class: `selo ${it.severidade}` }, T.niveis[it.severidade]),
+      el("span", { class: "num" }, `${E.maxima} ${fmt(it.t_max, 1, " °C")}`), it.regiao ? el("span", { class: "nota" }, it.regiao) : null));
+  dialogo({
+    titulo: E.ladoALadoTitulo(estado.analise.identificacao.equipamento),
+    conteudo: el("div", { class: "lado-a-lado" }, lado(ant, E.antes), lado(agora, E.agora)),
+    acoes: [{ rotulo: T.geral.fechar, valor: "ok", classe: "btn-primaria" }],
+  });
+  $("#dialogo").classList.add("dialogo-largo");
+  $("#dialogo").addEventListener("close", () => $("#dialogo").classList.remove("dialogo-largo"), { once: true });
+}
+
 /** Cartão da anomalia na análise aberta: situação, prazo e o botão de atualizar. */
 function desenharAcompanhamento() {
   const alvo = $("#acompanhamento");
@@ -2566,6 +2626,7 @@ function abrirAnalise(a, recemCriada = false) {
   desenharCaixas();
   preencherResultado();
   desenharAcompanhamento();
+  if (nova) carregarVizinhas();
   preencherMedicoes();
   preencherCondicoes();
   preencherParametros();
@@ -2749,7 +2810,7 @@ function evitarColisaoDeEtiquetas(s) {
   const area = s.getBoundingClientRect();
   const cabe = (r) => r.left >= area.left - 1 && r.right <= area.right + 1 && r.top >= area.top - 1 && r.bottom <= area.bottom + 1;
   const colide = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
-  const ocupadas = $$(".caixa .pico, .alvo-maximo, .mira, .marca-linha", s).map((p) => p.getBoundingClientRect());
+  const ocupadas = $$(".caixa .pico, .alvo-maximo, .mira, .marca-linha, .ponta-linha", s).map((p) => p.getBoundingClientRect());
   // Pontos e linhas foram pedidos pelo usuário: os rótulos deles escolhem lugar primeiro.
   for (const etq of $$(".etq-med", s)) {
     etq.hidden = false;

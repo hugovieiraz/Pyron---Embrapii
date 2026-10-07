@@ -1159,6 +1159,23 @@ def acompanhar(id_: str, corpo: dict = Body(...)) -> dict:
 # ---------------------------------------------------------------- rotas: equipamentos (histórico e tendência)
 
 
+@app.get("/api/analises/{id_}/vizinhas")
+def vizinhas(id_: str) -> dict:
+    """A inspeção anterior e a seguinte do mesmo equipamento, pela data da captura."""
+    itens = armazenamento.listar()
+    atual = next((it for it in itens if it["id"] == id_), None)
+    if atual is None:
+        raise HTTPException(404, "Inspeção não encontrada.")
+    chave = _chave_de(atual)
+    if chave == equipamentos.SEM_EQUIPAMENTO:
+        return {"anterior": None, "seguinte": None, "posicao": None, "total": 0}
+    mesmas = sorted((it for it in itens if _chave_de(it) == chave), key=lambda it: equipamentos.ponto(it)["data"])
+    i = next(k for k, it in enumerate(mesmas) if it["id"] == id_)
+    resumo = lambda it: it and {**equipamentos.ponto(it), "arquivo": it["arquivo"]}  # noqa: E731
+    return {"anterior": resumo(mesmas[i - 1]) if i > 0 else None, "seguinte": resumo(mesmas[i + 1]) if i + 1 < len(mesmas) else None,
+            "posicao": i + 1, "total": len(mesmas), "atual": resumo(atual)}
+
+
 @app.get("/api/equipamentos")
 def listar_equipamentos() -> list[dict]:
     return equipamentos.listar(armazenamento.listar())

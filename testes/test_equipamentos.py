@@ -130,3 +130,15 @@ def test_tendencia_a_plena_carga_com_ambiente_e_carga() -> None:
     it = _item("b", "2026-06-01T10:00:00", 50)
     it["condicoes"] = {"ambiente_c": 25.0, "carga_pct": 30}  # carga baixa demais: não projeta
     assert eq.ponto(it)["elevacao_plena"] is None
+
+
+def test_inspecao_anterior_e_seguinte_do_mesmo_equipamento(cliente) -> None:
+    enviar = lambda equip: cliente.post("/api/analises", files={"arquivo": ("t.jpg", _termograma_flir(), "image/jpeg")},
+                                        data={"instalacao": "SE Teste", "equipamento": equip}).json()
+    a, b, c = enviar("TR-01"), enviar("TR-01"), enviar("TR-02")
+    sem = cliente.post("/api/analises", files={"arquivo": ("t.jpg", _termograma_flir(), "image/jpeg")}).json()
+    v = cliente.get(f"/api/analises/{b['id']}/vizinhas").json()
+    assert v["total"] == 2 and {v["posicao"], (v["anterior"] or v["seguinte"])["id"]} <= {1, 2, a["id"]}
+    assert cliente.get(f"/api/analises/{c['id']}/vizinhas").json()["total"] == 1
+    assert cliente.get(f"/api/analises/{sem['id']}/vizinhas").json() == {"anterior": None, "seguinte": None, "posicao": None, "total": 0}
+    assert cliente.get("/api/analises/naoexiste/vizinhas").status_code == 404

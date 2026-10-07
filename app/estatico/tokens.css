@@ -161,6 +161,7 @@
   --medida: 68ch;            /* comprimento de linha para texto corrido */
   --altura-lista: 480px;     /* listas longas dentro de um cartão rolam por dentro */
   --largura-paleta: 640px;   /* busca rápida (Ctrl+K) */
+  --largura-lado: 1180px;    /* diálogo lado a lado (antes e agora) */
   --altura-paleta: 560px;
 
   /* ---------------------------------------------------------------- raio (3 valores) */

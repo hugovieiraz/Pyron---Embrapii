@@ -760,6 +760,22 @@ section[data-vista="sobre"] .cartao h2 { margin-bottom: var(--e-3); }
 .link-equip { display: inline-flex; align-items: center; gap: var(--e-1); font-weight: var(--p-medio); }
 .link-equip .ic { width: var(--e-4); height: var(--e-4); }
 
+/* ---------------------------------------------------------------- comparação com a inspeção anterior */
+.comparacao-anterior { display: grid; grid-template-columns: var(--e-16) minmax(0, 1fr); align-items: center; gap: var(--e-3); padding: var(--e-3); margin-bottom: var(--e-4); border: 1px solid var(--borda); border-radius: var(--r-m); background: var(--superficie); }
+.comparacao-anterior img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--r-p); background: var(--palco); }
+.comparacao-anterior .corpo { display: grid; gap: var(--e-1); min-width: 0; }
+.comparacao-anterior .corpo b { display: flex; align-items: center; gap: var(--e-2); }
+.comparacao-anterior .rotulo { font-size: var(--t-1); font-weight: var(--p-forte); color: var(--texto-3); }
+.comparacao-anterior .acoes { grid-column: 1 / -1; justify-content: flex-end; gap: var(--e-1); }
+.nav-equipamento { display: flex; align-items: center; gap: var(--e-1); margin-left: var(--e-2); white-space: nowrap; }
+.nav-equipamento .desativado { opacity: .35; pointer-events: none; }
+dialog.dialogo-largo { width: min(var(--largura-lado), calc(100vw - var(--e-8))); max-width: none; }
+.lado-a-lado { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e-4); }
+.lado { margin: 0; display: grid; gap: var(--e-2); }
+.lado img { width: 100%; border-radius: var(--r-m); background: var(--palco); }
+.lado figcaption { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2) var(--e-3); }
+@media (max-width: 900px) { .lado-a-lado { grid-template-columns: 1fr; } }
+
 /* ---------------------------------------------------------------- busca rápida e atalhos */
 .busca-topo { display: flex; align-items: center; gap: var(--e-2); flex: 0 1 var(--col-g); min-width: 0; height: var(--alvo-sm); margin-left: auto; margin-right: var(--e-3); padding: 0 var(--e-2) 0 var(--e-3); border: 1px solid var(--borda); border-radius: var(--r-m); background: var(--superficie-2); color: var(--texto-3); font: inherit; font-size: var(--t-2); cursor: pointer; transition: border-color var(--dur-rapida) var(--ease-padrao); }
 .busca-topo:hover { border-color: var(--borda-forte); color: var(--texto-2); }
