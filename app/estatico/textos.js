@@ -614,6 +614,11 @@ const TEXTOS = {
 
   config: {
     erroTitulo: "Não foi possível carregar as configurações",
+    usoDados: (total, n, videos) => `${total} · ${n === 1 ? "1 inspeção" : `${n} inspeções`}${videos ? ` (vídeos: ${videos})` : ""}`,
+    restaurarTitulo: "Restaurar este backup?",
+    restaurarTexto: (nome) => `As inspeções, equipamentos, pendências e configurações atuais serão trocados pelos de ${nome}. Antes, uma cópia do que está aqui hoje fica guardada na pasta de dados, em backups.`,
+    restaurarAcao: "Restaurar",
+    restaurado: (n) => `Backup restaurado: ${n === 1 ? "1 inspeção" : `${n} inspeções`}. Recarregando…`,
     logoSalvo: "Logotipo salvo. Os próximos laudos saem com ele no cabeçalho.",
     logoRemovido: "Logotipo removido.",
     logoAlt: "Logotipo da empresa",

@@ -777,10 +777,19 @@
           <div class="cartao">
             <div class="cartao-cabeca"><div><h2>Dados e sistema</h2><p class="nota">Tudo fica neste computador. Nenhuma imagem ou laudo sai daqui sem você mandar.</p></div></div>
             <dl class="meta meta-larga">
-              <div><dt>Inspeções, alertas e configurações</dt><dd id="pasta-dados" class="mono">—</dd></div>
-              <div><dt>Modelos instalados</dt><dd id="pasta-modelos-2" class="mono">—</dd></div>
+              <div><dt>Inspeções, alertas e configurações</dt><dd><span id="pasta-dados" class="mono">—</span> <button class="btn btn-sm btn-fantasma" type="button" data-abrir-pasta="dados">Abrir pasta</button></dd></div>
+              <div><dt>Modelos instalados</dt><dd><span id="pasta-modelos-2" class="mono">—</span> <button class="btn btn-sm btn-fantasma" type="button" data-abrir-pasta="modelos">Abrir pasta</button></dd></div>
+              <div><dt>Espaço ocupado</dt><dd id="uso-dados" class="num">—</dd></div>
               <div><dt>Versão</dt><dd id="versao-2" class="num">—</dd></div>
             </dl>
+          </div>
+          <div class="cartao">
+            <div class="cartao-cabeca"><div><h2>Backup</h2><p class="nota">Guarde uma cópia das inspeções, imagens, equipamentos, pendências e configurações fora deste computador (pendrive ou nuvem). Vídeos enviados e treinos ficam de fora; os modelos estão na pasta de modelos.</p></div></div>
+            <div class="acoes">
+              <a class="btn btn-primaria" href="/api/backup.zip" download><svg class="ic"><use href="#i-baixar"/></svg>Baixar backup</a>
+              <button class="btn" type="button" id="btn-restaurar"><svg class="ic"><use href="#i-refazer"/></svg>Restaurar backup</button>
+              <input type="file" id="arquivo-backup" accept=".zip" hidden>
+            </div>
           </div>
         </div>
       </section>

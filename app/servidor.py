@@ -27,6 +27,7 @@ from fastapi.staticfiles import StaticFiles
 from PIL import Image
 
 from app import avaliacoes as avaliacoes_mod
+from app import backup
 from app import equipamentos
 from app import laudo, monitoramento, pendencias
 from app import treinos as treinos_mod
@@ -776,6 +777,43 @@ async def enviar_logo(arquivo: UploadFile = File(...)) -> dict:
     PASTA_DADOS.mkdir(parents=True, exist_ok=True)
     img.save(PASTA_DADOS / "logo.png", format="PNG")
     return {"ok": True, "largura": img.width, "altura": img.height}
+
+
+@app.get("/api/sistema")
+def sistema() -> dict:
+    """Onde estão os dados, quanto ocupam e quantas inspeções há."""
+    return {"pasta_dados": str(PASTA_DADOS), "pasta_modelos": str(PASTA_MODELOS), "versao": VERSAO,
+            "inspecoes": len(armazenamento.listar()), **backup.contar(PASTA_DADOS)}
+
+
+@app.get("/api/backup.zip")
+def baixar_backup() -> Response:
+    with _trava:
+        dados = backup.gerar(PASTA_DADOS)
+    nome = f"pyron_backup_{datetime.now():%Y%m%d_%H%M}.zip"
+    return Response(dados, media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="{nome}"'})
+
+
+@app.post("/api/backup/restaurar")
+async def restaurar_backup(arquivo: UploadFile = File(...)) -> dict:
+    """Troca os dados atuais pelos do backup (o estado atual vai antes para dados_app/backups)."""
+    dados = await arquivo.read()
+    try:
+        with _trava:
+            return backup.restaurar(PASTA_DADOS, dados)
+    except ValueError as erro:
+        raise HTTPException(422, str(erro)) from erro
+
+
+@app.post("/api/sistema/abrir-pasta")
+def abrir_pasta(corpo: dict = Body(...)) -> dict:
+    """Abre a pasta de dados ou de modelos no Explorador de Arquivos (o Pyron roda neste computador)."""
+    pasta = {"dados": PASTA_DADOS, "modelos": PASTA_MODELOS}.get(corpo.get("qual"))
+    if pasta is None or not hasattr(os, "startfile"):
+        raise HTTPException(422, "Não dá para abrir essa pasta daqui.")
+    pasta.mkdir(parents=True, exist_ok=True)
+    os.startfile(pasta)  # noqa: S606 - pasta fixa do próprio programa, aberta a pedido do usuário
+    return {"ok": True}
 
 
 @app.get("/api/configuracoes/logo.png")

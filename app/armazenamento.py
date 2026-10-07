@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
 
 import numpy as np
@@ -38,8 +39,15 @@ class Armazenamento:
             )
             c.execute("CREATE TABLE IF NOT EXISTS alertas (id TEXT PRIMARY KEY, criado_em TEXT, status TEXT, dados TEXT)")
 
-    def _conexao(self) -> sqlite3.Connection:
-        return sqlite3.connect(self.banco)
+    @contextmanager
+    def _conexao(self):
+        """Conexão que grava (commit) e fecha ao sair: no Windows, conexão aberta prende o arquivo."""
+        c = sqlite3.connect(self.banco)
+        try:
+            with c:
+                yield c
+        finally:
+            c.close()
 
     def salvar(self, analise: dict, original: bytes | None = None, matriz: np.ndarray | None = None) -> None:
         if original is not None:

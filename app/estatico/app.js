@@ -3756,6 +3756,38 @@ function desenharLogo(tem) {
   $("#btn-logo").lastChild.textContent = tem ? T.config.logoTrocar : T.config.logoEnviar;
 }
 
+function tamanhoLegivel(bytes) {
+  if (bytes == null) return T.geral.semValor;
+  const [v, u] = bytes >= 1e9 ? [bytes / 1e9, "GB"] : bytes >= 1e6 ? [bytes / 1e6, "MB"] : [bytes / 1e3, "kB"];
+  return `${fmt(v, v < 10 ? 1 : 0)} ${u}`;
+}
+
+async function carregarSistema() {
+  try {
+    const s = await api("/api/sistema");
+    $("#uso-dados").textContent = T.config.usoDados(tamanhoLegivel(s.bytes), s.inspecoes, s.bytes_videos ? tamanhoLegivel(s.bytes_videos) : null);
+  } catch {
+    $("#uso-dados").textContent = T.geral.semValor;
+  }
+}
+
+async function restaurarBackup(arquivo) {
+  const C = T.config;
+  if (!(await confirmar(C.restaurarTitulo, C.restaurarTexto(arquivo.name), C.restaurarAcao, true))) return;
+  const dados = new FormData();
+  dados.append("arquivo", arquivo);
+  try {
+    const r = await api("/api/backup/restaurar", { method: "POST", body: dados });
+    avisar(C.restaurado(r.inspecoes), { duracao: 8000 });
+    estado.inspecoes = [];
+    estado.equipamentos = null;
+    estado.pendencias = null;
+    setTimeout(() => location.reload(), 1500);
+  } catch (e) {
+    falhou(e);
+  }
+}
+
 async function carregarConfiguracoes(aba) {
   if (aba) estado.abaConfig = aba;
   mostrarAbaConfig(estado.abaConfig);
@@ -3769,6 +3801,7 @@ async function carregarConfiguracoes(aba) {
   $("#cfg-empresa-nome").value = c.empresa.nome || "";
   $("#cfg-empresa-sub").value = c.empresa.subtitulo || "";
   desenharLogo(c.tem_logo);
+  carregarSistema();
   desenharResponsaveis(c.responsaveis || [], c.responsavel_padrao);
   aplicarTema(c.tema);
   $("#pasta-dados").textContent = c.pasta_dados;
@@ -4073,6 +4106,9 @@ function ligarEventos() {
     mostrarAbaConfig(b.dataset.abaConfig);
     history.replaceState(null, "", `#configuracoes/${b.dataset.abaConfig}`);
   }));
+  $("#btn-restaurar").addEventListener("click", () => $("#arquivo-backup").click());
+  $("#arquivo-backup").addEventListener("change", (ev) => { const f = ev.target.files[0]; ev.target.value = ""; if (f) restaurarBackup(f); });
+  $$("[data-abrir-pasta]").forEach((b) => b.addEventListener("click", () => api("/api/sistema/abrir-pasta", json("POST", { qual: b.dataset.abrirPasta })).catch(falhou)));
   $("#btn-logo").addEventListener("click", () => $("#arquivo-logo").click());
   $("#arquivo-logo").addEventListener("change", async (ev) => {
     const arquivo = ev.target.files[0];
