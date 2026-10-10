@@ -32,7 +32,7 @@ IMAGENS = AQUI / "imagens"
 LOGO = PROJETO / "app" / "estatico" / "marca" / "logo.png"
 SIMBOLO = PROJETO / "app" / "estatico" / "marca" / "simbolo.png"
 SAIDA = PROJETO / "docs" / "Pyron_Funcionalidades.pdf"
-VERSAO = "0.7.0"
+VERSAO = "0.7.3"
 
 # Cores dos tokens da interface (app/estatico/tokens.css).
 TINTA = colors.HexColor("#171B33")
@@ -311,12 +311,13 @@ def conteudo() -> list:
 
     # 4
     c += secao(4, "Painel", "Operação")
-    c += figura("m_painel.png", "Painel com indicadores, inspeções mais graves, distribuição por severidade e próximas inspeções.")
+    c += figura("m_painel.png", "Painel com indicadores, a situação atual de cada equipamento, distribuição por severidade e próximas inspeções.")
     c += [
         lista([
-            "<b>Indicadores:</b> inspeções, críticas (urgente ou imediato), <b>pendências vencidas</b>, <b>inspeções vencidas</b> por equipamento e "
-            "alertas pendentes do monitoramento. Cada indicador leva à lista já filtrada.",
-            "<b>Atenção agora:</b> as inspeções mais graves, com o equipamento, a região crítica e o valor que decidiu (por exemplo, 79% da MTA).",
+            "<b>Indicadores:</b> inspeções, críticas agora (urgente ou imediato na situação atual), <b>pendências vencidas</b>, "
+            "<b>inspeções vencidas</b> por equipamento e alertas pendentes do monitoramento. Cada indicador leva à lista já filtrada.",
+            "<b>Atenção agora:</b> a <b>situação atual</b>: de cada equipamento, só a inspeção mais recente (uma inspeção normal depois de uma "
+            "grave quer dizer que ele está normal agora; a anomalia antiga segue em Pendências). Mostra a região crítica e o valor que decidiu.",
             "<b>Distribuição por severidade:</b> barra empilhada e contagem de cada nível.",
             "<b>Próximas inspeções:</b> os equipamentos pela data da próxima inspeção, vencidos primeiro.",
             "<b>Monitoramento:</b> estado, pasta vigiada, última verificação e os alertas mais recentes.",
@@ -334,14 +335,23 @@ def conteudo() -> list:
             "entram direto no histórico daquele equipamento.",
             "<b>Uma imagem</b> abre direto para revisão; <b>várias</b> são analisadas em lote, com a severidade de cada uma.",
         ]),
-        p("Dois tipos de imagem", "h2"),
+        p("Três tipos de imagem", "h2"),
         tabela(["Tipo", "Como o Pyron lê", "Como aparece"], [
             ["JPEG radiométrico (FLIR)", "Lê os dados brutos da câmera e converte em temperatura com emissividade, distância, temperatura refletida, "
              "umidade e as constantes da própria câmera.", "Etiqueta verde <b>Temperatura medida</b>."],
             ["Imagem colorida com escala", "Lê os números da escala por OCR e converte cada cor na temperatura da paleta. "
              "Testado em 893 imagens: erro mediano de 0,5 °C e escala lida em 100% delas.", "Etiqueta amarela <b>Temperatura estimada pelas cores</b>."],
+            ["Sem dados nem escala legível", "Imagem da internet, feita por IA, cortada ou mandada como foto pelo WhatsApp. A análise não trava: "
+             "os componentes são identificados pela imagem colorida e as etapas de temperatura ficam como sem dado. Se a imagem tem a barra "
+             "de cores, informe o mínimo e o máximo dela na análise e a temperatura é estimada.", "Etiqueta <b>Sem temperatura</b>; inspeção "
+             "<b>Sem medida</b>, que não conta como normal, não vira pendência e não gera laudo."],
         ], [38, 90, LARGURA / mm - 128]),
+        Spacer(1, 6),
+        p("Aceita JPEG, PNG, WebP e BMP. Para medir de verdade, use o arquivo original da câmera (FLIRxxxx.jpg). No WhatsApp, mande como "
+          "documento: como foto, ele recomprime e apaga os dados de temperatura.", "nota"),
     ]
+    c += figura("m_sem_temperatura.png", "Imagem sem dados radiométricos (gerada por IA): os componentes foram identificados e a análise parou antes "
+                                         "da temperatura; o cartão pede o mínimo e o máximo da barra de cores para estimá-la.")
 
     # 6
     c += secao(6, "Análise de uma imagem", "Operação")
@@ -419,12 +429,16 @@ def conteudo() -> list:
             "<b>Para-raios e isoladores</b> aquecem por corrente de fuga, não por carga: têm faixas próprias e não recebem a correção de carga.",
             "<b>Carga limite:</b> o Pyron calcula com quanto de carga o componente chega à MTA.",
             "<b>Classificação indicativa:</b> sem ambiente, sem carga e sem fase semelhante, o nível aparece marcado como indicativo.",
+            "<b>Não avaliado:</b> para-raio e isolador não têm MTA e só se comparam com a mesma peça das outras fases. Sozinhos na imagem, "
+            "ficam Não avaliado (e não Normal), com o aviso de fotografar as três fases juntas.",
+            "<b>Conferir:</b> quando a severidade vem só de um ponto quente fora das peças que o modelo achou, a inspeção ganha o selo Conferir. "
+            "O ponto continua na classificação (pode ser defeito em outro equipamento), mas pode ser lâmpada, estrutura ou reflexo: olhe antes de agir.",
             "<b>NETA MTS:</b> o critério americano (ΔT sobre o ar ambiente) pode ser carregado como modelo em Configurações.",
             "Mudou o critério ou a biblioteca? Todas as inspeções salvas são recalculadas.",
         ]),
         p("Máximas admissíveis de partida (biblioteca de componentes)", "h2"),
         tabela(["Componente", "MTA", "Fonte"], [
-            ["Conexões, terminais, pontos quentes", "90 °C", "Prática brasileira para componentes metálicos; IEC 62271-1 (100 a 115 °C conforme o contato)."],
+            ["Conexões, terminais, pontos quentes", "90 °C", "Prática brasileira para componentes metálicos; IEC 62271-1: conexão nua no ar 90 °C, estanhada 105 °C, prateada 115 °C."],
             ["Terminal de bucha", "95 °C", "IEC 60137: 55 K de elevação sobre 40 °C de ambiente."],
             ["Cabo isolado (PVC)", "70 °C", "NBR 5410 (XLPE/EPR: 90 °C)."],
             ["Tanque e radiador (óleo no topo)", "100 °C", "NBR 5356-2 / IEC 60076-2: 60 K sobre 40 °C."],
@@ -433,6 +447,8 @@ def conteudo() -> list:
         Spacer(1, 6),
         p("Os valores são de partida e ficam editáveis. Confira sempre com o dado do fabricante, a edição vigente da NBR 15866 e o termografista responsável.", "nota"),
     ]
+    c += figura("m_conferir.png", "Selo Conferir: a classificação Imediato vem de um ponto a 240 °C fora das peças identificadas (provável sol ou reflexo).")
+    c += figura("m_nao_avaliado.png", "Para-raio sozinho na imagem: o para-raio e as aletas ficam sem avaliação e o aviso pede as três fases juntas.")
 
     # 8
     c += secao(8, "Relatório de inspeção (PDF)", "Documento técnico")
@@ -461,8 +477,9 @@ def conteudo() -> list:
         lista([
             "<b>Tabela</b> (padrão) ou <b>miniaturas</b>; colunas com termograma, arquivo, data da captura, equipamento (link para a página "
             "dele), região crítica, máxima e severidade.",
-            "<b>Indicadores clicáveis</b> filtram por severidade; <b>busca</b> por arquivo, instalação ou equipamento; <b>ordem</b> por data da captura, "
-            "gravidade ou nome.",
+            "<b>Indicadores clicáveis</b> e o filtro (Críticas, Programar, Atenção, Normais, <b>Sem medida</b>) filtram por severidade; "
+            "<b>busca</b> por arquivo, instalação ou equipamento; <b>ordem</b> por data da captura, gravidade ou nome. O selo <b>Conferir</b> "
+            "aparece ao lado da severidade quando ela vem de calor fora das peças identificadas.",
             "<b>Marque várias</b> (caixa de seleção) para <b>Definir equipamento</b> de todas de uma vez ou <b>Gerar relatório</b> com todas.",
             "<b>Exportar planilha</b>: todas as inspeções em CSV que abre direto no Excel.",
         ]),
@@ -518,11 +535,40 @@ def conteudo() -> list:
             "Depois, reproduza no ritmo em que os quadros foram analisados (espaço, setas), pule pelo gráfico ou pelos momentos com anomalia "
             "e use <b>Salvar quadro como inspeção</b> para ter o laudo daquele instante.",
             "Os números da escala só passam pelo OCR quando mudam; com a escala travada na câmera, informe os limites e a leitura fica exata.",
+            "Usa a <b>versão rápida (INT8)</b> do modelo escolhido, quando ela existe: mais quadros analisados por segundo, com o mesmo acerto.",
         ]),
     ]
 
     # 13
-    c += secao(13, "Monitoramento e alertas", "Operação")
+    c += secao(13, "Câmera do celular", "Identificação ao vivo")
+    c += [
+        p("Aponte a câmera do celular para uma imagem térmica (na tela do computador, por exemplo) e o Pyron marca os componentes ao vivo, "
+          "sem instalar nada no celular. <b>Só identificação:</b> a foto do celular não traz os números do sensor nem a escala."),
+        tabela(["Passo", "O que fazer"], [
+            ["1", "Celular e computador no mesmo Wi-Fi."],
+            ["2", "No Pyron, <b>Câmera do celular › Ligar conexão com o celular</b> e leia o QR code com o celular."],
+            ["3", "O celular avisa que a conexão não é particular (o certificado é do próprio Pyron): <b>Avançado › Continuar</b>."],
+            ["4", "Permita a câmera e aponte. <b>Capturar</b> salva o quadro como inspeção Sem medida, com as peças marcadas."],
+        ], [16, LARGURA / mm - 16]),
+        Spacer(1, 6),
+    ]
+    c += figura("m_celular_pc.png", "No computador: o QR code e o link do celular, e o espelho ao vivo do que o celular vê, com as peças e o ritmo de análise.")
+    c += figura("m_celular.png", "No celular: área do termograma tracejada, peças com rótulos sem sobreposição e a legenda com a confiança.", 70 * mm)
+    c += [
+        lista([
+            "<b>Só olha o termograma:</b> antes de detectar, o Pyron acha no quadro a área com cara de paleta (cores fortes de várias matizes) "
+            "e manda só ela ao modelo. Sem termograma no quadro, nada é procurado. Em 76 fotos comuns, nenhuma peça falsa (olhando o quadro "
+            "inteiro, eram 367); no celular simulado filmando a tela, 79 de 79 peças.",
+            "Uma peça só aparece se surgir em <b>dois quadros seguidos</b>, com confiança de 50% ou mais. Segure o celular na mesma orientação da imagem.",
+            "<b>Zoom</b> 1×, 2× ou 3× (quando o celular permite) para encher a tela com o termograma sem chegar perto.",
+            "Segurança: um servidor à parte, só com as rotas do celular, em HTTPS, ouvindo a rede local só enquanto o modo está ligado e com um "
+            "código novo no link a cada vez. Na primeira vez o Windows pergunta se o Pyron pode usar a rede: permita em redes privadas.",
+            "Usa a versão rápida (INT8) do modelo: cerca de 0,25 s por quadro neste notebook, na tomada.",
+        ]),
+    ]
+
+    # 14
+    c += secao(14, "Monitoramento e alertas", "Operação")
     c += figura("m_monitor.png", "Estado do monitoramento, fonte das imagens, regra de alerta, responsáveis e a prévia da mensagem.")
     c += [
         lista([
@@ -542,21 +588,25 @@ def conteudo() -> list:
         ], [52, LARGURA / mm - 52]),
     ]
 
-    # 14
-    c += secao(14, "Modelos e avaliação", "Sistema")
-    c += figura("m_modelos.png", "Detectores disponíveis: a regra de pontos quentes, o modelo de para-raios e o combinado dos dois.")
+    # 15
+    c += secao(15, "Modelos e avaliação", "Sistema")
+    c += figura("m_modelos.png", "Detectores: a regra de pontos quentes, o modelo de para-raios e o combinado (recomendado), cada um com a versão rápida (INT8).")
     c += [
         lista([
             "<b>Pontos quentes (regra):</b> embutido, sem IA. Aponta trechos mais quentes que o equipamento em volta.",
             "<b>Modelos treinados (IA):</b> por exemplo, o RF-DETR de para-raios (terminal superior, aletas isoladoras, terminal inferior), "
             "com mAP50 de 0,89 no teste. <b>Modelo + pontos quentes</b> junta os dois: diz em qual peça está o calor e compara as fases.",
+            "<b>Recomendado:</b> o combinado (peças + pontos quentes). A regra sozinha não sabe o que é cada coisa e marca lâmpadas e estruturas.",
+            "<b>Versão rápida (INT8):</b> os pesos do modelo em 8 bits ({0}), sem treinar de novo: 1,5 vez mais rápida no processador, com o "
+            "mesmo acerto no teste (mAP50 0,859 nas duas). Aparece dentro do cartão do modelo; a câmera do celular e o vídeo já a usam.".format(
+                mono("python -m ml.otimizar modelos/&lt;id&gt; --dados &lt;dataset&gt;")),
             "<b>Treino:</b> rotule com caixas no CVAT, exporte em COCO 1.0 e siga o passo a passo da tela, aqui (com placa NVIDIA) ou no Colab.",
         ]),
     ]
     c += figura("m_avaliacao.png", "Avaliação: comparação dos detectores treinados (acertos, peças perdidas, curvas de treino e exemplos).")
 
-    # 15
-    c += secao(15, "Configurações", "Sistema")
+    # 16
+    c += secao(16, "Configurações", "Sistema")
     c += figura("m_identidade.png", "Empresa, logotipo e responsáveis técnicos cadastrados.")
     c += [
         tabela(["Aba", "O que dá para ajustar"], [
@@ -572,8 +622,8 @@ def conteudo() -> list:
     c += figura("m_criterio.png", "Critério de severidade em quatro grupos, com os modelos Brasil (NBR 15866) e NETA MTS.")
     c += figura("m_componentes.png", "Biblioteca de componentes: tipo de aquecimento, MTA editável e a fonte de cada valor.")
 
-    # 16
-    c += secao(16, "Dados, backup e instalação", "Sistema")
+    # 17
+    c += secao(17, "Dados, backup e instalação", "Sistema")
     c += figura("m_dados.png", "Dados e sistema: pastas, espaço ocupado, versão e o backup.")
     c += [
         lista([
@@ -585,12 +635,14 @@ def conteudo() -> list:
         ]),
     ]
 
-    # 17
-    c += secao(17, "Limitações e próximos passos", "Roteiro", nova_pagina=False)
+    # 18
+    c += secao(18, "Limitações e próximos passos", "Roteiro", nova_pagina=False)
     c += [
         p("Limitações desta versão", "h2"),
         lista([
-            "Detector de IA só para para-raios; para os outros equipamentos, a regra de pontos quentes dá uma classificação indicativa.",
+            "Detector de IA só para para-raios, treinado com fotos de uma só subestação; falta validar com termografistas em outros lugares.",
+            "Para os outros equipamentos, a regra de pontos quentes dá uma classificação indicativa.",
+            "A câmera do celular só identifica: a foto do celular não traz temperatura.",
             "As máximas admissíveis e as faixas precisam ser conferidas na edição vigente da NBR 15866, com os fabricantes e com termografista certificado.",
             "A tendência só é confiável comparando inspeções em condições parecidas, ou com ambiente e carga informados (série a plena carga).",
             "Na imagem só colorida, o ponto quente precisa estar dentro da escala de cores.",
@@ -598,8 +650,9 @@ def conteudo() -> list:
         ]),
         p("Próximos passos", "h2"),
         lista([
-            "<b>Previsão com carga e clima</b> integrados (histórico de carga do SCADA) e tempo até ficar crítico com intervalo de confiança.",
+            "<b>Validação em campo:</b> comparar com laudos de termografistas em outras subestações.",
             "<b>Detectores</b> para transformador, disjuntor e seccionadora.",
+            "<b>Previsão com carga e clima</b> integrados (histórico de carga do SCADA) e tempo até ficar crítico com intervalo de confiança.",
             "<b>Câmeras fixas:</b> conexão direta RTSP/ONVIF e FLIR Atlas SDK; <b>avisos</b> automáticos no WhatsApp e no celular.",
             "<b>Gêmeo térmico do transformador</b> (IEC 60076-7) e perda de vida da isolação.",
         ]),
@@ -633,6 +686,10 @@ def conteudo() -> list:
               ["Pendência", "Anomalia em acompanhamento, com prazo, ordem de serviço e situação."],
               ["OS", "Ordem de serviço da manutenção que vai corrigir a anomalia."],
               ["Indicativa", "Classificação sem referência completa (ambiente, carga ou fase semelhante)."],
+              ["Não avaliado", "Peça que só se compara com a igual de outra fase (para-raio, isolador), sozinha na imagem."],
+              ["Sem medida", "Inspeção sem temperatura: imagem sem dados radiométricos nem escala legível, ou foto do celular."],
+              ["Conferir", "A severidade vem de calor fora das peças identificadas: confirme na imagem antes de agir."],
+              ["INT8", "Versão rápida de um modelo, com os pesos em 8 bits."],
           ], [32, LARGURA / mm - 32])]
     return c
 

@@ -25,15 +25,15 @@ COMPONENTES_PADRAO: dict[str, dict] = {
     },
     "conexao": {
         "nome": "Conexão", "aquecimento": "resistivo", "mta_c": 90.0,
-        "fonte": "90 °C (prática brasileira). IEC 62271-1: 100 °C nua, 105 °C estanhada, 115 °C prateada.",
+        "fonte": "90 °C (prática brasileira). IEC 62271-1: conexão aparafusada no ar 90 °C nua, 105 °C estanhada, 115 °C prateada (conferir na edição vigente).",
     },
     "terminal_superior": {
         "nome": "Terminal superior", "aquecimento": "resistivo", "mta_c": 90.0,
-        "fonte": "90 °C (prática brasileira). IEC 62271-1: terminal nu 100 °C.",
+        "fonte": "90 °C (prática brasileira). IEC 62271-1: terminal nu 90 °C, revestido 105 °C (conferir na edição vigente).",
     },
     "terminal_inferior": {
         "nome": "Terminal inferior", "aquecimento": "resistivo", "mta_c": 90.0,
-        "fonte": "90 °C (prática brasileira). IEC 62271-1: terminal nu 100 °C.",
+        "fonte": "90 °C (prática brasileira). IEC 62271-1: terminal nu 90 °C, revestido 105 °C (conferir na edição vigente).",
     },
     "bucha": {
         "nome": "Bucha (terminal)", "aquecimento": "resistivo", "mta_c": 95.0,
