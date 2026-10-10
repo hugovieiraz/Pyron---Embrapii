@@ -101,6 +101,30 @@ que verifica a correção. O Painel mostra as pendências vencidas e as próxima
   CSV que abre direto no Excel em português.
 - **Busca rápida (Ctrl+K)** por inspeção, equipamento, tela ou ação, e **?** para os atalhos.
 
+## Câmera do celular
+
+Aponte a câmera do celular para uma imagem térmica (na tela do computador, por exemplo) e o Pyron
+marca os componentes ao vivo, sem instalar nada no celular. Só identificação: a foto do celular não
+traz os números do sensor nem a escala.
+
+1. Celular e computador no mesmo Wi-Fi.
+2. No Pyron, **Câmera do celular › Ligar conexão com o celular**, e leia o QR code com o celular.
+3. O celular avisa que a conexão não é particular (o certificado é do próprio Pyron): **Avançado › Continuar**.
+4. Permita a câmera e aponte. **Capturar** salva o quadro como inspeção "Sem medida", com as peças marcadas.
+   O computador mostra ao vivo o que o celular está vendo.
+
+Por dentro: um segundo servidor, só com as rotas do celular (ninguém na rede alcança inspeções,
+backups ou configurações), em HTTPS, porque o navegador só libera a câmera assim. Ele ouve a rede
+local só enquanto o modo está ligado, com um código novo no link a cada vez. O certificado é gerado
+com o OpenSSL que vem com o Git para Windows. Na primeira vez, o Windows pergunta se o Pyron pode
+usar a rede: permita em redes privadas. Usa o modelo que olha a imagem colorida (o de para-raios).
+
+Simulação de celular filmando a tela (moldura, perspectiva, moiré, cor e tremor), 20 imagens de
+para-raios: 77 das 79 peças achadas no arquivo original apareceram também no quadro do celular. São
+imagens do conjunto em que o modelo foi treinado, então o número real tende a ser menor; o celular
+precisa estar na mesma orientação da imagem. Velocidade neste notebook, na tomada: 0,5 a 0,7 s por
+quadro (1,5 a 2 análises por segundo).
+
 ## Imagens sem temperatura
 
 Nem toda imagem térmica traz temperatura. De onde ela sai, em ordem de confiança:

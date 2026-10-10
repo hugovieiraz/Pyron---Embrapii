@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E1330">
+<title>Pyron · câmera do celular</title>
+<link rel="icon" href="/e/marca/icone-192.png">
+<link rel="stylesheet" href="/e/tokens.css">
+<link rel="stylesheet" href="/e/celular.css">
+</head>
+<body>
+<main class="cel" id="cel">
+  <video id="video" playsinline muted autoplay></video>
+  <img class="cel-foto" id="foto-img" alt="Foto enviada ao Pyron" hidden>
+  <div class="cel-caixas" id="caixas" aria-hidden="true"></div>
+  <div class="cel-flash" id="flash"></div>
+
+  <header class="cel-topo">
+    <img class="cel-logo" src="/e/marca/icone-192.png" alt="">
+    <div class="cel-titulo"><b>Pyron</b><span id="modelo">Câmera do celular</span></div>
+    <span class="cel-status" id="status" role="status"><i></i><span>Conectando</span></span>
+  </header>
+
+  <section class="cel-inicio" id="inicio">
+    <h1>Câmera do celular</h1>
+    <p>Aponte para uma imagem térmica, por exemplo na tela do computador. O Pyron marca os componentes ao vivo.</p>
+    <p class="cel-nota">Só identificação: a foto do celular não traz temperatura.</p>
+    <button class="cel-btn" type="button" id="btn-iniciar">Ligar a câmera</button>
+    <button class="cel-btn cel-btn-contorno" type="button" id="btn-foto" hidden>Tirar foto</button>
+    <p class="cel-nota cel-nota-erro" id="inicio-nota" role="alert"></p>
+  </section>
+
+  <footer class="cel-base" id="base" hidden>
+    <p class="cel-lista" id="lista" aria-live="polite"></p>
+    <div class="cel-controles">
+      <button class="cel-redondo" type="button" id="btn-pausar" aria-pressed="false">Pausar</button>
+      <button class="cel-captura" type="button" id="btn-capturar" aria-label="Capturar e salvar no Pyron"><i></i></button>
+      <span class="cel-redondo cel-ritmo" id="ritmo" title="Análises por segundo">–</span>
+    </div>
+  </footer>
+
+  <div class="cel-aviso" id="aviso" role="status" hidden></div>
+  <input type="file" id="arquivo-foto" accept="image/*" capture="environment" hidden>
+</main>
+<script src="/e/textos.js"></script>
+<script src="/e/celular.js"></script>
+</body>
+</html>

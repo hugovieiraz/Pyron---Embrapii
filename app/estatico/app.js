@@ -7,7 +7,7 @@
 const $ = (s, raiz = document) => raiz.querySelector(s);
 const $$ = (s, raiz = document) => [...raiz.querySelectorAll(s)];
 const T = TEXTOS;
-const VERSAO_INTERFACE = "0.7.1"; // igual a VERSAO em app/servidor.py
+const VERSAO_INTERFACE = "0.7.2"; // igual a VERSAO em app/servidor.py
 
 function el(tag, props = {}, ...filhos) {
   const n = document.createElement(tag);
@@ -286,7 +286,7 @@ midiaEscura.addEventListener("change", () => {
   if (document.documentElement.dataset.temaEscolhido === "sistema") aplicarTema("sistema");
 });
 
-const VISTAS = ["painel", "analise", "video", "inspecoes", "equipamentos", "pendencias", "monitoramento", "modelos", "avaliacao", "configuracoes", "sobre"];
+const VISTAS = ["painel", "analise", "video", "celular", "inspecoes", "equipamentos", "pendencias", "monitoramento", "modelos", "avaliacao", "configuracoes", "sobre"];
 
 function mostrarVista(vista) {
   const trocou = estado.vista !== vista;
@@ -374,6 +374,146 @@ function rota() {
     else mostrarInicioVideo();
   } else {
     pararVideo();
+  }
+  if (vista === "celular") carregarCelular();
+  else pararRelogioCelular();
+}
+
+// ================================================================= câmera do celular
+
+const INTERVALO_CELULAR_MS = 800; // espelho do que o celular vê: o detector faz ~1,5 quadro/s
+
+async function carregarCelular() {
+  const caixa = $("#celular-conteudo");
+  if (!caixa.childElementCount) caixa.replaceChildren(el("div", { class: "cartao" }, esqueleto.linhas(5)));
+  try {
+    desenharCelular(await api("/api/celular"));
+  } catch (e) {
+    caixa.replaceChildren(estadoErro(T.celular.erroTitulo, e, carregarCelular));
+  }
+}
+
+function pararRelogioCelular() {
+  clearInterval(estado.relogioCelular);
+  estado.relogioCelular = null;
+}
+
+/** Desligado: como conectar. Ligado: QR code e link à esquerda, o que o celular vê à direita. */
+function desenharCelular(c) {
+  const C = T.celular;
+  const caixa = $("#celular-conteudo");
+  pararRelogioCelular();
+  $("#nav-celular-ponto").hidden = !c.ligado;
+  estado.seqCelular = null;
+  if (!c.ligado) {
+    const semModelo = c.modelo && c.modelo.erro;
+    const botao = el("button", { class: "btn btn-primaria", type: "button", disabled: semModelo ? true : null, onclick: (ev) => ligarCelular(ev.currentTarget) }, icone("ligar"), C.ligar);
+    caixa.replaceChildren(el("div", { class: "cartao celular-ligar" },
+      el("h2", {}, C.comoTitulo),
+      el("ol", { class: "celular-passos" }, ...C.passos.map((p) => el("li", {}, p))),
+      semModelo
+        ? el("ul", { class: "avisos" }, el("li", {}, icone("alerta"), el("span", {}, c.modelo.erro)))
+        : el("p", { class: "nota" }, C.modeloUsado(c.modelo.nome)),
+      el("div", { class: "acoes" }, botao),
+      el("p", { class: "nota" }, C.notaRede)));
+    return;
+  }
+  caixa.replaceChildren(el("div", { class: "celular-grade" },
+    el("div", { class: "cartao celular-conectar" },
+      el("h2", {}, C.abraTitulo),
+      el("img", { class: "celular-qr", src: `/api/celular/qr.png?v=${encodeURIComponent(c.url)}`, alt: C.qrAlt }),
+      el("div", { class: "celular-link" },
+        el("code", { class: "celular-url" }, c.url),
+        el("button", { class: "btn btn-sm btn-fantasma", type: "button", onclick: () => copiarTexto(c.url) }, icone("copiar"), C.copiar)),
+      el("p", { class: "nota" }, C.avisoCertificado),
+      el("div", { class: "linha-estado", id: "celular-status" }),
+      el("p", { class: "nota" }, C.naoConectou),
+      el("div", { class: "acoes" }, el("button", { class: "btn", type: "button", onclick: (ev) => desligarCelular(ev.currentTarget) }, icone("x"), C.desligar))),
+    el("div", { class: "cartao" },
+      el("div", { class: "cartao-cabeca" }, tituloComIcone("celular", C.espelhoTitulo), el("span", { class: "nota num", id: "celular-ritmo" })),
+      el("div", { id: "celular-espelho" }),
+      el("div", { class: "celular-achados", id: "celular-achados" }))));
+  atualizarEspelho(c);
+  estado.relogioCelular = setInterval(atualizarCelular, INTERVALO_CELULAR_MS);
+}
+
+async function atualizarCelular() {
+  if (estado.vista !== "celular") return pararRelogioCelular();
+  try {
+    const c = await api("/api/celular");
+    if (!c.ligado) return desenharCelular(c);
+    atualizarEspelho(c);
+  } catch {
+    // a faixa "sem conexão" do topo já avisa; tenta de novo no próximo ciclo
+  }
+}
+
+function atualizarEspelho(c) {
+  const C = T.celular;
+  const u = c.ultimo;
+  $("#celular-status").replaceChildren(el("span", { class: `ponto${c.conectado ? " ok" : ""}` }),
+    el("span", {}, c.conectado ? C.conectado : u ? C.desconectado(fmt(u.ha_s, 0)) : C.esperando));
+  $("#celular-ritmo").textContent = u && c.conectado && u.analises_por_s != null ? C.ritmoPc(fmt(u.analises_por_s, 1), u.ms) : "";
+  const capturas = c.capturas
+    ? [el("span", { class: "nota" }, C.capturas(c.capturas)), el("a", { class: "btn btn-sm btn-fantasma", href: "#inspecoes" }, C.verInspecoes)]
+    : [];
+  const espelho = $("#celular-espelho");
+  if (!u) {
+    if (!espelho.querySelector(".vazio")) {
+      espelho.replaceChildren(estadoVazio({ nomeIcone: "celular", titulo: C.esperandoTitulo, texto: C.esperandoTexto, compacto: true }));
+    }
+    $("#celular-achados").replaceChildren(...capturas);
+    return;
+  }
+  if (estado.seqCelular === u.seq) return;
+  estado.seqCelular = u.seq;
+  const pct = (v) => `${v * 100}%`;
+  const img = new Image();
+  img.onload = () => {
+    let quadro = espelho.querySelector(".celular-quadro");
+    if (!quadro) {
+      quadro = el("div", { class: "celular-quadro" }, el("img", { alt: C.espelhoAlt }), el("div", { class: "celular-caixas" }));
+      espelho.replaceChildren(quadro);
+    }
+    $("img", quadro).src = img.src;
+    $(".celular-caixas", quadro).replaceChildren(...u.deteccoes.map((d) =>
+      el("div", { class: "celular-caixa", style: { left: pct(d.caixa[0]), top: pct(d.caixa[1]), width: pct(d.caixa[2] - d.caixa[0]), height: pct(d.caixa[3] - d.caixa[1]) } },
+        el("span", {}, C.rotulo(d.nome, Math.round(d.confianca * 100))))));
+    $("#celular-achados").replaceChildren(
+      ...(u.deteccoes.length ? u.deteccoes.map((d) => el("span", { class: "etiqueta" }, C.rotulo(d.nome, Math.round(d.confianca * 100)))) : [el("span", { class: "nota" }, C.nenhumNoQuadro)]),
+      ...capturas);
+  };
+  img.src = `/api/celular/quadro.jpg?seq=${u.seq}`;
+}
+
+async function ligarCelular(botao) {
+  ocupado(botao, true);
+  try {
+    desenharCelular(await api("/api/celular/ligar", { method: "POST" }));
+  } catch (e) {
+    avisar(e.message, { erro: true });
+  } finally {
+    ocupado(botao, false);
+  }
+}
+
+async function desligarCelular(botao) {
+  ocupado(botao, true);
+  try {
+    desenharCelular(await api("/api/celular/desligar", { method: "POST" }));
+    avisar(T.celular.desligado);
+  } catch (e) {
+    avisar(e.message, { erro: true });
+    ocupado(botao, false);
+  }
+}
+
+async function copiarTexto(texto) {
+  try {
+    await navigator.clipboard.writeText(texto);
+    avisar(T.geral.copiado);
+  } catch {
+    avisar(T.geral.naoCopiou, { erro: true });
   }
 }
 
@@ -2779,6 +2919,7 @@ function preencherCabecalho() {
     ? el("span", { class: "etiqueta sem-medida" }, T.analise.semTemperatura)
     : el("span", { class: `etiqueta ${a.radiometrica ? "medida" : "estimada"}` }, a.radiometrica ? T.analise.medida : T.analise.estimada)];
   if (a.fonte === "monitoramento") e.push(el("span", { class: "etiqueta info" }, icone("camera"), T.analise.monitor));
+  if (a.fonte === "celular") e.push(el("span", { class: "etiqueta info" }, icone("celular"), T.analise.doCelular));
   if (a.metadados.camera && a.metadados.camera !== "desconhecida") e.push(el("span", { class: "etiqueta" }, a.metadados.camera));
   if (a.metadados.data_hora) e.push(el("span", { class: "etiqueta" }, icone("calendario"), dataHora(a.metadados.data_hora)));
   e.push(el("span", { class: "etiqueta" }, a.modelo.nome));
@@ -3220,7 +3361,7 @@ function preencherInformarEscala(a) {
   caixa.hidden = a.radiometrica || (!a.sem_temperatura && lida.length !== 2);
   if (caixa.hidden) return caixa.replaceChildren();
   const cabeca = (texto) => el("div", { class: "escala-informar-cabeca" }, icone("info"), el("div", {}, el("b", {}, A.semTemperaturaTitulo), el("p", {}, texto)));
-  if (semBarra) return caixa.replaceChildren(cabeca(A.semTemperaturaSemBarra));
+  if (semBarra) return caixa.replaceChildren(cabeca(a.fonte === "celular" ? A.semTemperaturaCelular : A.semTemperaturaSemBarra));
   const campo = (rotulo, valor) => el("input", { type: "number", step: "0.1", required: true, value: valor ?? "", "aria-label": rotulo });
   const min = campo(A.escalaMinima, lida[0]);
   const max = campo(A.escalaMaxima, lida[1]);

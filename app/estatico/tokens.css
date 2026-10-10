@@ -143,6 +143,7 @@
   --alvo: 40px;         /* altura de botão e campo */
   --alvo-sm: 32px;      /* compacto, dentro de tabelas e cartões */
   --alvo-toque: 44px;   /* mínimo em telas de toque */
+  --botao-captura: 72px; /* botão de capturar na página do celular */
   --ic: 16px;
   --ic-g: 20px;
   --ponto: 8px;         /* bolinha de status */
@@ -156,6 +157,9 @@
   --col-g: 360px;
   --col-lateral: 300px;      /* coluna lateral de apoio */
   --col-num: 128px;          /* campo numérico com unidade */
+  --col-celular: 380px;      /* coluna do QR code na tela Câmera do celular */
+  --largura-qr: 240px;       /* QR code do link do celular */
+  --altura-espelho: 560px;   /* quadro do celular espelhado no computador */
   --miniatura: 64px;         /* termograma pequeno em tabela */
   --logo-g: 220px;
   --dialogo: 520px;

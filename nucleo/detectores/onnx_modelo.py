@@ -26,6 +26,7 @@ colorida e a matriz cobrem o mesmo campo de visão.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import numpy as np
@@ -72,7 +73,13 @@ class DetectorONNX(Detector):
         if self._sessao is None:
             import onnxruntime as ort
 
-            self._sessao = ort.InferenceSession(str(self.arquivo), providers=["CPUExecutionProvider"])
+            # Metade dos núcleos e sem espera ativa: com o processador livre fica igual ou mais rápido
+            # (455 × 498 ms neste notebook) e, dividindo o processador com o navegador ou o vídeo,
+            # não desaba (728 × 1042 ms). Com todos os núcleos em espera ativa, as linhas brigam entre si.
+            opcoes = ort.SessionOptions()
+            opcoes.intra_op_num_threads = max(1, (os.cpu_count() or 2) // 2)
+            opcoes.add_session_config_entry("session.intra_op.allow_spinning", "0")
+            self._sessao = ort.InferenceSession(str(self.arquivo), opcoes, providers=["CPUExecutionProvider"])
         return self._sessao
 
     # ---------------------------------------------------------------- entrada

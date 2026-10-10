@@ -27,7 +27,7 @@ from fastapi.staticfiles import StaticFiles
 from PIL import Image
 
 from app import avaliacoes as avaliacoes_mod
-from app import backup
+from app import backup, celular
 from app import equipamentos
 from app import laudo, monitoramento, pendencias
 from app import treinos as treinos_mod
@@ -35,7 +35,7 @@ from app import videos as videos_mod
 from app.armazenamento import Armazenamento, _destaque
 from nucleo import analise, detectores, entrada, referencias, render, video
 
-VERSAO = "0.7.1"
+VERSAO = "0.7.2"
 RAIZ = Path(__file__).resolve().parents[1]
 PASTA_APP = Path(__file__).resolve().parent
 # PYRON_DADOS (ou app.iniciar --dados) aponta outra pasta: demonstrações e testes sem tocar nas inspeções reais.
@@ -278,10 +278,10 @@ def _validar_medicoes(lista, matriz: np.ndarray) -> list[dict]:
 
 
 def _nova_analise(dados: bytes, nome: str, modelo: str | None, fonte: str = "manual", identificacao: dict | None = None,
-                  limites: tuple[float, float] | None = None) -> dict:
+                  limites: tuple[float, float] | None = None, somente_imagem: bool = False) -> dict:
     t0 = perf_counter()
     try:
-        img = entrada.carregar(dados, ocr=ocr, limites=limites)
+        img = entrada.carregar(dados, ocr=ocr, limites=limites, somente_imagem=somente_imagem)
     except ValueError as erro:
         raise HTTPException(422, str(erro)) from erro
     t1 = perf_counter()
@@ -1391,6 +1391,90 @@ def whatsapp_alerta(id_: str) -> dict:
         raise HTTPException(404, "Alerta não encontrado.")
     destinatarios = _config()["monitoramento"].get("destinatarios", [])
     return {"mensagem": alerta["mensagem"], "links": monitoramento.links_whatsapp(alerta["mensagem"], destinatarios)}
+
+
+# ---------------------------------------------------------------- câmera do celular
+
+
+def _detector_imagem() -> detectores.Detector:
+    """O modelo que olha a imagem colorida: o ativo, se for um; senão o primeiro instalado.
+
+    A foto do celular não tem temperatura, então a regra de pontos quentes não acha nada nela.
+    """
+    ativo = _detector(None)
+    if isinstance(ativo, detectores.Combinado):
+        ativo = ativo.partes[0]
+    if ativo.precisa_imagem and ativo.tipo == "aprendizado":
+        return ativo
+    for d in detectores.listar(PASTA_MODELOS):
+        if d.precisa_imagem and d.tipo == "aprendizado":
+            return d
+    raise ValueError("Nenhum modelo que olha a imagem colorida está instalado. Instale um em Modelos "
+                     "(o de para-raios, por exemplo).")
+
+
+def _celular_modelo() -> dict:
+    det = _detector_imagem()
+    return {"id": det.id, "nome": det.nome}
+
+
+def _celular_detectar(rgb: np.ndarray) -> tuple[list[dict], dict]:
+    det = _detector_imagem()
+    h, w = rgb.shape[:2]
+    saida = []
+    for d in det.detectar(np.zeros((h, w), dtype=np.float32), rgb):
+        nome = det.nomes.get(d.classe) or NOMES_CLASSES.get(d.classe, d.classe)
+        saida.append({"classe": d.classe, "nome": nome, "confianca": round(float(d.confianca), 3),
+                      "caixa": [float(v) for v in d.caixa]})
+    return saida, _celular_modelo()
+
+
+def _celular_capturar(dados: bytes, nome: str) -> dict:
+    det = _detector_imagem()
+    with _trava:
+        a = _nova_analise(dados, nome, det.id, fonte="celular", somente_imagem=True)
+    return {"id": a["id"], "arquivo": a["arquivo"], "regioes": len(a["regioes"]), "nomes": [r["nome"] for r in a["regioes"]]}
+
+
+celular_modo = celular.ModoCelular(PASTA_DADOS / "celular", _celular_detectar, _celular_capturar, _celular_modelo)
+
+
+@app.get("/api/celular")
+def celular_estado() -> dict:
+    return celular_modo.estado()
+
+
+@app.post("/api/celular/ligar")
+def celular_ligar() -> dict:
+    """Abre o servidor do celular na rede local (HTTPS, só as rotas do celular, com código no link)."""
+    try:
+        _detector_imagem()
+        celular_modo.ligar()
+    except ValueError as erro:
+        raise HTTPException(409, str(erro)) from erro
+    except (RuntimeError, OSError) as erro:
+        raise HTTPException(503, str(erro)) from erro
+    return celular_modo.estado()
+
+
+@app.post("/api/celular/desligar")
+def celular_desligar() -> dict:
+    celular_modo.desligar()
+    return celular_modo.estado()
+
+
+@app.get("/api/celular/qr.png")
+def celular_qr() -> Response:
+    if not celular_modo.url:
+        raise HTTPException(404, "O modo celular está desligado.")
+    return Response(celular.qr_png(celular_modo.url), media_type="image/png", headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/celular/quadro.jpg")
+def celular_quadro() -> Response:
+    if not celular_modo.ultimo.jpeg:
+        raise HTTPException(404, "Nenhum quadro do celular ainda.")
+    return Response(celular_modo.ultimo.jpeg, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
 
 
 # ---------------------------------------------------------------- ciclo de vida (janela do aplicativo)

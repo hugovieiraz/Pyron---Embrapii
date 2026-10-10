@@ -110,8 +110,16 @@ def _reduzir(mapa: np.ndarray, fator: int) -> np.ndarray:
         return np.nanmedian(blocos, axis=2).astype(np.float32)
 
 
-def carregar(dados: bytes, ocr=None, limites: tuple[float, float] | None = None, ajustes: dict | None = None) -> ImagemTermica:
+AVISO_CELULAR = ("Foto da câmera do celular: o Pyron identifica os componentes, mas a foto não traz temperatura. "
+                 "Para medir, use o arquivo original da câmera térmica.")
+
+
+def carregar(dados: bytes, ocr=None, limites: tuple[float, float] | None = None, ajustes: dict | None = None,
+             somente_imagem: bool = False) -> ImagemTermica:
     """Abre a imagem e devolve a temperatura de cada pixel.
+
+    ``somente_imagem`` (câmera do celular) pula a temperatura: as cores de uma foto de tela não são
+    as da câmera térmica, então nem a leitura pela barra seria confiável.
 
     ``ocr`` só é usado quando a imagem não é radiométrica (para ler os limites da escala).
     ``limites`` (mínimo, máximo) já conhecidos da escala dispensam o OCR, como num quadro de vídeo.
@@ -127,6 +135,8 @@ def carregar(dados: bytes, ocr=None, limites: tuple[float, float] | None = None,
     data = _data_exif(img)
     modelo_exif = str(img.getexif().get(272, "") or "")
     orientacao = int(img.getexif().get(274, 1) or 1)
+    if somente_imagem:
+        return _sem_temperatura(rgb, data, modelo_exif, orientacao, barra=False, aviso=AVISO_CELULAR)
 
     try:
         termo = flir.ler_bytes(dados, **(ajustes or {}))
@@ -184,7 +194,7 @@ def carregar(dados: bytes, ocr=None, limites: tuple[float, float] | None = None,
 
 
 def _sem_temperatura(rgb: np.ndarray, data: str, modelo_exif: str, orientacao: int, barra: bool,
-                     lidos: tuple[float | None, float | None] = (None, None)) -> ImagemTermica:
+                     lidos: tuple[float | None, float | None] = (None, None), aviso: str | None = None) -> ImagemTermica:
     """Imagem sem caminho até a temperatura: segue só com a identificação dos componentes.
 
     A matriz tem o mesmo tamanho da estimada pela paleta, para que as caixas continuem valendo se
@@ -197,6 +207,7 @@ def _sem_temperatura(rgb: np.ndarray, data: str, modelo_exif: str, orientacao: i
     else:
         motivo = ("A imagem não tem dados radiométricos nem barra de cores com escala. Os componentes foram "
                   "identificados, mas a temperatura só vem do JPEG original da câmera.")
+    motivo = aviso or motivo
     return ImagemTermica(
         temperatura_c=orientar(np.full((h, w), np.nan, dtype=np.float32), orientacao),
         radiometrica=False,
