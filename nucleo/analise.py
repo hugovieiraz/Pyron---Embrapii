@@ -31,9 +31,12 @@ NIVEIS = {
     "programar": {"ordem": 2, "rotulo": "Programar reparo", "acao": "Agendar a correção e reinspecionar."},
     "urgente": {"ordem": 3, "rotulo": "Urgente", "acao": "Corrigir o mais rápido possível."},
     "imediato": {"ordem": 4, "rotulo": "Imediato", "acao": "Corrigir imediatamente."},
+    # Para-raio ou isolador sem a peça igual de outra fase na imagem: não há com o que comparar.
+    "nao_avaliado": {"ordem": -1, "rotulo": "Não avaliado", "acao": "Fotografar junto a mesma peça das outras fases para comparar."},
     # Sem pixel com temperatura (imagem sem dados radiométricos nem escala): não é "normal".
-    "sem_medida": {"ordem": -1, "rotulo": "Sem medida", "acao": "Medir com o JPEG radiométrico ou informar a escala."},
+    "sem_medida": {"ordem": -2, "rotulo": "Sem medida", "acao": "Medir com o JPEG radiométrico ou informar a escala."},
 }
+SEM_CLASSIFICACAO = ("normal", "sem_medida", "nao_avaliado")  # não são anomalias: não viram pendência nem achado
 
 # Faixas brasileiras (NBR 15866 + Infraspection Institute, conforme prática de concessionárias).
 CRITERIOS_PADRAO = {
@@ -409,7 +412,11 @@ def analisar_regioes(
             if crit.get("usar_ambiente"):
                 item["niveis"]["ambiente"] = nivel_por_limites(item["dt_ambiente"], crit["ambiente"])
 
-        item["severidade"] = pior(item["niveis"].values())
+        if dieletrico and not item["niveis"]:
+            # Para-raio e isolador só se comparam com a peça igual: sem ela, nada foi avaliado (não é "normal").
+            item["severidade"] = "nao_avaliado"
+        else:
+            item["severidade"] = pior(item["niveis"].values())
         if item["severidade"] != "normal":
             item["criterio_disparo"] = [ROTULOS_CRITERIO[k] for k, v in item["niveis"].items() if v == item["severidade"]]
 
@@ -417,20 +424,27 @@ def analisar_regioes(
         n = NIVEIS[item["severidade"]]
         item["severidade_rotulo"], item["acao"] = n["rotulo"], n["acao"]
         # Indicativa: sem semelhante para comparar e sem projeção para plena carga.
-        item["indicativa"] = (item["severidade"] != "sem_medida" and "semelhantes" not in item.get("niveis", {})
+        item["indicativa"] = (item["severidade"] not in ("sem_medida", "nao_avaliado") and "semelhantes" not in item.get("niveis", {})
                               and item.get("avaliacao_absoluta") in (None, "sem_ambiente"))
 
     validos = temperatura[np.isfinite(temperatura)]
     if not validos.size:
         return saida, _resumo_sem_temperatura(saida, crit, fator_carga)
     sev = pior(i["severidade"] for i in saida)
-    criticos = [i for i in saida if i["severidade"] == sev and sev not in ("normal", "sem_medida")]
+    criticos = [i for i in saida if i["severidade"] == sev and sev not in SEM_CLASSIFICACAO]
     if sev == "normal":
         mensagem = "Nenhuma região acima dos limites do critério."
+    elif sev == "nao_avaliado":
+        mensagem = "Nenhuma peça pôde ser avaliada: falta a peça igual de outra fase para comparar."
     elif sev == "sem_medida":
         mensagem = "As regiões marcadas não têm pixels com temperatura."
     else:
         mensagem = _mensagem(sev, criticos)
+    nao_avaliadas = [i["nome"] for i in saida if i["severidade"] == "nao_avaliado"]
+    if nao_avaliadas:
+        nomes = ", ".join(nao_avaliadas[:4]) + ("…" if len(nao_avaliadas) > 4 else "")
+        avisos.append(f"Sem avaliação: {nomes}. Para-raios e isoladores só se comparam com a mesma peça das outras "
+                      "fases; fotografe as três juntas.")
     if saida and ambiente_c is None and any(i["referencia"]["mta_c"] and i["referencia"]["aquecimento"] != "dieletrico" for i in saida):
         avisos.append(
             "Sem temperatura ambiente, a comparação com a MTA usa a temperatura medida, sem projeção para plena carga. "
@@ -454,6 +468,15 @@ def analisar_regioes(
         fora = ponto_mais_quente["mais_quente_fora"]
         valor = f"{fora['t_max']:.1f}".replace(".", ",")
         avisos.append(f"Há um ponto mais quente fora das peças identificadas: {fora['regiao']['nome']}, {valor} °C.")
+    # A severidade vem só de pontos quentes fora das peças que o modelo achou: pode ser defeito num equipamento
+    # que o modelo não conhece, ou uma lâmpada, a estrutura, um reflexo. Não some da classificação (deixar
+    # passar um defeito é pior), mas pede o olhar de alguém antes de agir.
+    decisivas = [i for i in saida if i["severidade"] == sev]
+    conferir = (sev not in SEM_CLASSIFICACAO and bool(decisivas)
+                and all(i.get("classe") == PONTO_QUENTE and "componente" in i and not i["componente"] for i in decisivas))
+    if conferir:
+        avisos.insert(0, "Confira antes de agir: a classificação vem de um ponto quente fora das peças identificadas. "
+                         "Pode ser defeito em outro equipamento, ou uma lâmpada, a estrutura ou um reflexo.")
     resumo = {
         "ponto_mais_quente": ponto_mais_quente,
         "comparacao_componentes": comparacao,
@@ -467,6 +490,8 @@ def analisar_regioes(
         "fator_carga": fator_carga,
         "avisos": avisos,
         "criterio": crit["nome"],
+        **({"conferir": True} if conferir else {}),
+        **({"nao_avaliadas": len(nao_avaliadas)} if nao_avaliadas else {}),
     }
     return saida, resumo
 

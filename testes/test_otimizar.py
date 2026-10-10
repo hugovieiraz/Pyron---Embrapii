@@ -66,3 +66,18 @@ def test_celular_prefere_a_versao_rapida_do_modelo_escolhido(monkeypatch) -> Non
     assert servidor._detector_imagem() is outro  # sem versão rápida, fica o escolhido
     monkeypatch.setattr(servidor, "_detector", lambda _id: rapido)
     assert servidor._detector_imagem() is rapido
+
+
+def test_video_usa_a_versao_rapida_tambem_do_modelo_combinado(monkeypatch) -> None:
+    from app import servidor
+    from nucleo import detectores
+    from nucleo.detectores.pontos_quentes import PontosQuentes
+
+    pontos = PontosQuentes()
+    original, rapido = _Imagem("pr"), _Imagem("pr-int8", {"origem": "pr"})
+    comb, comb_rapido = detectores.Combinado(original, pontos), detectores.Combinado(rapido, pontos)
+    monkeypatch.setattr(detectores, "listar", lambda _pasta=None: [pontos, original, rapido, comb, comb_rapido])
+    assert servidor._versao_rapida(comb) is comb_rapido
+    assert servidor._versao_rapida(original) is rapido
+    assert servidor._versao_rapida(pontos) is pontos  # regra não tem versão rápida
+    assert servidor._versao_rapida(comb_rapido) is comb_rapido

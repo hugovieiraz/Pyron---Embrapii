@@ -7,7 +7,7 @@
 const $ = (s, raiz = document) => raiz.querySelector(s);
 const $$ = (s, raiz = document) => [...raiz.querySelectorAll(s)];
 const T = TEXTOS;
-const VERSAO_INTERFACE = "0.7.2"; // igual a VERSAO em app/servidor.py
+const VERSAO_INTERFACE = "0.7.3"; // igual a VERSAO em app/servidor.py
 
 function el(tag, props = {}, ...filhos) {
   const n = document.createElement(tag);
@@ -229,6 +229,11 @@ function revelarGrafico(svg, largura, altura) {
   for (const n of $$("path.linha, path.area, line.reta-tendencia, circle", svg)) g.append(n);
   svg.append(g);
   return svg;
+}
+
+/** Selo "Conferir": a classificação vem de calor fora das peças identificadas (lâmpada, estrutura, outro equipamento?). */
+function seloConferir() {
+  return el("span", { class: "selo-conferir", title: T.analise.conferirDica }, icone("alerta"), T.analise.conferir);
 }
 
 /** Ao lado do termograma: a foto visível que a câmera gravou junto, a imagem original da câmera ou nada. */
@@ -609,8 +614,31 @@ async function carregarModelos() {
   } catch (e) {
     return grade.replaceChildren(estadoErro(T.modelos.erroTitulo, e, carregarModelos));
   }
-  const cartoes = estado.modelos.map((m) => {
-    const emUso = m.id === estado.ativo;
+  // A versão rápida (INT8, ml/otimizar.py) não ganha cartão próprio: vira uma opção no cartão do original.
+  const rapidas = new Map(); // id do original (ou do original + pontos quentes) → versão rápida
+  for (const m of estado.modelos) {
+    const origem = (m.cartao && m.cartao.otimizacao || {}).origem;
+    if (!origem) continue;
+    rapidas.set(origem, m);
+    const combinada = estado.modelos.find((x) => x.id === `${m.id}+pontos-quentes`);
+    if (combinada) rapidas.set(`${origem}+pontos-quentes`, { ...combinada, cartao: { ...combinada.cartao, otimizacao: m.cartao.otimizacao } });
+  }
+  const ehRapida = (m) => [...rapidas.values()].some((r) => r.id === m.id);
+  const usarModelo = async (botao, modelo) => {
+    ocupado(botao, true);
+    try {
+      await api("/api/modelos/ativo", json("PUT", { id: modelo.id }));
+      avisar(T.modelos.passaASer(modelo.nome));
+      carregarModelos();
+    } catch (e) {
+      ocupado(botao, false);
+      falhou(e);
+    }
+  };
+  const cartoes = estado.modelos.filter((m) => !ehRapida(m)).map((m) => {
+    const rapida = rapidas.get(m.id);
+    const rapidaEmUso = rapida && rapida.id === estado.ativo;
+    const emUso = m.id === estado.ativo || rapidaEmUso;
     const c = m.cartao || {};
     const detalhes = el("div", { class: "detalhes" });
     const linha = (rotulo, valor) => detalhes.append(el("div", {}, el("b", {}, `${rotulo}: `), valor));
@@ -618,29 +646,25 @@ async function carregarModelos() {
     else if (c.treino) linha(T.modelos.treino, Object.values(c.treino).join(" · "));
     if (c.metricas) linha(T.modelos.desempenho, Object.entries(c.metricas).map(([k, v]) => `${k} ${v ?? T.geral.semValor}`).join(" · "));
     if (c.limitacoes && c.limitacoes.length) detalhes.append(el("b", {}, T.modelos.limitacoes), el("ul", {}, c.limitacoes.map((l) => el("li", {}, l))));
-    const rodape = emUso
+    const o = rapida && rapida.cartao.otimizacao;
+    const faixaRapida = o ? el("div", { class: "modelo-rapido" },
+      el("div", {}, el("b", {}, icone("ligar"), T.modelos.rapida), el("p", { class: "nota" }, T.modelos.rapidaInfo(o.tempo_ms, o.tempo_original_ms, o.tamanho_mb, o.tamanho_original_mb)),
+        o.teste && o.teste_original ? el("p", { class: "nota" }, T.modelos.rapidaAcerto(fmt(o.teste_original.mAP50, 3), fmt(o.teste.mAP50, 3))) : null),
+      rapidaEmUso ? el("span", { class: "em-uso" }, icone("check"), T.modelos.emUsoRapida)
+        : el("button", { class: "btn btn-sm btn-fantasma", type: "button", onclick: (ev) => usarModelo(ev.currentTarget, rapida) }, T.modelos.usarRapida)) : null;
+    const rodape = m.id === estado.ativo
       ? el("span", { class: "em-uso" }, icone("check"), T.modelos.emUso)
-      : el("button", {
-          class: "btn btn-sm", type: "button",
-          onclick: async (ev) => {
-            ocupado(ev.currentTarget, true);
-            try {
-              await api("/api/modelos/ativo", json("PUT", { id: m.id }));
-              avisar(T.modelos.passaASer(m.nome));
-              carregarModelos();
-            } catch (e) {
-              ocupado(ev.currentTarget, false);
-              falhou(e);
-            }
-          },
-        }, T.modelos.usar);
+      : el("button", { class: "btn btn-sm", type: "button", onclick: (ev) => usarModelo(ev.currentTarget, m) }, rapida ? T.modelos.usarNormal : T.modelos.usar);
     return el("div", { class: `cartao modelo${emUso ? " ativo" : ""}` },
       el("div", { class: "modelo-topo" },
-        el("div", {}, el("h2", {}, m.nome), el("p", { class: "nota" }, T.modelos.versao(m.arquitetura, m.versao))),
+        el("div", {}, el("h2", {}, m.nome), el("p", { class: "nota" }, T.modelos.versao(m.arquitetura, m.versao)),
+          // IA + regra: diz o que é cada peça e liga o calor a ela; separa defeito de lâmpada e estrutura.
+          m.tipo === "combinado" ? el("span", { class: "etiqueta disponivel", title: T.modelos.recomendadoDica }, icone("check"), T.modelos.recomendado) : null),
         el("span", { class: `tipo ${m.tipo}` }, { regra: T.modelos.regra, combinado: T.modelos.combinado }[m.tipo] || T.modelos.ia)),
       el("p", {}, m.descricao),
       el("div", { class: "fichas" }, m.classes.map((cl) => el("span", { class: "ficha" }, nomeClasse(cl, m)))),
       detalhes,
+      faixaRapida,
       el("div", { class: "rodape-modelo" }, el("span", { class: "nota" }, { regra: T.modelos.embutido, combinado: T.modelos.combinadoNota }[m.tipo] || T.modelos.instaladoEm), rodape));
   });
   grade.replaceChildren(...animarEntrada(cartoes));
@@ -2637,7 +2661,7 @@ function cartaoAtencao(lista) {
       el("td", {}, el("img", { class: "miniatura-tabela", src: miniaturaSrc(it), alt: "", loading: "lazy" })),
       el("td", {}, el("div", { class: "principal-celula" }, el("b", { title: titulo }, titulo), el("span", {}, detalhe))),
       el("td", { class: "num" }, valorDestaque(it.destaque)),
-      el("td", {}, el("span", { class: `selo ${it.resumo.severidade}` }, T.niveis[it.resumo.severidade])),
+      el("td", {}, el("span", { class: `selo ${it.resumo.severidade}` }, T.niveis[it.resumo.severidade]), it.resumo.conferir ? seloConferir() : null),
       el("td", { class: "direita" }, el("button", { class: "btn btn-sm", type: "button", onclick: (ev) => { ev.stopPropagation(); abrirInspecao(it.id); } }, T.geral.abrir)));
   });
   return el("div", { class: "cartao tabela-cartao" }, cabeca,
@@ -2651,8 +2675,8 @@ function cartaoDistribuicao(lista) {
   const total = lista.length;
   const barra = el("div", { class: "barra-empilhada", role: "img", "aria-label": T.painel.distribuicao });
   const legenda = el("ul", { class: "legenda-severidade" });
-  const semMedida = lista.some((it) => it.resumo.severidade === "sem_medida") ? ["sem_medida"] : [];
-  for (const n of [...NIVEIS].reverse().concat(semMedida)) {
+  const extras = ["nao_avaliado", "sem_medida"].filter((n) => lista.some((it) => it.resumo.severidade === n));
+  for (const n of [...NIVEIS].reverse().concat(extras)) {
     const q = lista.filter((it) => it.resumo.severidade === n).length;
     if (q) barra.append(el("i", { style: { width: `${(q / total) * 100}%`, background: `var(--${n})` }, title: `${T.niveis[n]}: ${q}` }));
     legenda.append(el("li", {}, el("span", { class: "ponto", style: { background: `var(--${n})` } }), T.niveis[n], el("b", {}, String(q))));
@@ -3228,9 +3252,10 @@ function preencherResultado() {
   const r = a.resumo;
   const v = $("#veredito");
   v.className = `veredito ${r.severidade}`;
-  $("use", v).setAttribute("href", r.severidade === "normal" ? "#i-check" : r.severidade === "sem_medida" ? "#i-info" : "#i-alerta");
+  $("use", v).setAttribute("href", r.severidade === "normal" ? "#i-check" : ["sem_medida", "nao_avaliado"].includes(r.severidade) ? "#i-info" : "#i-alerta");
   const indicativa = a.regioes.some((x) => x.indicativa && x.severidade === r.severidade);
-  $("#veredito-titulo").textContent = r.severidade_rotulo + (indicativa && r.severidade !== "normal" ? T.analise.indicativa : "");
+  $("#veredito-titulo").replaceChildren(r.severidade_rotulo + (indicativa && r.severidade !== "normal" ? T.analise.indicativa : ""),
+    ...(r.conferir ? [seloConferir()] : []));
   $("#veredito-texto").textContent = r.mensagem;
   $("#k-max").textContent = fmt(r.t_max_cena, 1, " °C");
   if (r.maior_pct_mta != null) {
@@ -3826,6 +3851,7 @@ function desenharInspecoes() {
     programar: (s) => s === "programar",
     atencao: (s) => s === "atencao",
     normal: (s) => s === "normal",
+    sem: (s) => s === "sem_medida" || s === "nao_avaliado",
   }[estado.filtro];
   let itens = estado.inspecoes.filter((it) => {
     if (!passa(it.resumo.severidade)) return false;
@@ -3987,7 +4013,7 @@ function tabelaInspecoes(itens) {
       el("td", {}, local),
       el("td", { class: "num" }, valorDestaque(it.destaque) || T.geral.semValor),
       el("td", { class: "num direita" }, fmt(it.resumo.t_max_cena, 1, " °C")),
-      el("td", {}, el("span", { class: `selo ${it.resumo.severidade}` }, T.niveis[it.resumo.severidade])),
+      el("td", {}, el("span", { class: `selo ${it.resumo.severidade}` }, T.niveis[it.resumo.severidade]), it.resumo.conferir ? seloConferir() : null),
       el("td", {}, el("div", { class: "acoes-linha" }, acoesInspecao(it))));
   });
   const todas = el("input", {

@@ -297,7 +297,7 @@ def gerar_relatorio(itens: list[tuple[dict, np.ndarray, bytes | None]], versao: 
     ]
     corpo.append(Spacer(1, 2 * mm))
     corpo.append(tabela(["Critério", "Classificação"], linhas_crit, [62 * mm, 114 * mm]))
-    niveis = [k for k in nucleo_analise.NIVEIS if k != "sem_medida"]  # o laudo só sai com temperatura
+    niveis = [k for k in nucleo_analise.NIVEIS if k not in ("sem_medida", "nao_avaliado")]  # só os níveis do critério
     linhas_acao = [[Paragraph(nucleo_analise.NIVEIS[k]["rotulo"], est["cel"]), Paragraph(nucleo_analise.NIVEIS[k]["acao"], est["cel"])] for k in niveis]
     corpo.append(Spacer(1, 2 * mm))
     corpo.append(tabela(["Classificação", "Recomendação"], linhas_acao, [40 * mm, 136 * mm],
@@ -445,8 +445,13 @@ def gerar_relatorio(itens: list[tuple[dict, np.ndarray, bytes | None]], versao: 
     # ---------------------------------------------------------------- conclusão
     corpo.append(Paragraph(f"{5 if n_img > 1 else 4}. Conclusão", est["h"]))
     pior = nucleo_analise.pior(a["resumo"]["severidade"] for a, _, _ in itens)
-    achados = [(k, a, r) for k, (a, _, _) in enumerate(itens, start=1) for r in a["regioes"] if r.get("severidade", "normal") != "normal"]
-    if not achados:
+    achados = [(k, a, r) for k, (a, _, _) in enumerate(itens, start=1) for r in a["regioes"]
+               if r.get("severidade", "normal") not in nucleo_analise.SEM_CLASSIFICACAO]
+    nao_avaliadas = [r.get("nome") for a, _, _ in itens for r in a["regioes"] if r.get("severidade") == "nao_avaliado"]
+    if not achados and pior == "nao_avaliado":
+        texto = ("Os componentes não puderam ser avaliados: para-raios e isoladores se comparam com a mesma peça das "
+                 "outras fases, que não aparece nas imagens. Recomenda-se nova inspeção enquadrando as três fases.")
+    elif not achados:
         texto = ("Não foram identificadas anomalias térmicas acima dos limites do critério nos componentes avaliados. "
                  "Recomenda-se manter a periodicidade de inspeção.")
     else:
@@ -464,6 +469,10 @@ def gerar_relatorio(itens: list[tuple[dict, np.ndarray, bytes | None]], versao: 
                            Paragraph(_esc(r.get("acao")), est["cel"])])
         corpo.append(Spacer(1, 2 * mm))
         corpo.append(tabela(["Equipamento", "Ponto", "Classificação", "Recomendação"], linhas, [46 * mm, 40 * mm, 32 * mm, 58 * mm]))
+    if nao_avaliadas and pior != "nao_avaliado":
+        nomes = ", ".join(_esc(n) for n in nao_avaliadas[:6]) + ("…" if len(nao_avaliadas) > 6 else "")
+        corpo.append(Spacer(1, 2 * mm))
+        corpo.append(Paragraph(f"Não avaliados (sem a mesma peça de outra fase para comparar): {nomes}.", est["p"]))
     corpo.append(Spacer(1, 2 * mm))
     corpo.append(Paragraph("A inspeção termográfica reflete as condições do instante da medição e não substitui outros ensaios.", est["pequeno"]))
 

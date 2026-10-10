@@ -57,6 +57,8 @@
   --imediato: #B0123A;   --imediato-fundo: #FAE3EA;   --imediato-texto: #86082A;
   /* sem medida: imagem sem temperatura (não é "normal"); neutro, segue o tema pelos tokens de base */
   --sem_medida: var(--n-500); --sem_medida-fundo: var(--superficie-3); --sem_medida-texto: var(--texto-2);
+  /* não avaliado: peça sem a igual de outra fase para comparar (não é "normal"); mesmo neutro */
+  --nao_avaliado: var(--n-500); --nao_avaliado-fundo: var(--superficie-3); --nao_avaliado-texto: var(--texto-2);
 
   /* ---------------------------------------------------------------- séries de gráfico (comparação de modelos: dado) */
   --serie-1: var(--azul-600);

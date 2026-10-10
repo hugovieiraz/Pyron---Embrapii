@@ -35,7 +35,7 @@ from app import videos as videos_mod
 from app.armazenamento import Armazenamento, _destaque
 from nucleo import analise, detectores, enquadrar, entrada, referencias, render, video
 
-VERSAO = "0.7.2"
+VERSAO = "0.7.3"
 RAIZ = Path(__file__).resolve().parents[1]
 PASTA_APP = Path(__file__).resolve().parent
 # PYRON_DADOS (ou app.iniciar --dados) aponta outra pasta: demonstrações e testes sem tocar nas inspeções reais.
@@ -160,7 +160,7 @@ def _validar_criterios(c: dict) -> dict:
     for grupo in ("similares", "dieletrico", "mta_faixas", "ambiente"):
         linhas = []
         for limite, nivel in c.get(grupo, analise.CRITERIOS_PADRAO[grupo]):
-            if nivel not in analise.NIVEIS or nivel in ("normal", "sem_medida"):
+            if nivel not in analise.NIVEIS or nivel in analise.SEM_CLASSIFICACAO:
                 raise HTTPException(422, f"Nível desconhecido no critério: {nivel}.")
             linhas.append([round(float(limite), 2), nivel])
         linhas.sort(key=lambda linha: linha[0])
@@ -339,7 +339,7 @@ def _completa(a: dict) -> dict:
     matriz = armazenamento.matriz(a["id"])
     saida = dict(a)
     saida["equipamento_chave"] = _chave_de(a)
-    if a.get("resumo", {}).get("severidade", "normal") not in ("normal", "sem_medida"):
+    if a.get("resumo", {}).get("severidade", "normal") not in analise.SEM_CLASSIFICACAO:
         item = {**a, "destaque": _destaque(a), "data_captura": (a.get("metadados") or {}).get("data_hora", "")}
         saida["pendencia"] = pendencias.montar(item)
     if matriz is not None:
@@ -1278,8 +1278,11 @@ def _regiao_do_quadro(r: dict) -> dict:
 
 
 def _preparar_video(opcoes: dict):
-    """Detector, critério e termômetro de um vídeo; devolve a função que analisa cada quadro."""
-    det = _detector(opcoes.get("modelo"))
+    """Detector, critério e termômetro de um vídeo; devolve a função que analisa cada quadro.
+
+    Ao vivo a velocidade manda: usa a versão rápida (INT8) do modelo escolhido, se houver.
+    """
+    det = _versao_rapida(_detector(opcoes.get("modelo")))
     termometro = video.Termometro(entrada.OCRPreguicoso(), opcoes.get("limites"))  # OCR próprio: roda em outra thread
     criterios, componentes = _criterios(), _componentes()
 
@@ -1411,9 +1414,26 @@ def _detector_imagem() -> detectores.Detector:
     if base is None:
         raise ValueError("Nenhum modelo que olha a imagem colorida está instalado. Instale um em Modelos "
                          "(o de para-raios, por exemplo).")
-    origem = (base.cartao.get("otimizacao") or {}).get("origem", base.id)
-    rapida = next((d for d in candidatos if (d.cartao.get("otimizacao") or {}).get("origem") == origem), None)
-    return rapida or base
+    return _versao_rapida(base)
+
+
+def _versao_rapida(det: detectores.Detector) -> detectores.Detector:
+    """A versão rápida (INT8, ``ml/otimizar.py``) do mesmo modelo, se houver; senão o próprio.
+
+    Vale também para o modelo combinado com os pontos quentes. Usada onde a velocidade manda (celular e
+    vídeo); as análises de foto ficam com o modelo escolhido, que é o que o laudo registra.
+    """
+    combinado = isinstance(det, detectores.Combinado)
+    base = det.partes[0] if combinado else det
+    if base.cartao.get("otimizacao"):
+        return det
+    todos = detectores.listar(PASTA_MODELOS)
+    rapida = next((d for d in todos if d.tipo == "aprendizado" and (d.cartao.get("otimizacao") or {}).get("origem") == base.id), None)
+    if rapida is None:
+        return det
+    if combinado:
+        return next((d for d in todos if d.id == f"{rapida.id}+{det.partes[1].id}"), det)
+    return rapida
 
 
 def _celular_modelo() -> dict:

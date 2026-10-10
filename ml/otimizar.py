@@ -102,9 +102,10 @@ def otimizar(pasta: Path, dados: Path | None = None) -> Path:
     if dados:
         limiar = float(cartao.get("limiar_confianca", relatorio.get("limiar", 0.5)))
         print("Medindo o acerto no conjunto de teste…", flush=True)
+        # As duas medidas pela mesma conta (a do relatório original pode ter vindo de outro cálculo de mAP,
+        # então não é trocada: a comparação justa fica em "otimizacao").
         otimizacao["teste_original"] = medir_acerto(pasta, dados, limiar)
         otimizacao["teste"] = medir_acerto(destino, dados, limiar)
-        relatorio["teste"] = otimizacao["teste"]
         a, b = otimizacao["teste_original"], otimizacao["teste"]
         print(f"mAP50 {a['mAP50']} → {b['mAP50']} | mAP50-95 {a['mAP50-95']} → {b['mAP50-95']} | revocação {a['revocacao']} → {b['revocacao']}")
     novo["otimizacao"] = otimizacao

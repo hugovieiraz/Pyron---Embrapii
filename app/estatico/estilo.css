@@ -212,6 +212,18 @@ label > .segmentado { justify-self: start; }
 .selo.urgente { background: var(--urgente-fundo); color: var(--urgente-texto); }
 .selo.imediato { background: var(--imediato-fundo); color: var(--imediato-texto); }
 .selo.sem_medida { background: var(--sem_medida-fundo); color: var(--sem_medida-texto); }
+.selo.nao_avaliado { background: var(--nao_avaliado-fundo); color: var(--nao_avaliado-texto); }
+/* "Conferir": a classificação vem de calor fora das peças identificadas e pede um olhar antes de agir */
+.selo-conferir { display: inline-flex; align-items: center; gap: var(--e-1); height: var(--e-6); padding: 0 var(--e-2); border-radius: var(--r-g);
+  background: var(--aviso-fundo); color: var(--aviso-texto); font-size: var(--t-1); font-weight: var(--p-forte); white-space: nowrap; vertical-align: middle; }
+.selo-conferir .ic { width: var(--ic); height: var(--ic); }
+/* versão rápida (INT8) de um modelo, dentro do cartão do original */
+.modelo-rapido { display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); flex-wrap: wrap;
+  padding: var(--e-3) var(--e-4); border-radius: var(--r-m); background: var(--acao-suave); }
+.modelo-rapido b { display: inline-flex; align-items: center; gap: var(--e-2); color: var(--texto); }
+.modelo-rapido .ic { color: var(--acao); }
+.modelo-rapido p { margin: var(--e-1) 0 0; }
+td .selo-conferir { margin-left: var(--e-1); }
 
 /* ---------------------------------------------------------------- câmera do celular */
 .celular-grade { display: grid; grid-template-columns: var(--col-celular) minmax(0, 1fr); gap: var(--e-6); align-items: start; }
@@ -232,7 +244,7 @@ label > .segmentado { justify-self: start; }
   color: var(--branco); border-radius: var(--r-p); font-size: var(--t-1); line-height: var(--a-2); font-weight: var(--p-forte); white-space: nowrap; }
 .celular-rotulo i, .ponto-classe { display: inline-block; width: var(--e-2); height: var(--e-2); border-radius: 50%; flex: none; }
 .celular-achados { display: flex; flex-wrap: wrap; gap: var(--e-2); margin-top: var(--e-3); align-items: center; }
-.selo.sem_medida::before { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
+.selo.sem_medida::before, .selo.nao_avaliado::before { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
 .selo.indicativa { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
 .etiqueta { display: inline-flex; align-items: center; gap: var(--e-1); height: var(--e-6); padding: 0 var(--e-2); border-radius: var(--r-p); background: var(--superficie-3); color: var(--texto-2); font-size: var(--t-1); font-weight: var(--p-medio); white-space: nowrap; }
 .etiqueta.medida { background: var(--sucesso-fundo); color: var(--sucesso-texto); }
@@ -475,7 +487,8 @@ kbd { font: var(--p-medio) var(--t-1) / var(--a-1) var(--fonte-num); padding: 0 
 .veredito.programar { background: var(--programar-fundo); color: var(--programar-texto); border-color: var(--programar); }
 .veredito.urgente { background: var(--urgente-fundo); color: var(--urgente-texto); border-color: var(--urgente); }
 .veredito.imediato { background: var(--imediato-fundo); color: var(--imediato-texto); border-color: var(--imediato); }
-.veredito.sem_medida { background: var(--sem_medida-fundo); color: var(--sem_medida-texto); border-color: var(--borda-forte); border-style: dashed; }
+.veredito.sem_medida, .veredito.nao_avaliado { background: var(--sem_medida-fundo); color: var(--sem_medida-texto); border-color: var(--borda-forte); border-style: dashed; }
+#veredito-titulo .selo-conferir { margin-left: var(--e-2); }
 
 /* Imagem sem temperatura: o palco mostra a própria imagem; some o que só faz sentido com temperatura. */
 .area-analise.sem-temperatura :is(#seg-paleta, #seg-faixa, #btn-isoterma, #btn-original, #escala-controle, #isoterma-controle, .escala,

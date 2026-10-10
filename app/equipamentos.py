@@ -22,9 +22,9 @@ from datetime import datetime, timedelta
 
 import numpy as np
 
-ORDEM = ["sem_medida", "normal", "atencao", "programar", "urgente", "imediato"]
-# Dias até reinspecionar, pela severidade da última inspeção. Sem medida: refazer com uma imagem que meça.
-PRAZO_DIAS = {"sem_medida": 30, "normal": 365, "atencao": 90, "programar": 30, "urgente": 7, "imediato": 1}
+ORDEM = ["sem_medida", "nao_avaliado", "normal", "atencao", "programar", "urgente", "imediato"]
+# Dias até reinspecionar, pela severidade da última inspeção. Sem medida ou não avaliado: refazer a foto.
+PRAZO_DIAS = {"sem_medida": 30, "nao_avaliado": 30, "normal": 365, "atencao": 90, "programar": 30, "urgente": 7, "imediato": 1}
 SEM_EQUIPAMENTO = "sem-equipamento"
 MINIMO_PONTOS = 3
 MINIMO_DIAS = 30  # em poucos dias a diferença é de carga e horário, não de desgaste
@@ -138,7 +138,7 @@ def _grupos(itens: list[dict]) -> dict[str, dict]:
 def resumir(g: dict, hoje: datetime | None = None) -> dict:
     pontos = sorted((ponto(it) for it in g["itens"]), key=lambda p: p["data"])
     # Inspeções sem temperatura entram na série, mas o estado vem da última que mediu.
-    medidas = [p for p in pontos if p["severidade"] != "sem_medida"] or pontos
+    medidas = [p for p in pontos if p["severidade"] not in ("sem_medida", "nao_avaliado")] or pontos
     ultima = medidas[-1]
     pior = max(medidas, key=lambda p: ORDEM.index(p["severidade"]) if p["severidade"] in ORDEM else 0)
     saida = {

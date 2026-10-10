@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Callable
 from urllib.parse import quote
 
-ORDEM = {"sem_medida": -1, "normal": 0, "atencao": 1, "programar": 2, "urgente": 3, "imediato": 4}
+ORDEM = {"sem_medida": -2, "nao_avaliado": -1, "normal": 0, "atencao": 1, "programar": 2, "urgente": 3, "imediato": 4}
 EXTENSOES = {".jpg", ".jpeg", ".png"}
 SEGUNDOS_ESTAVEL = 2.0  # arquivo mais novo que isso pode ainda estar sendo gravado pela câmera
 

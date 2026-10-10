@@ -497,6 +497,7 @@
             <button type="button" data-valor="programar" aria-pressed="false">Programar</button>
             <button type="button" data-valor="atencao" aria-pressed="false">Atenção</button>
             <button type="button" data-valor="normal" aria-pressed="false">Normais</button>
+            <button type="button" data-valor="sem" aria-pressed="false" title="Sem temperatura ou sem peça igual para comparar">Sem medida</button>
           </div>
           <select id="ordem" aria-label="Ordenar">
             <option value="recentes">Mais recentes</option>
@@ -827,9 +828,9 @@
         <div class="cartao">
           <h2>Para onde vai</h2>
           <div class="linha-tempo">
-            <div class="marco atual"><span>Agora</span><b>Inspeção, histórico e acompanhamento</b><p>Laudo, pasta vigiada, vídeo ao vivo, histórico e tendência de cada equipamento e pendências até a correção verificada.</p></div>
-            <div class="marco"><span>Próximo</span><b>Previsão com carga e clima</b><p>Tendência normalizada pela carga e pelo ambiente, tempo estimado até ficar crítico e conexão direta com câmeras fixas.</p></div>
-            <div class="marco"><span>Depois</span><b>Gêmeo térmico e celular</b><p>Modelo térmico do transformador, aviso no celular e envio automático pelo WhatsApp Business.</p></div>
+            <div class="marco atual"><span>Agora</span><b>Inspeção, histórico, celular e vídeo</b><p>Laudo, pasta vigiada, câmera do celular, vídeo ao vivo, histórico e tendência de cada equipamento e pendências até a correção verificada.</p></div>
+            <div class="marco"><span>Próximo</span><b>Validação em campo e mais equipamentos</b><p>Comparar com laudos de termografistas em outras subestações e detectores para transformador, disjuntor e seccionadora.</p></div>
+            <div class="marco"><span>Depois</span><b>Previsão e gêmeo térmico</b><p>Tempo estimado até ficar crítico, conexão direta com câmeras fixas e modelo térmico do transformador.</p></div>
           </div>
         </div>
         <div class="cartao">
@@ -843,8 +844,13 @@
             <li class="ok">Histórico por equipamento com tendência em °C por mês, próxima inspeção pela severidade e pendências com ordem de serviço.</li>
             <li class="ok">Ferramentas de medição (ponto, linha com perfil, escala manual), correção de emissividade e exportação para PNG e Excel.</li>
             <li class="ok">Vídeo da câmera analisado quadro a quadro, como se estivesse ao vivo.</li>
+            <li class="ok">Câmera do celular: aponta para um termograma e os componentes aparecem ao vivo. Só a área com cara de termograma vai ao detector: nenhuma peça falsa em 76 fotos comuns, contra 367 olhando o quadro inteiro.</li>
+            <li class="ok">Imagens sem temperatura (da internet, feitas por IA, cortadas) não travam: os componentes são identificados e a inspeção fica Sem medida. Com a barra de cores, a escala pode ser informada depois.</li>
+            <li class="ok">Versão rápida (INT8) dos modelos: 1,5 vez mais rápida no processador, com o mesmo acerto no teste.</li>
+            <li class="ok">Para-raio ou isolador sem a peça igual de outra fase fica Não avaliado (não Normal); calor fora das peças identificadas pede conferência antes de agir.</li>
+            <li class="pendente">Validação com termografistas em outras subestações: o detector foi treinado com fotos de uma só subestação.</li>
             <li class="pendente">Detectores para os outros equipamentos (transformador, disjuntor, seccionadora): faltam rótulos. Até lá, a regra de pontos quentes dá uma classificação indicativa.</li>
-            <li class="pendente">Tendência ainda sem normalizar pela carga e pelo ambiente: compare inspeções feitas em condições parecidas.</li>
+            <li class="pendente">A tendência a plena carga precisa de ambiente e carga informados em cada inspeção; sem eles, compare inspeções feitas em condições parecidas.</li>
             <li class="pendente">Máximas admissíveis e faixas de severidade a conferir na edição vigente da NBR 15866, nos dados dos fabricantes e com termografista certificado.</li>
           </ul>
           <p class="nota">Imagens de exemplo: dataset de estudo ScienceDB 10185 (CC BY-NC-SA 4.0), usado só para estudo e demonstração.</p>

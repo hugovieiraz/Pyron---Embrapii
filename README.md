@@ -136,6 +136,16 @@ modelo treinou, então o número real tende a ser menor. Segure o celular na mes
 Velocidade neste notebook, na tomada: cerca de 0,25 s por quadro com a versão rápida (INT8) do
 modelo, que o celular usa sozinho quando ela existe (veja abaixo).
 
+## Diagnóstico honesto
+
+- **Não avaliado:** para-raio e isolador só se comparam com a mesma peça das outras fases (não têm
+  MTA). Sozinhos na imagem, ficam "Não avaliado", não "Normal", com o aviso de fotografar as três fases.
+  Nas fotos de para-raios do conjunto, 9 de 31 tinham um para-raio só.
+- **Conferir:** quando a severidade vem só de um ponto quente fora das peças que o modelo achou, a
+  inspeção ganha o selo "Conferir". O ponto não some da classificação (pode ser defeito num equipamento
+  que o modelo não conhece), mas pode ser lâmpada, estrutura ou reflexo: alguém olha antes de agir.
+  Vale com o modelo combinado (peças + pontos quentes), o recomendado em Modelos.
+
 ## Imagens sem temperatura
 
 Nem toda imagem térmica traz temperatura. De onde ela sai, em ordem de confiança:
