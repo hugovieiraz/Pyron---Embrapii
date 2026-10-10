@@ -119,11 +119,21 @@ local só enquanto o modo está ligado, com um código novo no link a cada vez. 
 com o OpenSSL que vem com o Git para Windows. Na primeira vez, o Windows pergunta se o Pyron pode
 usar a rede: permita em redes privadas. Usa o modelo que olha a imagem colorida (o de para-raios).
 
-Simulação de celular filmando a tela (moldura, perspectiva, moiré, cor e tremor), 20 imagens de
-para-raios: 77 das 79 peças achadas no arquivo original apareceram também no quadro do celular. São
-imagens do conjunto em que o modelo foi treinado, então o número real tende a ser menor; o celular
-precisa estar na mesma orientação da imagem. Velocidade neste notebook, na tomada: 0,5 a 0,7 s por
-quadro (1,5 a 2 análises por segundo).
+**Só olha o termograma.** O modelo foi treinado só com termogramas e, olhando o quadro inteiro, vê
+para-raios em qualquer coisa da casa. Antes de detectar, o Pyron procura no quadro a área com cara de
+paleta (cores fortes de várias matizes; `nucleo/enquadrar.py`) e passa só esse recorte ao modelo.
+Sem termograma no quadro, nada é procurado. Uma peça só aparece se surgir em dois quadros seguidos,
+com confiança de 50% ou mais, e a captura salva só a área do termograma.
+
+| Medida | Quadro inteiro | Só a área do termograma |
+|---|---|---|
+| Fotos comuns (76 fotos visíveis do conjunto) | 367 peças falsas em 68 fotos | nenhuma |
+| Celular simulado filmando a tela (20 para-raios) | 77 de 79 peças (97%) | 79 de 79 (100%) |
+
+O filtro aceitou os 151 termogramas e recusou as 151 fotos comuns em que foi ajustado. O celular
+simulado tem moldura, perspectiva, moiré, cor deslocada e tremor; as imagens são do conjunto em que o
+modelo treinou, então o número real tende a ser menor. Segure o celular na mesma orientação da imagem.
+Velocidade neste notebook, na tomada: 0,5 a 0,7 s por quadro (cerca de 2 análises por segundo).
 
 ## Imagens sem temperatura
 

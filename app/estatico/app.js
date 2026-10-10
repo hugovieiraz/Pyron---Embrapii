@@ -476,11 +476,13 @@ function atualizarEspelho(c) {
       espelho.replaceChildren(quadro);
     }
     $("img", quadro).src = img.src;
-    $(".celular-caixas", quadro).replaceChildren(...u.deteccoes.map((d) =>
-      el("div", { class: "celular-caixa", style: { left: pct(d.caixa[0]), top: pct(d.caixa[1]), width: pct(d.caixa[2] - d.caixa[0]), height: pct(d.caixa[3] - d.caixa[1]) } },
-        el("span", {}, C.rotulo(d.nome, Math.round(d.confianca * 100))))));
+    const caixaEm = (c) => ({ left: pct(c[0]), top: pct(c[1]), width: pct(c[2] - c[0]), height: pct(c[3] - c[1]) });
+    $(".celular-caixas", quadro).replaceChildren(
+      ...(u.area ? [el("div", { class: "celular-area", style: caixaEm(u.area) })] : []),
+      ...u.deteccoes.map((d) => el("div", { class: "celular-caixa", style: caixaEm(d.caixa) }, el("span", {}, C.rotulo(d.nome, Math.round(d.confianca * 100))))));
+    const vazio = u.area ? C.nenhumNoQuadro : C.semTermograma;
     $("#celular-achados").replaceChildren(
-      ...(u.deteccoes.length ? u.deteccoes.map((d) => el("span", { class: "etiqueta" }, C.rotulo(d.nome, Math.round(d.confianca * 100)))) : [el("span", { class: "nota" }, C.nenhumNoQuadro)]),
+      ...(u.deteccoes.length ? u.deteccoes.map((d) => el("span", { class: "etiqueta" }, C.rotulo(d.nome, Math.round(d.confianca * 100)))) : [el("span", { class: "nota" }, vazio)]),
       ...capturas);
   };
   img.src = `/api/celular/quadro.jpg?seq=${u.seq}`;

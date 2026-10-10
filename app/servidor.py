@@ -33,7 +33,7 @@ from app import laudo, monitoramento, pendencias
 from app import treinos as treinos_mod
 from app import videos as videos_mod
 from app.armazenamento import Armazenamento, _destaque
-from nucleo import analise, detectores, entrada, referencias, render, video
+from nucleo import analise, detectores, enquadrar, entrada, referencias, render, video
 
 VERSAO = "0.7.2"
 RAIZ = Path(__file__).resolve().parents[1]
@@ -1418,21 +1418,43 @@ def _celular_modelo() -> dict:
     return {"id": det.id, "nome": det.nome}
 
 
+CONFIANCA_CELULAR = 0.5  # foto de tela tem reflexo e moiré: só caixas com boa confiança
+
+
 def _celular_detectar(rgb: np.ndarray) -> tuple[list[dict], dict]:
+    """Peças achadas no quadro, só dentro da área que parece um termograma.
+
+    O modelo foi treinado só com termogramas: no quadro inteiro (a sala, a mesa) ele vê para-raios em
+    qualquer coisa. No recorte, ele também vê o termograma maior e na proporção em que aprendeu.
+    """
     det = _detector_imagem()
-    h, w = rgb.shape[:2]
+    area = enquadrar.achar_termograma(rgb)
+    if area is None:
+        return [], {"area": None}
+    recorte = rgb[area.y0:area.y1, area.x0:area.x1]
+    h, w = recorte.shape[:2]
     saida = []
-    for d in det.detectar(np.zeros((h, w), dtype=np.float32), rgb):
+    for d in det.detectar(np.zeros((h, w), dtype=np.float32), recorte):
+        if d.confianca < CONFIANCA_CELULAR:
+            continue
+        x0, y0, x1, y1 = (float(v) for v in d.caixa)
         nome = det.nomes.get(d.classe) or NOMES_CLASSES.get(d.classe, d.classe)
         saida.append({"classe": d.classe, "nome": nome, "confianca": round(float(d.confianca), 3),
-                      "caixa": [float(v) for v in d.caixa]})
-    return saida, _celular_modelo()
+                      "caixa": [x0 + area.x0, y0 + area.y0, x1 + area.x0, y1 + area.y0]})
+    return saida, {"area": area.caixa()}
 
 
 def _celular_capturar(dados: bytes, nome: str) -> dict:
+    """Salva só a área do termograma: é ela que vira a imagem da inspeção."""
     det = _detector_imagem()
+    rgb = celular.ler_imagem(dados)
+    area = enquadrar.achar_termograma(rgb)
+    if area is None:
+        raise ValueError("Nenhuma imagem térmica no quadro. Aponte para o termograma e tente de novo.")
+    buf = io.BytesIO()
+    Image.fromarray(np.ascontiguousarray(rgb[area.y0:area.y1, area.x0:area.x1])).save(buf, format="JPEG", quality=92)
     with _trava:
-        a = _nova_analise(dados, nome, det.id, fonte="celular", somente_imagem=True)
+        a = _nova_analise(buf.getvalue(), nome, det.id, fonte="celular", somente_imagem=True)
     return {"id": a["id"], "arquivo": a["arquivo"], "regioes": len(a["regioes"]), "nomes": [r["nome"] for r in a["regioes"]]}
 
 

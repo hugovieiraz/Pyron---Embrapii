@@ -40,6 +40,7 @@ PORTA_INICIAL = 8791
 LIMITE_QUADRO = 4 * 1024 * 1024  # bytes de um quadro ou captura (o celular manda ~60 KB)
 LADO_MAXIMO = 1280  # o quadro é reduzido a isso antes do detector
 CONECTADO_S = 4.0  # sem quadro há mais que isso: o celular saiu da página ou perdeu a rede
+IOU_MESMA_PECA = 0.3  # caixas de quadros seguidos com essa sobreposição são a mesma peça
 DIAS_CERTIFICADO = 825
 
 
@@ -137,6 +138,15 @@ def ler_imagem(dados: bytes) -> np.ndarray:
     return np.asarray(img)
 
 
+def iou(a: list[float], b: list[float]) -> float:
+    """Sobreposição de duas caixas (x0, y0, x1, y1): interseção sobre união."""
+    ix = max(0.0, min(a[2], b[2]) - max(a[0], b[0]))
+    iy = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+    inter = ix * iy
+    uniao = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter
+    return inter / uniao if uniao > 0 else 0.0
+
+
 # ---------------------------------------------------------------- estado do modo celular
 
 
@@ -149,6 +159,7 @@ class Ultimo:
     quando: float = 0.0
     ms: int = 0
     seq: int = 0  # número do quadro: o espelho no computador só baixa a imagem quando ele muda
+    area: list | None = None  # onde está o termograma no quadro (0 a 1), ou None se não há
 
 
 class ModoCelular:
@@ -169,6 +180,7 @@ class ModoCelular:
         self.ultimo = Ultimo()
         self.capturas = 0
         self._tempos: deque[float] = deque(maxlen=20)  # instantes dos últimos quadros (análises por segundo)
+        self._anteriores: deque[list] = deque(maxlen=2)  # peças dos quadros anteriores, para confirmar
         self._servidor = None
         self._fio: threading.Thread | None = None
         self._trava = threading.Lock()  # um quadro por vez no detector
@@ -197,6 +209,7 @@ class ModoCelular:
             self.token = secrets.token_urlsafe(6)
             self.ultimo = Ultimo()
             self._tempos.clear()
+            self._anteriores.clear()
             config = uvicorn.Config(criar_app(self), host=self.host, port=self.porta, ssl_certfile=str(cert),
                                     ssl_keyfile=str(chave), log_level="warning", log_config=None)
             self._servidor = uvicorn.Server(config)
@@ -229,18 +242,30 @@ class ModoCelular:
             raise RuntimeError("O detector está ocupado.")
         try:
             t0 = time.perf_counter()
-            caixas, _ = self._detectar(rgb)
+            caixas, info = self._detectar(rgb)
             ms = round((time.perf_counter() - t0) * 1000)
         finally:
             self._trava.release()
-        deteccoes = [{**d, "caixa": [round(d["caixa"][0] / w, 4), round(d["caixa"][1] / h, 4),
-                                      round(d["caixa"][2] / w, 4), round(d["caixa"][3] / h, 4)]} for d in caixas]
+        normalizar = lambda c: [round(c[0] / w, 4), round(c[1] / h, 4), round(c[2] / w, 4), round(c[3] / h, 4)]  # noqa: E731
+        area = normalizar(info["area"]) if info.get("area") else None
+        deteccoes = self._confirmar([{**d, "caixa": normalizar(d["caixa"])} for d in caixas], area is not None)
         agora = time.time()
         self._tempos.append(agora)
         buf = io.BytesIO()
         Image.fromarray(rgb).save(buf, format="JPEG", quality=80)
-        self.ultimo = Ultimo(buf.getvalue(), deteccoes, w, h, agora, ms, self.ultimo.seq + 1)
-        return {"deteccoes": deteccoes, "ms": ms, "largura": w, "altura": h}
+        self.ultimo = Ultimo(buf.getvalue(), deteccoes, w, h, agora, ms, self.ultimo.seq + 1, area)
+        return {"deteccoes": deteccoes, "area": area, "ms": ms, "largura": w, "altura": h}
+
+    def _confirmar(self, atuais: list[dict], com_termograma: bool) -> list[dict]:
+        """Só mostra a peça que aparece em dois quadros seguidos: engano costuma surgir num quadro e sumir."""
+        if not com_termograma:
+            self._anteriores.clear()
+            return []
+        confirmadas = [d for d in atuais
+                       if any(a["classe"] == d["classe"] and iou(a["caixa"], d["caixa"]) >= IOU_MESMA_PECA
+                              for quadro in self._anteriores for a in quadro)]
+        self._anteriores.append(atuais)
+        return confirmadas
 
     def capturar(self, dados: bytes) -> dict:
         ler_imagem(dados)  # confere antes de gravar
@@ -273,7 +298,7 @@ class ModoCelular:
             "conectado": conectado,
             "capturas": self.capturas,
             "ultimo": None if not u.quando else {
-                "deteccoes": u.deteccoes, "largura": u.largura, "altura": u.altura, "ms": u.ms, "seq": u.seq,
+                "deteccoes": u.deteccoes, "area": u.area, "largura": u.largura, "altura": u.altura, "ms": u.ms, "seq": u.seq,
                 "ha_s": round(time.time() - u.quando, 1), "analises_por_s": self.analises_por_s(),
             },
         }

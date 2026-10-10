@@ -17,7 +17,7 @@ const JANELA_RITMO = 8; // análises usadas na média de análises por segundo
 
 const video = $("#video");
 const foto = $("#foto-img");
-const estado = { ativo: false, pausado: false, capturando: false, ultimas: [], tempos: [], fonte: video };
+const estado = { ativo: false, pausado: false, capturando: false, ultimas: [], area: null, tempos: [], fonte: video };
 
 const esperar = (ms) => new Promise((ok) => setTimeout(ok, ms));
 const numero = (v, casas = 1) => v.toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas });
@@ -101,8 +101,9 @@ async function ciclo() {
       if (estado.pausado) continue;
       registrarRitmo();
       estado.ultimas = r.deteccoes;
+      estado.area = r.area;
       desenhar();
-      status("ao-vivo", T.aoVivo);
+      status(r.area ? "ao-vivo" : "", r.area ? T.aoVivo : T.procurandoCurto);
     } catch (e) {
       status("erro", e instanceof TypeError ? T.semConexao : e.message);
       await esperar(ESPERA_ERRO_MS);
@@ -135,13 +136,21 @@ function desenhar() {
   const camada = $("#caixas");
   const area = areaDaImagem();
   const lista = area ? estado.ultimas : [];
-  while (camada.children.length < lista.length) {
+  const guia = $("#area");
+  guia.hidden = !(area && estado.area);
+  if (!guia.hidden) {
+    const [ax0, ay0, ax1, ay1] = estado.area;
+    guia.style.transform = `translate(${area.x + ax0 * area.w}px, ${area.y + ay0 * area.h}px)`;
+    guia.style.width = `${(ax1 - ax0) * area.w}px`;
+    guia.style.height = `${(ay1 - ay0) * area.h}px`;
+  }
+  while (camada.querySelectorAll(".cel-caixa").length < lista.length) {
     const caixa = document.createElement("div");
     caixa.className = "cel-caixa";
     caixa.append(document.createElement("span"));
     camada.append(caixa);
   }
-  [...camada.children].forEach((caixa, i) => {
+  [...camada.querySelectorAll(".cel-caixa")].forEach((caixa, i) => {
     const d = lista[i];
     caixa.hidden = !d;
     if (!d) return;
@@ -154,7 +163,7 @@ function desenhar() {
     caixa.classList.toggle("baixo", topo < $(".cel-topo").offsetHeight + caixa.firstChild.offsetHeight);
     caixa.firstChild.textContent = T.rotulo(d.nome, Math.round(d.confianca * 100));
   });
-  $("#lista").textContent = estado.pausado ? T.pausado : resumo(lista);
+  $("#lista").textContent = estado.pausado ? T.pausado : estado.area === null && estado.tempos.length ? T.procurando : resumo(lista);
 }
 
 function resumo(lista) {
@@ -213,6 +222,7 @@ async function analisarFoto(arquivo) {
   try {
     const r = await api("/quadro", { method: "POST", body: arquivo, headers: { "Content-Type": arquivo.type || "image/jpeg" } });
     estado.ultimas = r.deteccoes;
+    estado.area = r.area;
     desenhar();
     status("ao-vivo", T.fotoAnalisada);
   } catch (e) {

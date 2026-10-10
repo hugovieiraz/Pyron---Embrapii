@@ -226,6 +226,7 @@ label > .segmentado { justify-self: start; }
 .celular-quadro { position: relative; width: fit-content; max-width: 100%; margin-inline: auto; border-radius: var(--r-m); overflow: hidden; background: var(--palco); }
 .celular-quadro img { display: block; max-width: 100%; max-height: var(--altura-espelho); }
 .celular-caixas { position: absolute; inset: 0; }
+.celular-area { position: absolute; border: 2px dashed var(--realce-imagem); border-radius: var(--r-m); }
 .celular-caixa { position: absolute; border: 2px solid var(--branco); border-radius: var(--r-p); box-shadow: 0 0 0 1px var(--contorno-imagem); }
 .celular-caixa span { position: absolute; left: 2px; top: 2px; padding: 0 var(--e-2); background: var(--rotulo-imagem); color: var(--branco); border-radius: var(--r-p); font-size: var(--t-1); line-height: var(--a-2); white-space: nowrap; }
 .celular-achados { display: flex; flex-wrap: wrap; gap: var(--e-2); margin-top: var(--e-3); align-items: center; }

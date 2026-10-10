@@ -15,6 +15,8 @@ button { font: inherit; }
 .cel-caixa { position: absolute; left: 0; top: 0; border: 2px solid var(--branco); border-radius: var(--r-p); box-shadow: 0 0 0 1px var(--contorno-imagem), inset 0 0 0 1px var(--contorno-imagem); }
 .cel-caixa span { position: absolute; left: -2px; bottom: 100%; padding: 0 var(--e-2); border-radius: var(--r-p); background: var(--rotulo-imagem); color: var(--branco); font-size: var(--t-1); line-height: var(--a-2); font-weight: var(--p-forte); white-space: nowrap; transform: translateY(calc(-1 * var(--e-1))); }
 .cel-caixa.baixo span { bottom: auto; top: 100%; transform: translateY(var(--e-1)); }
+/* área onde o Pyron achou o termograma: tracejada, só para orientar o enquadramento */
+.cel-area { position: absolute; left: 0; top: 0; border: 2px dashed var(--realce-imagem); border-radius: var(--r-m); }
 
 .cel-flash { position: absolute; inset: 0; background: var(--branco); opacity: 0; pointer-events: none; }
 .cel-flash.ativo { animation: cel-flash var(--dur-lenta) var(--ease-saida); }

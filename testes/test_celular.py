@@ -19,6 +19,17 @@ def _jpeg(largura: int = 800, altura: int = 600) -> bytes:
     return buf.getvalue()
 
 
+def _termograma_na_sala() -> bytes:
+    """Termograma arco-íris sintético (o dos testes da paleta) no meio de uma sala escura."""
+    from testes.test_paleta import _cena, _imagem_sintetica
+
+    sala = np.full((1280, 720, 3), (60, 54, 48), np.uint8)
+    sala[400:880, 40:680] = _imagem_sintetica(50.0, 10.0, _cena())
+    buf = io.BytesIO()
+    Image.fromarray(sala).save(buf, format="JPEG", quality=92)
+    return buf.getvalue()
+
+
 class _DetectorImagem(Detector):
     """Acha sempre um para-raio no quarto esquerdo da imagem (em pixels da matriz)."""
 
@@ -57,7 +68,8 @@ def test_rotas_do_celular_pedem_o_codigo_e_devolvem_caixas_normalizadas(tmp_path
     modo = celular.ModoCelular(
         tmp_path,
         detectar=lambda rgb: ([{"classe": "para_raio", "nome": "Para-raio", "confianca": 0.9,
-                                "caixa": [0.0, 0.0, rgb.shape[1] / 4, rgb.shape[0] / 2]}], {}),
+                                "caixa": [0.0, 0.0, rgb.shape[1] / 4, rgb.shape[0] / 2]}],
+                              {"area": [0, 0, rgb.shape[1], rgb.shape[0]]}),
         capturar=lambda dados, nome: capturas.append(nome) or {"id": "x", "regioes": 1},
         modelo=lambda: {"id": "teste", "nome": "Modelo de teste"},
     )
@@ -72,6 +84,8 @@ def test_rotas_do_celular_pedem_o_codigo_e_devolvem_caixas_normalizadas(tmp_path
 
     r = c.post("/c/codigo-certo/quadro", content=_jpeg(800, 600), headers={"Content-Type": "image/jpeg"})
     assert r.status_code == 200, r.text
+    assert r.json()["deteccoes"] == [] and r.json()["area"] == [0.0, 0.0, 1.0, 1.0]  # um quadro só não confirma
+    r = c.post("/c/codigo-certo/quadro", content=_jpeg(800, 600), headers={"Content-Type": "image/jpeg"})
     d = r.json()["deteccoes"][0]
     assert d["caixa"] == [0.0, 0.0, 0.25, 0.5]
     assert c.post("/c/codigo-certo/quadro", content=b"lixo").status_code == 422
@@ -79,7 +93,18 @@ def test_rotas_do_celular_pedem_o_codigo_e_devolvem_caixas_normalizadas(tmp_path
     assert c.post("/c/codigo-certo/capturar", content=_jpeg()).json()["regioes"] == 1
     assert capturas and capturas[0].startswith("celular_")
     e = modo.estado()
-    assert e["ultimo"]["seq"] == 1 and e["capturas"] == 1 and e["ultimo"]["deteccoes"][0]["nome"] == "Para-raio"
+    assert e["ultimo"]["seq"] == 2 and e["capturas"] == 1 and e["ultimo"]["deteccoes"][0]["nome"] == "Para-raio"
+
+
+def test_peca_so_aparece_confirmada_e_some_sem_termograma(tmp_path) -> None:
+    modo = celular.ModoCelular(tmp_path, detectar=None, capturar=None, modelo=None)
+    para_raio = {"classe": "para_raio", "caixa": [0.1, 0.1, 0.3, 0.6]}
+    assert modo._confirmar([para_raio], True) == []
+    mexeu = {"classe": "para_raio", "caixa": [0.12, 0.11, 0.31, 0.62]}  # a mão mexeu um pouco
+    assert modo._confirmar([mexeu], True) == [mexeu]
+    assert modo._confirmar([{"classe": "terminal_superior", "caixa": [0.5, 0.5, 0.6, 0.6]}], True) == []
+    assert modo._confirmar([mexeu], False) == []  # sem termograma: esquece o histórico
+    assert modo._confirmar([mexeu], True) == []
 
 
 @pytest.fixture()
@@ -108,10 +133,17 @@ def test_captura_do_celular_vira_inspecao_sem_temperatura(cliente, monkeypatch) 
     det = _DetectorImagem()
     monkeypatch.setattr(servidor, "_detector_imagem", lambda: det)
     monkeypatch.setattr(servidor, "_detector", lambda _id: det)
-    caixas, modelo = servidor._celular_detectar(celular.ler_imagem(_jpeg()))
-    assert caixas[0]["nome"] == "Para-raio" and modelo["nome"] == "Modelo de teste"
+    # Sem termograma no quadro (só uma parede laranja), nada é procurado e nada é salvo.
+    assert servidor._celular_detectar(celular.ler_imagem(_jpeg())) == ([], {"area": None})
+    with pytest.raises(ValueError, match="Nenhuma imagem térmica"):
+        servidor._celular_capturar(_jpeg(), "celular_teste.jpg")
 
-    resumo = servidor._celular_capturar(_jpeg(), "celular_teste.jpg")
+    caixas, info = servidor._celular_detectar(celular.ler_imagem(_termograma_na_sala()))
+    x0, y0, x1, y1 = info["area"]
+    assert x0 <= 40 and y0 <= 400 and x1 >= 680 and y1 >= 880 and y1 - y0 < 1280  # a área é o termograma, não a sala
+    assert caixas[0]["nome"] == "Para-raio" and caixas[0]["caixa"][0] == x0 and caixas[0]["caixa"][1] == y0
+
+    resumo = servidor._celular_capturar(_termograma_na_sala(), "celular_teste.jpg")
     assert resumo["regioes"] == 1
     a = cliente.get(f"/api/analises/{resumo['id']}").json()
     assert a["fonte"] == "celular"
