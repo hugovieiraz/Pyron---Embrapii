@@ -8,19 +8,27 @@ const T = TEXTOS.celular;
 const $ = (s) => document.querySelector(s);
 const TOKEN = location.pathname.split("/")[2] || "";
 const BASE = `/c/${TOKEN}`;
-const LADO_QUADRO = 640; // o detector trabalha em 640: maior que isso só pesa na rede
+// O Pyron recorta só o termograma do quadro: mandar 960 deixa o recorte com detalhe para o detector (640).
+const LADO_QUADRO = 960;
 const LADO_CAPTURA = 1280; // a captura vira inspeção e merece mais detalhe
 const QUALIDADE_JPEG = 0.72;
 const ESPERA_ERRO_MS = 1500;
 const ESPERA_PAUSA_MS = 200;
 const JANELA_RITMO = 8; // análises usadas na média de análises por segundo
+const PASSOS_ZOOM = [1, 2, 3];
 
 const video = $("#video");
 const foto = $("#foto-img");
-const estado = { ativo: false, pausado: false, capturando: false, ultimas: [], area: null, tempos: [], fonte: video };
+const estado = {
+  ativo: false, pausado: false, capturando: false, fonte: video,
+  ultimas: [], area: null, tempos: [], ritmo: null, classes: [],
+  lugares: new Map(), // chave da detecção → lugar do rótulo no quadro passado
+  trilha: null, zooms: [], zoom: 0,
+};
 
 const esperar = (ms) => new Promise((ok) => setTimeout(ok, ms));
 const numero = (v, casas = 1) => v.toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas });
+const token = (nome) => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(nome)) || 0;
 
 async function api(caminho, opcoes = {}) {
   const r = await fetch(BASE + caminho, opcoes);
@@ -45,7 +53,7 @@ function avisar(texto, erro = false) {
   relogioAviso = setTimeout(() => { a.hidden = true; }, erro ? 6000 : 3000);
 }
 
-// ------------------------------------------------------------------ câmera e quadros
+// ------------------------------------------------------------------ câmera, zoom e quadros
 
 async function ligarCamera() {
   $("#inicio-nota").textContent = "";
@@ -55,11 +63,13 @@ async function ligarCamera() {
     return;
   }
   try {
-    video.srcObject = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+    const fluxo = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
       audio: false,
     });
+    video.srcObject = fluxo;
     await video.play();
+    prepararZoom(fluxo.getVideoTracks()[0]);
   } catch (e) {
     $("#inicio-nota").textContent = e && e.name === "NotAllowedError" ? T.cameraNegada : T.cameraFalhou(e && e.message);
     $("#btn-foto").hidden = false;
@@ -70,6 +80,28 @@ async function ligarCamera() {
   manterTelaAcesa();
   estado.ativo = true;
   ciclo();
+}
+
+/** Zoom da própria câmera, quando o celular deixa: enche a tela com o termograma sem chegar perto. */
+function prepararZoom(trilha) {
+  const cap = trilha && trilha.getCapabilities ? trilha.getCapabilities() : {};
+  if (!cap.zoom) return;
+  estado.trilha = trilha;
+  estado.zooms = PASSOS_ZOOM.filter((z) => z >= cap.zoom.min && z <= cap.zoom.max);
+  if (estado.zooms.length < 2) return;
+  estado.zoom = 0;
+  $("#btn-zoom").hidden = false;
+}
+
+async function trocarZoom() {
+  estado.zoom = (estado.zoom + 1) % estado.zooms.length;
+  const z = estado.zooms[estado.zoom];
+  try {
+    await estado.trilha.applyConstraints({ advanced: [{ zoom: z }] });
+    $("#btn-zoom").textContent = T.zoom(z);
+  } catch {
+    avisar(T.zoomFalhou, true);
+  }
 }
 
 /** O quadro atual da câmera em JPEG, com o lado maior reduzido a ``lado``. */
@@ -100,10 +132,7 @@ async function ciclo() {
       const r = await api("/quadro", { method: "POST", body: blob, headers: { "Content-Type": "image/jpeg" } });
       if (estado.pausado) continue;
       registrarRitmo();
-      estado.ultimas = r.deteccoes;
-      estado.area = r.area;
-      desenhar();
-      status(r.area ? "ao-vivo" : "", r.area ? T.aoVivo : T.procurandoCurto);
+      receber(r);
     } catch (e) {
       status("erro", e instanceof TypeError ? T.semConexao : e.message);
       await esperar(ESPERA_ERRO_MS);
@@ -111,14 +140,22 @@ async function ciclo() {
   }
 }
 
+function receber(r) {
+  estado.ultimas = r.deteccoes;
+  estado.area = r.area;
+  desenhar();
+  const ritmo = estado.ritmo ? ` · ${T.ritmo(numero(estado.ritmo))}` : "";
+  status(r.area ? "ao-vivo" : "", (r.area ? T.aoVivo : T.procurandoCurto) + ritmo);
+}
+
 function registrarRitmo() {
   estado.tempos.push(performance.now());
   if (estado.tempos.length > JANELA_RITMO) estado.tempos.shift();
   const t = estado.tempos;
-  if (t.length >= 2) $("#ritmo").textContent = T.ritmo(numero((1000 * (t.length - 1)) / (t[t.length - 1] - t[0])));
+  if (t.length >= 2) estado.ritmo = (1000 * (t.length - 1)) / (t[t.length - 1] - t[0]);
 }
 
-// ------------------------------------------------------------------ caixas sobre a imagem
+// ------------------------------------------------------------------ caixas, rótulos e legenda
 
 /** Onde a imagem aparece na tela: vídeo em "cover" (preenche), foto em "contain" (inteira). */
 function areaDaImagem() {
@@ -132,45 +169,73 @@ function areaDaImagem() {
   return { x: (W - iw * s) / 2, y: (H - ih * s) / 2, w: iw * s, h: ih * s };
 }
 
+/** Garante ``n`` filhos com a classe dada na camada; devolve os ``n`` primeiros e esconde o resto. */
+function reaproveitar(camada, classe, n, criar) {
+  let filhos = [...camada.querySelectorAll(`.${classe}`)];
+  while (filhos.length < n) {
+    const novo = criar();
+    camada.append(novo);
+    filhos.push(novo);
+  }
+  filhos.forEach((f, i) => { f.hidden = i >= n; });
+  return filhos.slice(0, n);
+}
+
+const posicionar = (no, x, y) => { no.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`; };
+
 function desenhar() {
-  const camada = $("#caixas");
   const area = areaDaImagem();
   const lista = area ? estado.ultimas : [];
+  const emTela = (c) => ({ x: area.x + c[0] * area.w, y: area.y + c[1] * area.h, w: (c[2] - c[0]) * area.w, h: (c[3] - c[1]) * area.h });
+
   const guia = $("#area");
   guia.hidden = !(area && estado.area);
   if (!guia.hidden) {
-    const [ax0, ay0, ax1, ay1] = estado.area;
-    guia.style.transform = `translate(${area.x + ax0 * area.w}px, ${area.y + ay0 * area.h}px)`;
-    guia.style.width = `${(ax1 - ax0) * area.w}px`;
-    guia.style.height = `${(ay1 - ay0) * area.h}px`;
+    const g = emTela(estado.area);
+    posicionar(guia, g.x, g.y);
+    guia.style.width = `${g.w}px`;
+    guia.style.height = `${g.h}px`;
   }
-  while (camada.querySelectorAll(".cel-caixa").length < lista.length) {
-    const caixa = document.createElement("div");
-    caixa.className = "cel-caixa";
-    caixa.append(document.createElement("span"));
-    camada.append(caixa);
-  }
-  [...camada.querySelectorAll(".cel-caixa")].forEach((caixa, i) => {
-    const d = lista[i];
-    caixa.hidden = !d;
-    if (!d) return;
-    const [x0, y0, x1, y1] = d.caixa;
-    const topo = area.y + y0 * area.h;
-    caixa.style.transform = `translate(${area.x + x0 * area.w}px, ${topo}px)`;
-    caixa.style.width = `${(x1 - x0) * area.w}px`;
-    caixa.style.height = `${(y1 - y0) * area.h}px`;
-    // Perto do topo, o rótulo ficaria embaixo da barra do Pyron: vai para baixo da caixa.
-    caixa.classList.toggle("baixo", topo < $(".cel-topo").offsetHeight + caixa.firstChild.offsetHeight);
-    caixa.firstChild.textContent = T.rotulo(d.nome, Math.round(d.confianca * 100));
+
+  const caixas = reaproveitar($("#caixas"), "cel-caixa", lista.length, () => Object.assign(document.createElement("div"), { className: "cel-caixa" }));
+  const rotulos = reaproveitar($("#rotulos"), "cel-rotulo", lista.length, () => {
+    const r = Object.assign(document.createElement("span"), { className: "cel-rotulo" });
+    r.append(document.createElement("i"), document.createElement("span"));
+    return r;
   });
-  $("#lista").textContent = estado.pausado ? T.pausado : estado.area === null && estado.tempos.length ? T.procurando : resumo(lista);
+  const chaves = chavesDasDeteccoes(lista);
+  const itens = lista.map((d, i) => {
+    const c = emTela(d.caixa);
+    posicionar(caixas[i], c.x, c.y);
+    caixas[i].style.width = `${c.w}px`;
+    caixas[i].style.height = `${c.h}px`;
+    rotulos[i].firstChild.style.background = corDaClasse(d.classe, estado.classes);
+    rotulos[i].lastChild.textContent = d.nome;
+    return { chave: chaves[i], caixa: c, largura: rotulos[i].offsetWidth, altura: rotulos[i].offsetHeight };
+  });
+  // Os rótulos ficam entre a barra do topo e a base, sem cobrir uns aos outros.
+  const W = $("#rotulos").clientWidth;
+  const margem = token("--e-1");
+  const limites = { x0: margem, y0: $(".cel-topo").offsetHeight + margem, x1: W - margem, y1: $("#base").hidden ? window.innerHeight : $("#base").offsetTop - margem };
+  posicionarRotulos(itens, limites, estado.lugares, margem).forEach((p, i) => posicionar(rotulos[i], p.x, p.y));
+
+  desenharLegenda(lista);
 }
 
-function resumo(lista) {
-  if (!lista.length) return T.nadaAchado;
-  const contagem = new Map();
-  for (const d of lista) contagem.set(d.nome, (contagem.get(d.nome) || 0) + 1);
-  return [...contagem].map(([nome, n]) => (n > 1 ? `${n} × ${nome}` : nome)).join(" · ");
+/** Legenda embaixo: uma etiqueta por peça, de cima para baixo, com a cor do tipo e a confiança. */
+function desenharLegenda(lista) {
+  const ordenadas = [...lista].sort((a, b) => a.caixa[1] - b.caixa[1]);
+  $("#legenda").replaceChildren(...ordenadas.map((d) => {
+    const chip = Object.assign(document.createElement("span"), { className: "cel-chip" });
+    const ponto = document.createElement("i");
+    ponto.style.background = corDaClasse(d.classe, estado.classes);
+    chip.append(ponto, d.nome, Object.assign(document.createElement("b"), { textContent: T.confianca(Math.round(d.confianca * 100)) }));
+    return chip;
+  }));
+  let texto = "";
+  if (estado.pausado) texto = T.pausado;
+  else if (!lista.length && estado.tempos.length) texto = estado.area ? T.nadaAchado : T.procurando;
+  $("#lista").textContent = texto;
 }
 
 // ------------------------------------------------------------------ captura, pausa e modo foto
@@ -220,10 +285,10 @@ async function analisarFoto(arquivo) {
   $("#btn-pausar").hidden = true;
   status("", T.analisando);
   try {
+    // Uma foto só não tem o quadro seguinte para confirmar as peças: manda duas vezes.
+    await api("/quadro", { method: "POST", body: arquivo, headers: { "Content-Type": arquivo.type || "image/jpeg" } });
     const r = await api("/quadro", { method: "POST", body: arquivo, headers: { "Content-Type": arquivo.type || "image/jpeg" } });
-    estado.ultimas = r.deteccoes;
-    estado.area = r.area;
-    desenhar();
+    receber(r);
     status("ao-vivo", T.fotoAnalisada);
   } catch (e) {
     status("erro", e instanceof TypeError ? T.semConexao : e.message);
@@ -251,10 +316,12 @@ $("#btn-foto").addEventListener("click", () => $("#arquivo-foto").click());
 $("#arquivo-foto").addEventListener("change", (ev) => analisarFoto(ev.target.files[0]));
 $("#btn-capturar").addEventListener("click", capturar);
 $("#btn-pausar").addEventListener("click", pausar);
+$("#btn-zoom").addEventListener("click", trocarZoom);
 
 api("/modelo")
   .then((m) => {
     $("#modelo").textContent = m.nome;
+    estado.classes = m.classes || [];
     status("", T.pronto);
   })
   .catch((e) => {

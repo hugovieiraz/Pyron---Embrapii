@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-tema="escuro">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -14,6 +14,7 @@
   <video id="video" playsinline muted autoplay></video>
   <img class="cel-foto" id="foto-img" alt="Foto enviada ao Pyron" hidden>
   <div class="cel-caixas" id="caixas" aria-hidden="true"><div class="cel-area" id="area" hidden></div></div>
+  <div class="cel-rotulos" id="rotulos" aria-hidden="true"></div>
   <div class="cel-flash" id="flash"></div>
 
   <header class="cel-topo">
@@ -32,11 +33,12 @@
   </section>
 
   <footer class="cel-base" id="base" hidden>
+    <div class="cel-legenda" id="legenda" aria-live="polite"></div>
     <p class="cel-lista" id="lista" aria-live="polite"></p>
     <div class="cel-controles">
       <button class="cel-redondo" type="button" id="btn-pausar" aria-pressed="false">Pausar</button>
       <button class="cel-captura" type="button" id="btn-capturar" aria-label="Capturar e salvar no Pyron"><i></i></button>
-      <span class="cel-redondo cel-ritmo" id="ritmo" title="Análises por segundo">–</span>
+      <button class="cel-redondo cel-zoom" type="button" id="btn-zoom" aria-label="Zoom da câmera" hidden>1×</button>
     </div>
   </footer>
 
@@ -44,6 +46,7 @@
   <input type="file" id="arquivo-foto" accept="image/*" capture="environment" hidden>
 </main>
 <script src="/e/textos.js"></script>
+<script src="/e/rotulos.js"></script>
 <script src="/e/celular.js"></script>
 </body>
 </html>

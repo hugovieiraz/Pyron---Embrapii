@@ -1415,7 +1415,7 @@ def _detector_imagem() -> detectores.Detector:
 
 def _celular_modelo() -> dict:
     det = _detector_imagem()
-    return {"id": det.id, "nome": det.nome}
+    return {"id": det.id, "nome": det.nome, "classes": det.classes}
 
 
 CONFIANCA_CELULAR = 0.5  # foto de tela tem reflexo e moiré: só caixas com boa confiança

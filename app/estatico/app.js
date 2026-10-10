@@ -405,6 +405,7 @@ function desenharCelular(c) {
   pararRelogioCelular();
   $("#nav-celular-ponto").hidden = !c.ligado;
   estado.seqCelular = null;
+  estado.lugaresCelular = new Map(); // lugar de cada rótulo no quadro passado: não pulam a cada quadro
   if (!c.ligado) {
     const semModelo = c.modelo && c.modelo.erro;
     const botao = el("button", { class: "btn btn-primaria", type: "button", disabled: semModelo ? true : null, onclick: (ev) => ligarCelular(ev.currentTarget) }, icone("ligar"), C.ligar);
@@ -468,21 +469,40 @@ function atualizarEspelho(c) {
   if (estado.seqCelular === u.seq) return;
   estado.seqCelular = u.seq;
   const pct = (v) => `${v * 100}%`;
+  const classes = (c.modelo && c.modelo.classes) || [];
   const img = new Image();
-  img.onload = () => {
+  img.onload = async () => {
     let quadro = espelho.querySelector(".celular-quadro");
     if (!quadro) {
       quadro = el("div", { class: "celular-quadro" }, el("img", { alt: C.espelhoAlt }), el("div", { class: "celular-caixas" }));
       espelho.replaceChildren(quadro);
     }
-    $("img", quadro).src = img.src;
-    const caixaEm = (c) => ({ left: pct(c[0]), top: pct(c[1]), width: pct(c[2] - c[0]), height: pct(c[3] - c[1]) });
+    const foto = $("img", quadro);
+    foto.src = img.src;
+    await foto.decode().catch(() => {});
+    const caixaEm = (b) => ({ left: pct(b[0]), top: pct(b[1]), width: pct(b[2] - b[0]), height: pct(b[3] - b[1]) });
+    const rotulos = u.deteccoes.map((d) => el("span", { class: "celular-rotulo" }, el("i", { style: { background: corDaClasse(d.classe, classes) } }), d.nome));
     $(".celular-caixas", quadro).replaceChildren(
       ...(u.area ? [el("div", { class: "celular-area", style: caixaEm(u.area) })] : []),
-      ...u.deteccoes.map((d) => el("div", { class: "celular-caixa", style: caixaEm(d.caixa) }, el("span", {}, C.rotulo(d.nome, Math.round(d.confianca * 100))))));
+      ...u.deteccoes.map((d) => el("div", { class: "celular-caixa", style: caixaEm(d.caixa) })),
+      ...rotulos);
+    // Rótulos fora das caixas e sem cobrir uns aos outros (rotulos.js, o mesmo do celular).
+    const W = quadro.clientWidth;
+    const H = quadro.clientHeight;
+    const m = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--e-1")) || 0;
+    const chaves = chavesDasDeteccoes(u.deteccoes);
+    const itens = u.deteccoes.map((d, i) => ({
+      chave: chaves[i], largura: rotulos[i].offsetWidth, altura: rotulos[i].offsetHeight,
+      caixa: { x: d.caixa[0] * W, y: d.caixa[1] * H, w: (d.caixa[2] - d.caixa[0]) * W, h: (d.caixa[3] - d.caixa[1]) * H },
+    }));
+    posicionarRotulos(itens, { x0: m, y0: m, x1: W - m, y1: H - m }, estado.lugaresCelular, m)
+      .forEach((p, i) => { rotulos[i].style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px)`; });
     const vazio = u.area ? C.nenhumNoQuadro : C.semTermograma;
+    const ordenadas = [...u.deteccoes].sort((a, b) => a.caixa[1] - b.caixa[1]);
     $("#celular-achados").replaceChildren(
-      ...(u.deteccoes.length ? u.deteccoes.map((d) => el("span", { class: "etiqueta" }, C.rotulo(d.nome, Math.round(d.confianca * 100)))) : [el("span", { class: "nota" }, vazio)]),
+      ...(ordenadas.length
+        ? ordenadas.map((d) => el("span", { class: "etiqueta" }, el("i", { class: "ponto-classe", style: { background: corDaClasse(d.classe, classes) } }), C.rotulo(d.nome, Math.round(d.confianca * 100))))
+        : [el("span", { class: "nota" }, vazio)]),
       ...capturas);
   };
   img.src = `/api/celular/quadro.jpg?seq=${u.seq}`;
