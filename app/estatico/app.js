@@ -2557,8 +2557,8 @@ async function carregarPainel() {
   preencherSugestoes(equips);
   if (estado.vista !== "painel") return;
 
-  const conta = (niveis) => lista.filter((it) => niveis.includes(it.resumo.severidade)).length;
-  const criticas = conta(["urgente", "imediato"]);
+  const atual = situacaoAtual(lista);
+  const criticas = atual.filter((it) => ["urgente", "imediato"].includes(it.resumo.severidade)).length;
   const kpi = (rotulo, valor, nota, destino, classe = "", ic = null, tom = "") =>
     el("button", { class: `kpi-grande ${classe}`, type: "button", onclick: destino },
       ic ? el("span", { class: `kpi-icone ${tom}`, "aria-hidden": "true" }, icone(ic)) : null,
@@ -2579,7 +2579,7 @@ async function carregarPainel() {
   }
 
   corpo.replaceChildren(...[avisoConfiguracao(), kpis].filter(Boolean), el("div", { class: "painel-grade" },
-    cartaoAtencao(lista),
+    cartaoAtencao(atual),
     el("div", { class: "pilha" }, cartaoDistribuicao(lista), cartaoProximas(equips), cartaoMonitor(status, alertas))));
   contarNumeros(corpo);
 }
@@ -2639,9 +2639,30 @@ function miniaturaSrc(it) {
   return `/api/analises/${it.id}/miniatura.png?v=${encodeURIComponent(it.resumo.severidade + it.resumo.regioes)}`;
 }
 
+/**
+ * Situação atual: de cada equipamento, só a inspeção mais recente (uma inspeção normal depois de uma
+ * grave quer dizer que o equipamento está normal agora; a anomalia antiga segue em Pendências até a
+ * correção ser verificada). Inspeções sem equipamento valem cada uma por si.
+ */
+function situacaoAtual(lista) {
+  const quando = (it) => (it.data_captura || it.criado_em || "").replace("T", " ");
+  const ultimas = new Map();
+  const soltas = [];
+  for (const it of lista) {
+    const chave = it.equipamento_chave;
+    if (!chave || chave === SEM_EQUIPAMENTO) {
+      soltas.push(it);
+      continue;
+    }
+    const antes = ultimas.get(chave);
+    if (!antes || quando(it) > quando(antes)) ultimas.set(chave, it);
+  }
+  return [...ultimas.values(), ...soltas];
+}
+
 function cartaoAtencao(lista) {
   const graves = lista
-    .filter((it) => it.resumo.severidade !== "normal")
+    .filter((it) => NIVEIS.includes(it.resumo.severidade) && it.resumo.severidade !== "normal")
     .sort((a, b) =>
       NIVEIS.indexOf(b.resumo.severidade) - NIVEIS.indexOf(a.resumo.severidade) ||
       ((b.destaque && b.destaque.pct_mta) || 0) - ((a.destaque && a.destaque.pct_mta) || 0) ||
@@ -4717,6 +4738,8 @@ async function iniciar() {
   rota();
   api("/api/equipamentos").then((l) => { estado.equipamentos = estado.equipamentos || l; preencherSugestoes(l); }).catch(() => {});
   api("/api/pendencias").then((l) => { estado.pendencias = estado.pendencias || l; atualizarContadorPendencias(); }).catch(() => {});
+  // O contador de inspeções do menu aparece em qualquer tela de entrada, não só depois do Painel.
+  api("/api/analises").then((l) => { if (!estado.inspecoes.length) estado.inspecoes = l; atualizarContador(); }).catch(() => {});
   atualizarStatus();
   setInterval(atualizarStatus, 15000);
 }

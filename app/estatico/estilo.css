@@ -932,7 +932,7 @@ kbd { display: inline-grid; place-items: center; min-width: var(--e-5); height: 
 .cartao-equip { display: grid; grid-template-columns: var(--e-24) minmax(0, 1fr); gap: var(--e-3); padding: var(--e-3); background: var(--superficie); border: 1px solid var(--borda); border-radius: var(--r-g); box-shadow: var(--sombra-1); cursor: pointer; transition: border-color var(--dur-rapida) var(--ease-padrao), box-shadow var(--dur-rapida) var(--ease-padrao); }
 .cartao-equip:hover, .cartao-equip:focus-visible { border-color: var(--acao); box-shadow: var(--sombra-2); }
 .cartao-equip-img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--r-m); background: var(--palco); align-self: start; }
-.cartao-equip-corpo { display: grid; gap: var(--e-1); min-width: 0; }
+.cartao-equip-corpo { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--e-1); min-width: 0; } /* a coluna não cresce com a largura natural do gráfico */
 .cartao-equip-topo { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); }
 .cartao-equip-nome { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cartao-equip-serie { display: flex; align-items: center; gap: var(--e-3); min-width: 0; }
