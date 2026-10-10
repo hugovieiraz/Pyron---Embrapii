@@ -133,7 +133,8 @@ com confiança de 50% ou mais, e a captura salva só a área do termograma.
 O filtro aceitou os 151 termogramas e recusou as 151 fotos comuns em que foi ajustado. O celular
 simulado tem moldura, perspectiva, moiré, cor deslocada e tremor; as imagens são do conjunto em que o
 modelo treinou, então o número real tende a ser menor. Segure o celular na mesma orientação da imagem.
-Velocidade neste notebook, na tomada: 0,5 a 0,7 s por quadro (cerca de 2 análises por segundo).
+Velocidade neste notebook, na tomada: cerca de 0,25 s por quadro com a versão rápida (INT8) do
+modelo, que o celular usa sozinho quando ela existe (veja abaixo).
 
 ## Imagens sem temperatura
 
@@ -262,6 +263,29 @@ detector do Pyron, escolhe o limiar na validação, mede o **erro da Tmáx** (ca
 rotulada, na matriz radiométrica), instala em `modelos/` e grava a avaliação na aba Avaliação.
 O cálculo de mAP usa o `faster_coco_eval`: o `vernier` (padrão do RF-DETR) e o `hotcoco` são
 bloqueados pelo Windows.
+
+### Versão rápida de um modelo (INT8)
+
+```bash
+.venv/Scripts/python.exe -m ml.otimizar modelos/<id> --dados dados/para_raios_dataset_v2
+```
+
+Guarda os pesos dos MatMul em 8 bits (quantização dinâmica do ONNX Runtime, sem treinar de novo),
+mede a velocidade alternando com o original e, com `--dados`, o acerto no conjunto de teste. Instala
+ao lado do original como `modelos/<id>-int8`; a câmera do celular passa a usá-la sozinha.
+
+| Para-raios (RF-DETR Medium, 640 px), processador i5-13420H | Original | INT8 |
+|---|---|---|
+| Tempo por imagem (mediana, rodadas alternadas) | 335–368 ms | 235–245 ms |
+| mAP50 / mAP50-95 no teste (27 fotos) | 0,859 / 0,536 | 0,859 / 0,530 |
+| Revocação no teste | 0,898 | 0,904 |
+| Celular simulado (20 para-raios, recorte do termograma) | 79 de 79 peças | 79 de 79 peças |
+| Arquivo | 123 MB | 43 MB |
+
+Detectores do tipo DETR podem perder muito acerto com quantização estática; por isso só os MatMul,
+dinâmica, e o acerto é medido de novo. O que foi testado e não ajudou: fixar as linhas do ONNX nos
+núcleos rápidos (fica igual ou pior que 6 linhas sem espera ativa) e corrigir as cores do recorte do
+celular (cor puxada, reflexo e ângulo forte já davam 78–79 de 79 peças).
 
 ## Interface
 

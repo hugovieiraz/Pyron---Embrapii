@@ -1400,17 +1400,20 @@ def _detector_imagem() -> detectores.Detector:
     """O modelo que olha a imagem colorida: o ativo, se for um; senão o primeiro instalado.
 
     A foto do celular não tem temperatura, então a regra de pontos quentes não acha nada nela.
+    Ao vivo, cada milissegundo conta: se existe a versão rápida (INT8, ``ml/otimizar.py``) do mesmo
+    modelo, é ela que vai.
     """
     ativo = _detector(None)
     if isinstance(ativo, detectores.Combinado):
         ativo = ativo.partes[0]
-    if ativo.precisa_imagem and ativo.tipo == "aprendizado":
-        return ativo
-    for d in detectores.listar(PASTA_MODELOS):
-        if d.precisa_imagem and d.tipo == "aprendizado":
-            return d
-    raise ValueError("Nenhum modelo que olha a imagem colorida está instalado. Instale um em Modelos "
-                     "(o de para-raios, por exemplo).")
+    candidatos = [d for d in detectores.listar(PASTA_MODELOS) if d.precisa_imagem and d.tipo == "aprendizado"]
+    base = ativo if ativo.precisa_imagem and ativo.tipo == "aprendizado" else next(iter(candidatos), None)
+    if base is None:
+        raise ValueError("Nenhum modelo que olha a imagem colorida está instalado. Instale um em Modelos "
+                         "(o de para-raios, por exemplo).")
+    origem = (base.cartao.get("otimizacao") or {}).get("origem", base.id)
+    rapida = next((d for d in candidatos if (d.cartao.get("otimizacao") or {}).get("origem") == origem), None)
+    return rapida or base
 
 
 def _celular_modelo() -> dict:
