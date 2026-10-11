@@ -40,6 +40,20 @@ Sem o `.exe`, pela pasta do projeto:
 .venv/Scripts/python.exe -m app.iniciar --janela
 ```
 
+**Se o Windows barrar o `Pyron.exe`** ("O controle inteligente de aplicativos bloqueou um aplicativo
+que pode não ser seguro"): o `.exe` não tem assinatura digital, e o Controle Inteligente de
+Aplicativos decide pela reputação na nuvem; o mesmo arquivo que passava pode passar a ser barrado
+(aconteceu em 11/10/2026). Use o atalho **Abrir Pyron** da área de trabalho: ele chama direto o
+`pythonw.exe` do projeto, assinado pela Python Software Foundation, que o Windows deixa rodar
+(`-m app.iniciar --janela --auto-encerrar`: mesma janela, desliga ao fechar, só sem a tela de
+abertura). Para criar o atalho de novo:
+
+```bash
+.venv/Scripts/python.exe lancador/atalho.py
+```
+
+Não desligue a proteção do Windows para isso; para distribuir a clientes, o caminho é assinar o `.exe`.
+
 Depois de uma atualização, se um servidor de versão antiga ainda estiver na memória, o `Pyron.exe`
 percebe (compara `/api/saude` com `VERSAO` de `app/servidor.py`), desliga o antigo e sobe o novo; as
 janelas abertas recarregam sozinhas quando o servidor volta.
@@ -396,7 +410,7 @@ Demonstração sem tocar nas inspeções reais:
 |---|---|
 | `nucleo/` | Motor sem interface: leitura radiométrica FLIR (`flir.py`), inversão de paleta (`paleta.py`), entrada única (`entrada.py`), referências de temperatura (`referencias.py`), medição e severidade (`analise.py`), desenho (`render.py`), detectores (`detectores/`) |
 | `app/` | Servidor local (FastAPI), laudo em PDF, inspeções e alertas salvos, equipamentos e tendência (`equipamentos.py`), pendências (`pendencias.py`), vídeo (`videos.py`), monitoramento de pasta (`monitoramento.py`) e interface web (`estatico/`) |
-| `lancador/` | `Pyron.exe`: fonte C# e script de construção |
+| `lancador/` | `Pyron.exe`: fonte C# e script de construção; `atalho.py` cria o atalho que abre sem o `.exe` |
 | `marca/` | Logo original e o script que gera símbolo, ícones e favicon (`gerar_marca.py`) |
 | `ml/` | Treino de detectores a partir de rótulos do CVAT, avaliação e exportação ONNX |
 | `modelos/` | Modelos treinados instalados (ver `modelos/LEIA-ME.md`) |
