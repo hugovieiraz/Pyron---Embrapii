@@ -140,7 +140,8 @@ modelo, que o celular usa sozinho quando ela existe (veja abaixo).
 
 - **Não avaliado:** para-raio e isolador só se comparam com a mesma peça das outras fases (não têm
   MTA). Sozinhos na imagem, ficam "Não avaliado", não "Normal", com o aviso de fotografar as três fases.
-  Nas fotos de para-raios do conjunto, 9 de 31 tinham um para-raio só.
+  Nas fotos de para-raios testadas do conjunto, o modelo achou três para-raios em 13 de 31, dois em 8 e um só em
+  10. Com dois, compara com o mais frio; só com um fica sem avaliação.
 - **Conferir:** quando a severidade vem só de um ponto quente fora das peças que o modelo achou, a
   inspeção ganha o selo "Conferir". O ponto não some da classificação (pode ser defeito num equipamento
   que o modelo não conhece), mas pode ser lâmpada, estrutura ou reflexo: alguém olha antes de agir.
