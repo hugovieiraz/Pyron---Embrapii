@@ -37,7 +37,7 @@ from app.armazenamento import Armazenamento, _destaque
 from nucleo import analise, barra, detectores, enquadrar, entrada, referencias, render, video
 from nucleo.detectores import placa
 
-VERSAO = "0.7.6"
+VERSAO = "0.7.7"
 RAIZ = Path(__file__).resolve().parents[1]
 PASTA_APP = Path(__file__).resolve().parent
 # PYRON_DADOS (ou app.iniciar --dados) aponta outra pasta: demonstrações e testes sem tocar nas inspeções reais.

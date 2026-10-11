@@ -145,3 +145,25 @@ def test_na_placa_de_video_as_pecas_sao_as_mesmas_do_onnx() -> None:
     assert [d.classe for d in a] == [d.classe for d in b]
     for x, y in zip(a, b):
         assert np.allclose(x.caixa, y.caixa, atol=2.0) and abs(x.confianca - y.confianca) < 0.02
+
+
+def test_no_directml_as_pecas_sao_as_mesmas_da_cpu() -> None:
+    """Só roda com o onnxruntime-directml e o modelo instalado (este notebook)."""
+    from pathlib import Path
+
+    from nucleo.detectores import placa
+    from nucleo.detectores.onnx_modelo import DetectorONNX
+    from testes.test_paleta import _cena, _imagem_sintetica
+
+    pasta = Path(__file__).resolve().parents[1] / "modelos" / "para-raios-rfdetr-local-20260930-1627"
+    if not (pasta / "modelo.onnx").exists() or not placa.tem_directml():
+        pytest.skip("sem DirectML ou sem o modelo instalado")
+    cpu = DetectorONNX(pasta)
+    dml = placa.DetectorDirectML(cpu)
+    dml.carregar()
+    img = _imagem_sintetica(50.0, 10.0, _cena())
+    t = np.zeros(img.shape[:2], np.float32)
+    a, b = cpu.detectar(t, img), dml.detectar(t, img)
+    assert [d.classe for d in a] == [d.classe for d in b]
+    for x, y in zip(a, b):
+        assert np.allclose(x.caixa, y.caixa, atol=0.5) and abs(x.confianca - y.confianca) < 0.005

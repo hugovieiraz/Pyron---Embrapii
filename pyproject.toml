@@ -7,6 +7,8 @@ dependencies = ["numpy", "pillow", "scipy"]
 
 [project.optional-dependencies]
 ocr = ["rapidocr-onnxruntime"]
+# placa de vídeo no ao vivo (celular e vídeo); substitui o pacote "onnxruntime" (o mesmo módulo, com o DirectML)
+placa = ["onnxruntime-directml"]
 dev = ["pytest", "matplotlib"]
 
 [tool.setuptools]

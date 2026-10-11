@@ -151,17 +151,21 @@ simulado tem moldura, perspectiva, moiré, cor deslocada e tremor; as imagens s�
 modelo treinou, então o número real tende a ser menor. Segure o celular na mesma orientação da imagem.
 **Velocidade.** Na CPU, o detector leva ~0,27 s por quadro mesmo na versão rápida (INT8): 2 a 3
 análises por segundo, e dividir o processador entre duas análises não rende mais (ele já fica cheio,
-~4 análises/s no máximo). Com placa de vídeo NVIDIA e o PyTorch com CUDA, o ao vivo (celular e vídeo)
-roda o mesmo modelo na placa (`nucleo/detectores/placa.py`): ~40 ms de detector e ~60 ms o quadro
-inteiro na RTX 3050 deste notebook. A placa carrega sozinha em ~8 s, num fio à parte, quando a tela
-do celular abre; até lá, ou sem placa, segue a versão INT8 na CPU. Para isso o modelo precisa trazer
-os pesos do PyTorch (`pesos.pth` e `pytorch` no cartão; o treino local já grava). Mesmas peças do
-ONNX: 223 de 225 em 31 fotos (as outras duas no limite da confiança); a captura que vira inspeção
-continua no ONNX.
+~4 análises/s no máximo). Com placa de vídeo, o ao vivo (celular e vídeo) roda o mesmo modelo nela
+(`nucleo/detectores/placa.py`), por um destes motores:
 
-O PyTorch não tem assinatura digital e o Controle Inteligente de Aplicativos do Windows às vezes barra
-as DLLs dele (`c10.dll`, WinError 4551; aconteceu em 11/10/2026 à noite, depois de passar de manhã):
-aí o ao vivo fica na CPU e o computador mostra "processador; o Windows barrou a placa de vídeo".
+1. **DirectML** (`pip install onnxruntime-directml`, no lugar do `onnxruntime`): o mesmo `modelo.onnx`,
+   na placa de alto desempenho (na RTX 3050 deste notebook ~54 ms por quadro; a Intel integrada levaria
+   ~440). As peças são as da CPU: 225 de 225 iguais em 31 fotos do acervo, confiança a menos de 0,001.
+   Carrega em ~1 s. As DLLs são assinadas pela Microsoft, então o Controle Inteligente de Aplicativos do
+   Windows deixa rodar. É o motor instalado aqui desde a 0.7.7.
+2. **PyTorch com CUDA**, quando não há DirectML e o modelo traz os pesos do PyTorch (`pesos.pth` e
+   `pytorch` no cartão; o treino local já grava): ~40 ms, mas as DLLs do PyTorch não têm assinatura e o
+   Windows às vezes as barra (`c10.dll`, WinError 4551; aconteceu em 11/10/2026 à noite, depois de passar
+   de manhã). Aí o computador mostra "processador; o Windows barrou a placa de vídeo".
+
+Até a placa ficar pronta, ou sem placa, segue a versão INT8 na CPU. A captura que vira inspeção
+continua no ONNX da CPU.
 
 O celular manda quadros no ritmo das análises (o dobro, mais 2, entre 5 e 15 por segundo): na CPU
 são ~7, na placa 15. Mandar mais do que o computador analisa só gastava o celular. A cada 2 s ele
@@ -171,8 +175,8 @@ por quadro (celular mais simples), ele segue um quadro sim, outro não.
 
 | Análises por segundo no celular (teste com o celular falso no mesmo notebook) | CPU (INT8) | Placa de vídeo |
 |---|---|---|
-| Câmera passeando | 2,3 a 3,2 | 7,0 |
-| Câmera parada | ~2,5 | 10,0 |
+| Câmera passeando | 2,3 a 3,2 | 8,1 (DirectML) · 7,0 (PyTorch) |
+| Câmera parada | ~2,5 | 9,4 (DirectML) · 10,0 (PyTorch) |
 
 **Transmissão e fluidez.** O celular transmite por WebSocket: uns 12 quadros JPEG por segundo, sem
 fila (se a rede não deu conta do anterior, o quadro é pulado). O Pyron analisa sempre o mais novo e

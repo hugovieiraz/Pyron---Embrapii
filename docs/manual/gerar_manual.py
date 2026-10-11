@@ -32,7 +32,7 @@ IMAGENS = AQUI / "imagens"
 LOGO = PROJETO / "app" / "estatico" / "marca" / "logo.png"
 SIMBOLO = PROJETO / "app" / "estatico" / "marca" / "simbolo.png"
 SAIDA = PROJETO / "docs" / "Pyron_Funcionalidades.pdf"
-VERSAO = "0.7.6"
+VERSAO = "0.7.7"
 
 # Cores dos tokens da interface (app/estatico/tokens.css).
 TINTA = colors.HexColor("#171B33")
@@ -566,9 +566,10 @@ def conteudo() -> list:
             "<b>Zoom</b> 1×, 2× ou 3× (quando o celular permite) para encher a tela com o termograma sem chegar perto.",
             "Segurança: um servidor à parte, só com as rotas do celular, em HTTPS, ouvindo a rede local só enquanto o modo está ligado e com um "
             "código novo no link a cada vez. Na primeira vez o Windows pergunta se o Pyron pode usar a rede: permita em redes privadas.",
-            "<b>Placa de vídeo:</b> com placa NVIDIA, o detector do ao vivo roda nela (~60 ms por quadro, 7 a 10 análises por "
-            "segundo no teste, contra 2 a 3 na CPU). Ela carrega sozinha em alguns segundos; até lá, vai a versão rápida (INT8) na CPU. "
-            "O computador mostra onde o detector está rodando, ao lado do ritmo.",
+            "<b>Placa de vídeo:</b> o detector do ao vivo roda nela pelo DirectML, da Microsoft (~54 ms por quadro na RTX 3050, "
+            "8 a 9 análises por segundo no teste, contra 2 a 3 na CPU), com as mesmas peças da CPU. Carrega em cerca de 1 s; até lá, "
+            "vai a versão rápida (INT8) na CPU. O computador mostra onde o detector está rodando, ao lado do ritmo, e o que o "
+            "celular está gastando (câmera, envio, JPEG).",
             "<b>Vídeo fluido:</b> o celular transmite uns 12 quadros por segundo (WebSocket) e o computador mostra esse vídeo. Entre uma análise "
             "e outra, o celular acompanha o movimento da câmera e leva as caixas junto (erro de 0,3 pixel na tela num teste com a câmera "
             "passeando, contra cerca de 100 sem isso). Se a cena muda demais, as caixas somem até a próxima análise.",
