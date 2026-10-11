@@ -36,8 +36,9 @@ from app import treinos as treinos_mod
 from app import videos as videos_mod
 from app.armazenamento import Armazenamento, _destaque
 from nucleo import analise, barra, detectores, enquadrar, entrada, referencias, render, video
+from nucleo.detectores import placa
 
-VERSAO = "0.7.4"
+VERSAO = "0.7.5"
 RAIZ = Path(__file__).resolve().parents[1]
 PASTA_APP = Path(__file__).resolve().parent
 # PYRON_DADOS (ou app.iniciar --dados) aponta outra pasta: demonstrações e testes sem tocar nas inspeções reais.
@@ -1284,7 +1285,7 @@ def _preparar_video(opcoes: dict):
 
     Ao vivo a velocidade manda: usa a versão rápida (INT8) do modelo escolhido, se houver.
     """
-    det = _versao_rapida(_detector(opcoes.get("modelo")))
+    det = _ao_vivo(_detector(opcoes.get("modelo")))
     termometro = video.Termometro(entrada.OCRPreguicoso(), opcoes.get("limites"))  # OCR próprio: roda em outra thread
     criterios, componentes = _criterios(), _componentes()
 
@@ -1405,8 +1406,7 @@ def _detector_imagem() -> detectores.Detector:
     """O modelo que olha a imagem colorida: o ativo, se for um; senão o primeiro instalado.
 
     A foto do celular não tem temperatura, então a regra de pontos quentes não acha nada nela.
-    Ao vivo, cada milissegundo conta: se existe a versão rápida (INT8, ``ml/otimizar.py``) do mesmo
-    modelo, é ela que vai.
+    Ao vivo, cada milissegundo conta: vai o mesmo modelo na placa de vídeo, se houver (``_ao_vivo``).
     """
     ativo = _detector(None)
     if isinstance(ativo, detectores.Combinado):
@@ -1416,7 +1416,27 @@ def _detector_imagem() -> detectores.Detector:
     if base is None:
         raise ValueError("Nenhum modelo que olha a imagem colorida está instalado. Instale um em Modelos "
                          "(o de para-raios, por exemplo).")
-    return _versao_rapida(base)
+    return _ao_vivo(base)
+
+
+def _original(det: detectores.Detector) -> detectores.Detector:
+    """O modelo de onde a versão rápida (INT8) saiu; o próprio, se não for uma."""
+    origem = (det.cartao.get("otimizacao") or {}).get("origem")
+    return next((d for d in detectores.listar(PASTA_MODELOS) if d.id == origem), det) if origem else det
+
+
+def _ao_vivo(det: detectores.Detector) -> detectores.Detector:
+    """O detector para o ao vivo (celular e vídeo): o mesmo modelo na placa de vídeo, se houver.
+
+    A placa carrega em outro fio na primeira vez (``nucleo/detectores/placa.py``); até lá, ou se ela
+    não estiver disponível, vai a versão rápida (INT8) na CPU. Vale também para o combinado com os
+    pontos quentes.
+    """
+    combinado = isinstance(det, detectores.Combinado)
+    na_placa = placa.variante(_original(det.partes[0] if combinado else det))
+    if na_placa is None:
+        return _versao_rapida(det)
+    return detectores.Combinado(na_placa, det.partes[1]) if combinado else na_placa
 
 
 def _versao_rapida(det: detectores.Detector) -> detectores.Detector:
@@ -1440,7 +1460,8 @@ def _versao_rapida(det: detectores.Detector) -> detectores.Detector:
 
 def _celular_modelo() -> dict:
     det = _detector_imagem()
-    return {"id": det.id, "nome": det.nome, "classes": det.classes}
+    return {"id": det.id, "nome": det.nome, "classes": det.classes,
+            "onde": placa.situacao(_original(det.partes[0] if isinstance(det, detectores.Combinado) else det))}
 
 
 CONFIANCA_CELULAR = 0.5  # foto de tela tem reflexo e moiré: só caixas com boa confiança

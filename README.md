@@ -135,8 +135,20 @@ com confiança de 50% ou mais, e a captura salva só a área do termograma.
 O filtro aceitou os 151 termogramas e recusou as 151 fotos comuns em que foi ajustado. O celular
 simulado tem moldura, perspectiva, moiré, cor deslocada e tremor; as imagens são do conjunto em que o
 modelo treinou, então o número real tende a ser menor. Segure o celular na mesma orientação da imagem.
-Velocidade neste notebook, na tomada: cerca de 0,25 s por quadro com a versão rápida (INT8) do
-modelo, que o celular usa sozinho quando ela existe (veja abaixo).
+**Velocidade.** Na CPU, o detector leva ~0,27 s por quadro mesmo na versão rápida (INT8): 2 a 3
+análises por segundo, e dividir o processador entre duas análises não rende mais (ele já fica cheio,
+~4 análises/s no máximo). Com placa de vídeo NVIDIA e o PyTorch com CUDA, o ao vivo (celular e vídeo)
+roda o mesmo modelo na placa (`nucleo/detectores/placa.py`): ~40 ms de detector e ~60 ms o quadro
+inteiro na RTX 3050 deste notebook. A placa carrega sozinha em ~8 s, num fio à parte, quando a tela
+do celular abre; até lá, ou sem placa, segue a versão INT8 na CPU. Para isso o modelo precisa trazer
+os pesos do PyTorch (`pesos.pth` e `pytorch` no cartão; o treino local já grava). Mesmas peças do
+ONNX: 223 de 225 em 31 fotos (as outras duas no limite da confiança); a captura que vira inspeção
+continua no ONNX.
+
+| Análises por segundo no celular (teste com o celular falso no mesmo notebook) | CPU (INT8) | Placa de vídeo |
+|---|---|---|
+| Câmera passeando | 2,3 a 3,2 | 7,0 |
+| Câmera parada | ~2,5 | 10,0 |
 
 **Transmissão e fluidez.** O celular transmite por WebSocket: uns 12 quadros JPEG por segundo, sem
 fila (se a rede não deu conta do anterior, o quadro é pulado). O Pyron analisa sempre o mais novo e
@@ -176,7 +188,9 @@ puxada pela câmera do celular puxa a barra do mesmo jeito, e a comparação con
   depois de aparecer duas vezes; até lá o celular mostra "lendo os números da escala".
 - **Máxima de cada peça:** percentil 99 da temperatura dentro da caixa, depois de apagar linhas finas
   desenhadas pela câmera (a moldura da área de medição é branca como o topo da escala). Quando bate no
-  topo da escala, aparece "≥": a temperatura real pode ser maior e não dá para saber quanto.
+  topo da escala, aparece "≥": a temperatura real pode ser maior e não dá para saber quanto. Ao vivo, o
+  número mostrado é a mediana dos últimos 5 quadros em que a peça apareceu (com a mesma escala): a 10
+  análises por segundo, a máxima pulava de um quadro para o outro.
 - **Barra cortada** pela beira do quadro não vale: a ponta cortada não é o limite da escala. Pelo mesmo
   motivo, a cada quadro as pontas saem da imagem nova (a busca roda numa janela em volta de onde a
   barra estava, ~10 ms), nunca da posição antiga: uma ponta deslocada estica ou encolhe a escala.

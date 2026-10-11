@@ -7,7 +7,7 @@
 const $ = (s, raiz = document) => raiz.querySelector(s);
 const $$ = (s, raiz = document) => [...raiz.querySelectorAll(s)];
 const T = TEXTOS;
-const VERSAO_INTERFACE = "0.7.4"; // igual a VERSAO em app/servidor.py
+const VERSAO_INTERFACE = "0.7.5"; // igual a VERSAO em app/servidor.py
 
 function el(tag, props = {}, ...filhos) {
   const n = document.createElement(tag);
@@ -467,7 +467,8 @@ function atualizarEspelho(c) {
     el("span", {}, c.conectado ? C.conectado : u ? C.desconectado(fmt(u.ha_s, 0)) : C.esperando));
   const ritmo = [];
   if (u && c.conectado && u.quadros_por_s != null) ritmo.push(C.videoPc(fmt(u.quadros_por_s, 0)));
-  if (u && c.conectado && u.analises_por_s != null) ritmo.push(C.ritmoPc(fmt(u.analises_por_s, 1), u.ms));
+  const onde = { placa: C.ondePlaca, carregando: C.ondeCarregando, cpu: C.ondeCpu }[c.modelo && c.modelo.onde && c.modelo.onde.onde];
+  if (u && c.conectado && u.analises_por_s != null) ritmo.push(C.ritmoPc(fmt(u.analises_por_s, 1), u.ms, onde));
   $("#celular-ritmo").textContent = ritmo.join(" · ");
   if (estado.capturasCelular !== c.capturas) {
     estado.capturasCelular = c.capturas;

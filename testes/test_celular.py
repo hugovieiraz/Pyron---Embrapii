@@ -80,6 +80,7 @@ def test_rotas_do_celular_pedem_o_codigo_e_devolvem_caixas_normalizadas(tmp_path
     assert c.post("/c/errado/quadro", content=_jpeg()).status_code == 404
     pagina = c.get("/c/codigo-certo")
     assert pagina.status_code == 200 and "celular.js" in pagina.text
+    assert c.get("/e/celular.js").headers["cache-control"] == "no-cache"  # o celular sempre confere a versão
     assert c.get("/c/codigo-certo/modelo").json()["nome"] == "Modelo de teste"
 
     r = c.post("/c/codigo-certo/quadro", content=_jpeg(800, 600), headers={"Content-Type": "image/jpeg"})
@@ -182,6 +183,21 @@ def test_peca_so_aparece_confirmada_e_some_sem_termograma(tmp_path) -> None:
     assert modo._confirmar([{"classe": "terminal_superior", "caixa": [0.5, 0.5, 0.6, 0.6]}], True) == []
     assert modo._confirmar([mexeu], False) == []  # sem termograma: esquece o histórico
     assert modo._confirmar([mexeu], True) == []
+
+
+def test_maxima_mostrada_e_a_mediana_dos_ultimos_quadros(tmp_path) -> None:
+    modo = celular.ModoCelular(tmp_path, detectar=None, capturar=None, modelo=None)
+    escala = {"estado": "lida", "min": 19.8, "max": 30.0}
+    mostradas = []
+    for i, t in enumerate([26.0, 26.4, 29.9, 26.2, 26.1]):  # um pico isolado (a mira da câmera em cima)
+        peca = {"classe": "para_raio", "caixa": [0.1 + 0.01 * i, 0.1, 0.3 + 0.01 * i, 0.6], "tmax": t, "tmax_acima": t > 29.5}
+        posicao = {"x": 0.01 * i, "y": 0.0, "trecho": 1}  # a câmera andando: a peça anda junto
+        mostradas.append(modo._suavizar([peca], [peca], posicao, escala)[0])
+    assert [m["tmax"] for m in mostradas] == [26.0, 26.2, 26.4, 26.3, 26.2]
+    assert not any(m["tmax_acima"] for m in mostradas)
+    outra = modo._suavizar([{"classe": "para_raio", "caixa": [0.14, 0.1, 0.34, 0.6], "tmax": 40.0}], [],
+                           {"x": 0.05, "y": 0.0, "trecho": 1}, {"estado": "lida", "min": 20.0, "max": 45.0})
+    assert outra[0]["tmax"] == 40.0  # outra escala na tela: não mistura
 
 
 def test_confirmacao_desconta_o_quanto_a_camera_andou(tmp_path) -> None:

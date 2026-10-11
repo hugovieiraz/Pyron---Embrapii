@@ -55,6 +55,7 @@ LIMITE_QUADRO = 4 * 1024 * 1024  # bytes de um quadro ou captura (o celular mand
 LADO_MAXIMO = 1280  # o quadro é reduzido a isso antes do detector
 CONECTADO_S = 4.0  # sem quadro há mais que isso: o celular saiu da página ou perdeu a rede
 IOU_MESMA_PECA = 0.3  # caixas de quadros seguidos com essa sobreposição são a mesma peça
+QUADROS_TEMPERATURA = 5  # a máxima mostrada de cada peça é a mediana dela nos últimos quadros
 DIAS_CERTIFICADO = 825
 # Antes do JPEG de cada quadro transmitido: número do quadro, trecho do rastro e posição da câmera em x
 # e y (fração da largura e da altura do quadro), little-endian. O trecho muda quando o celular perde o
@@ -230,6 +231,8 @@ class ModoCelular:
         self._recebidos: deque[float] = deque(maxlen=40)  # instantes dos quadros que chegaram (transmissão)
         # peças dos quadros anteriores, com a posição da câmera em cada um, para confirmar
         self._anteriores: deque[tuple[list, dict | None]] = deque(maxlen=2)
+        # máximas de cada peça nos últimos quadros (com a posição da câmera e a escala), para suavizar
+        self._temperaturas: deque[tuple[list, dict | None, tuple | None]] = deque(maxlen=QUADROS_TEMPERATURA - 1)
         self._servidor = None
         self._fio: threading.Thread | None = None
         self._trava = threading.Lock()  # um quadro por vez no detector
@@ -261,6 +264,7 @@ class ModoCelular:
             self._tempos.clear()
             self._recebidos.clear()
             self._anteriores.clear()
+            self._temperaturas.clear()
             config = uvicorn.Config(criar_app(self), host=self.host, port=self.porta, ssl_certfile=str(cert),
                                     ssl_keyfile=str(chave), log_level="warning", log_config=None)
             self._servidor = uvicorn.Server(config)
@@ -305,7 +309,8 @@ class ModoCelular:
             self._trava.release()
         normalizar = lambda c: [round(c[0] / w, 4), round(c[1] / h, 4), round(c[2] / w, 4), round(c[3] / h, 4)]  # noqa: E731
         area = normalizar(info["area"]) if info.get("area") else None
-        deteccoes = self._confirmar([{**d, "caixa": normalizar(d["caixa"])} for d in caixas], area is not None, posicao)
+        atuais = [{**d, "caixa": normalizar(d["caixa"])} for d in caixas]
+        deteccoes = self._suavizar(self._confirmar(atuais, area is not None, posicao), atuais, posicao, info.get("escala"))
         agora = time.time()
         self._tempos.append(agora)
         escala = info.get("escala")
@@ -323,12 +328,41 @@ class ModoCelular:
         """
         if not com_termograma:
             self._anteriores.clear()
+            self._temperaturas.clear()
             return []
         confirmadas = [d for d in atuais
                        if any(a["classe"] == d["classe"] and iou(_levar(a["caixa"], antes, posicao), d["caixa"]) >= IOU_MESMA_PECA
                               for quadro, antes in self._anteriores for a in quadro)]
         self._anteriores.append((atuais, posicao))
         return confirmadas
+
+    def _suavizar(self, confirmadas: list[dict], atuais: list[dict], posicao: dict | None, escala: dict | None) -> list[dict]:
+        """Máxima de cada peça pela mediana dos últimos quadros em que ela apareceu (com a mesma escala).
+
+        A 10 análises por segundo, a máxima de um quadro para o outro pula: ruído da foto da tela e, às
+        vezes, a mira da câmera passando por cima da peça. A mediana segura os picos isolados. A peça é a
+        mesma de um quadro para o outro como na confirmação: mesma classe e caixa sobreposta, descontado
+        o quanto a câmera andou.
+        """
+        limites = (escala.get("min"), escala.get("max")) if escala and escala.get("estado") == "lida" else None
+        saida = []
+        for d in confirmadas:
+            if d.get("tmax") is None:
+                saida.append(d)
+                continue
+            valores, acima = [d["tmax"]], [bool(d.get("tmax_acima"))]
+            for quadro, antes, lim in self._temperaturas:
+                if lim != limites:
+                    continue
+                pares = [(iou(_levar(a["caixa"], antes, posicao), d["caixa"]), a) for a in quadro
+                         if a["classe"] == d["classe"] and a.get("tmax") is not None]
+                melhor = max(pares, default=(0.0, None), key=lambda p: p[0])
+                if melhor[0] >= IOU_MESMA_PECA:
+                    valores.append(melhor[1]["tmax"])
+                    acima.append(bool(melhor[1].get("tmax_acima")))
+            saida.append({**d, "tmax": round(float(np.median(valores)), 1), "tmax_acima": sum(acima) * 2 > len(acima)})
+        self._temperaturas.append((atuais, posicao, limites))
+        return saida
 
     def capturar(self, dados: bytes) -> dict:
         ler_imagem(dados)  # confere antes de gravar
@@ -399,6 +433,14 @@ def criar_app(modo: ModoCelular) -> FastAPI:
     @app.exception_handler(HTTPException)
     async def _erro(_request: Request, exc: HTTPException):
         return JSONResponse({"erro": exc.detail}, status_code=exc.status_code)
+
+    @app.middleware("http")
+    async def _sempre_a_versao_nova(request: Request, seguir):
+        """Os scripts da página sempre conferem a versão: o navegador do celular guardava o antigo."""
+        resposta = await seguir(request)
+        if request.url.path.startswith("/e/"):
+            resposta.headers["Cache-Control"] = "no-cache"
+        return resposta
 
     @app.get("/c/{token}")
     def pagina(token: str):

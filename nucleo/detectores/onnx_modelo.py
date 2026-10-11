@@ -56,6 +56,7 @@ class DetectorONNX(Detector):
             cartao=cartao,
             nomes=dict(cartao.get("nomes", {})),
         )
+        self.pasta = pasta
         self.arquivo = arquivo
         self.entrada = cartao["entrada"]
         self.saida = cartao.get("saida", {})
@@ -129,6 +130,12 @@ class DetectorONNX(Detector):
 
     # ---------------------------------------------------------------- detecção
 
+    def _rodar(self, x: np.ndarray) -> dict:
+        """Saídas do modelo pelo nome, para a entrada já preparada (o ONNX na CPU; ver ``placa.py``)."""
+        sessao = self._sessao_onnx()
+        brutas = sessao.run(None, {sessao.get_inputs()[0].name: x})
+        return dict(zip((o.name for o in sessao.get_outputs()), brutas))
+
     def detectar(self, temperatura: np.ndarray, imagem: np.ndarray | None = None) -> list[Deteccao]:
         h, w = temperatura.shape
         if self.precisa_imagem:
@@ -137,9 +144,7 @@ class DetectorONNX(Detector):
             x = self.preparar_imagem(imagem)
         else:
             x = self.preparar(temperatura)
-        sessao = self._sessao_onnx()
-        brutas = sessao.run(None, {sessao.get_inputs()[0].name: x})
-        saidas = dict(zip((o.name for o in sessao.get_outputs()), brutas))
+        saidas = self._rodar(x)
         caixas, pontuacoes, classes = self._ler_rfdetr(saidas) if self.formato == "rfdetr" else self._ler_contrato(saidas)
         resultado = []
         for caixa, p, c in zip(caixas, pontuacoes, classes):

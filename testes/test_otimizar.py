@@ -81,3 +81,56 @@ def test_video_usa_a_versao_rapida_tambem_do_modelo_combinado(monkeypatch) -> No
     assert servidor._versao_rapida(original) is rapido
     assert servidor._versao_rapida(pontos) is pontos  # regra não tem versão rápida
     assert servidor._versao_rapida(comb_rapido) is comb_rapido
+
+
+def test_ao_vivo_vai_para_a_placa_de_video_quando_ela_fica_pronta(monkeypatch) -> None:
+    from app import servidor
+    from nucleo import detectores
+    from nucleo.detectores import placa
+    from nucleo.detectores.pontos_quentes import PontosQuentes
+
+    pontos = PontosQuentes()
+    original, rapido = _Imagem("pr"), _Imagem("pr-int8", {"origem": "pr"})
+    na_placa = _Imagem("pr")
+    monkeypatch.setattr(detectores, "listar", lambda _pasta=None: [pontos, original, rapido, detectores.Combinado(rapido, pontos)])
+    pedidos = []
+    monkeypatch.setattr(placa, "variante", lambda det: pedidos.append(det.id) or None)
+    assert servidor._ao_vivo(original) is rapido  # placa ainda carregando: a versão rápida na CPU
+    assert servidor._ao_vivo(rapido) is rapido and pedidos == ["pr", "pr"]  # a placa roda o original, não o INT8
+    monkeypatch.setattr(placa, "variante", lambda det: na_placa if det.id == "pr" else None)
+    assert servidor._ao_vivo(original) is na_placa
+    combinado = servidor._ao_vivo(detectores.Combinado(original, pontos))
+    assert combinado.partes[0] is na_placa and combinado.partes[1] is pontos
+
+
+def test_sem_pesos_do_pytorch_o_modelo_fica_na_cpu() -> None:
+    from nucleo.detectores import placa
+
+    assert placa.variante(_Imagem("sem-pesos")) is None
+    assert placa.situacao(_Imagem("sem-pesos"))["onde"] == "cpu"
+
+
+def test_na_placa_de_video_as_pecas_sao_as_mesmas_do_onnx() -> None:
+    """Só roda neste notebook: modelo instalado com os pesos do PyTorch e placa com CUDA."""
+    from pathlib import Path
+
+    from nucleo.detectores import placa
+    from nucleo.detectores.onnx_modelo import DetectorONNX
+
+    pasta = Path(__file__).resolve().parents[1] / "modelos" / "para-raios-rfdetr-local-20260930-1627"
+    if not (pasta / "pesos.pth").exists():
+        pytest.skip("modelo com pesos do PyTorch não instalado")
+    torch = pytest.importorskip("torch")
+    if not torch.cuda.is_available():
+        pytest.skip("sem placa de vídeo com CUDA")
+    from testes.test_paleta import _cena, _imagem_sintetica
+
+    cpu = DetectorONNX(pasta)
+    gpu = placa.DetectorPlaca(cpu)
+    gpu.carregar()
+    img = _imagem_sintetica(50.0, 10.0, _cena())
+    t = np.zeros(img.shape[:2], np.float32)
+    a, b = cpu.detectar(t, img), gpu.detectar(t, img)
+    assert [d.classe for d in a] == [d.classe for d in b]
+    for x, y in zip(a, b):
+        assert np.allclose(x.caixa, y.caixa, atol=2.0) and abs(x.confianca - y.confianca) < 0.02

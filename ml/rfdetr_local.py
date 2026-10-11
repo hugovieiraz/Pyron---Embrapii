@@ -491,8 +491,15 @@ def main(argv=None) -> dict:
     pasta_modelo = saida / id_
     pasta_modelo.mkdir(parents=True)
     shutil.copy(gerados[0], pasta_modelo / "modelo.onnx")
+    # Os pesos do PyTorch vão junto: com placa de vídeo, o ao vivo roda o mesmo modelo nela
+    # (nucleo/detectores/placa.py), ~7× mais rápido que o ONNX na CPU.
+    pytorch = None
+    if melhor_ckpt.exists():
+        shutil.copy(melhor_ckpt, pasta_modelo / "pesos.pth")
+        pytorch = {"pytorch": {"arquitetura": args.modelo, "resolucao": args.resolucao, "pesos": "pesos.pth"}}
 
     def gravar_cartao(deslocamento, limiar, extra=None):
+        extra = {**(pytorch or {}), **(extra or {})}
         c = cartao_modelo(id_, nome_modelo, classes, largura_in, altura_in, deslocamento, limiar, nomes_saida, extra)
         (pasta_modelo / "cartao.json").write_text(json.dumps(c, ensure_ascii=False, indent=1), encoding="utf-8")
         return c
