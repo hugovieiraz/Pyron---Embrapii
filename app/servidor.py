@@ -5,7 +5,6 @@ Iniciar:  Pyron.exe na área de trabalho, ou  python -m app.iniciar --janela
 
 from __future__ import annotations
 
-import asyncio
 import base64
 import csv
 import io
@@ -38,7 +37,7 @@ from app.armazenamento import Armazenamento, _destaque
 from nucleo import analise, barra, detectores, enquadrar, entrada, referencias, render, video
 from nucleo.detectores import placa
 
-VERSAO = "0.7.5"
+VERSAO = "0.7.6"
 RAIZ = Path(__file__).resolve().parents[1]
 PASTA_APP = Path(__file__).resolve().parent
 # PYRON_DADOS (ou app.iniciar --dados) aponta outra pasta: demonstrações e testes sem tocar nas inspeções reais.
@@ -1572,32 +1571,40 @@ async def celular_ao_vivo(ws: WebSocket) -> None:
     as caixas junto com a câmera nos quadros seguintes. Só o próprio computador alcança este servidor;
     o celular fala com o servidor à parte (outro laço de eventos), por isso aqui se confere o estado.
     """
+    import anyio
+
     await ws.accept()
+    # Grupo de tarefas do anyio (o que o Starlette usa): quando uma das duas acaba, a outra é cancelada.
+    # Com tarefas soltas do asyncio, o cancelamento de quem fecha a conexão chegava no meio da limpeza.
+    async with anyio.create_task_group() as grupo:
 
-    async def mandar() -> None:
-        visto_quadro = visto_resultado = -1
-        while True:
-            vivo, ultimo = celular_modo.vivo, celular_modo.ultimo
-            if vivo.seq != visto_quadro and vivo.jpeg:
-                visto_quadro = vivo.seq
-                await ws.send_bytes(celular.cabecalho(vivo.quadro, vivo.posicao) + vivo.jpeg)
-            if ultimo.seq != visto_resultado and ultimo.quando:
-                visto_resultado = ultimo.seq
-                await ws.send_json({"deteccoes": ultimo.deteccoes, "area": ultimo.area, "escala": ultimo.escala,
-                                    "seq": ultimo.seq, "ms": ultimo.ms, "quadro": ultimo.quadro, "posicao": ultimo.posicao})
-            await asyncio.sleep(INTERVALO_ESPELHO_S)
+        async def mandar() -> None:
+            visto_quadro = visto_resultado = -1
+            try:
+                while True:
+                    vivo, ultimo = celular_modo.vivo, celular_modo.ultimo
+                    if vivo.seq != visto_quadro and vivo.jpeg:
+                        visto_quadro = vivo.seq
+                        await ws.send_bytes(celular.cabecalho(vivo.quadro, vivo.posicao) + vivo.jpeg)
+                    if ultimo.seq != visto_resultado and ultimo.quando:
+                        visto_resultado = ultimo.seq
+                        await ws.send_json({"deteccoes": ultimo.deteccoes, "area": ultimo.area, "escala": ultimo.escala,
+                                            "seq": ultimo.seq, "ms": ultimo.ms, "quadro": ultimo.quadro, "posicao": ultimo.posicao})
+                    await anyio.sleep(INTERVALO_ESPELHO_S)
+            except (WebSocketDisconnect, RuntimeError):
+                pass
+            finally:
+                grupo.cancel_scope.cancel()
 
-    async def ouvir() -> None:  # só para saber quando a tela fecha: o computador não manda nada
-        while (await ws.receive())["type"] != "websocket.disconnect":
-            pass
+        async def ouvir() -> None:  # só para saber quando a tela fecha: o computador não manda nada
+            try:
+                while (await ws.receive())["type"] != "websocket.disconnect":
+                    pass
+            finally:
+                grupo.cancel_scope.cancel()
 
-    tarefas = [asyncio.create_task(mandar()), asyncio.create_task(ouvir())]
-    try:
-        await asyncio.wait(tarefas, return_when=asyncio.FIRST_COMPLETED)
-    finally:
-        for t in tarefas:
-            t.cancel()
-        await asyncio.gather(*tarefas, return_exceptions=True)
+        grupo.start_soon(mandar)
+        grupo.start_soon(ouvir)
 
 
 # ---------------------------------------------------------------- ciclo de vida (janela do aplicativo)

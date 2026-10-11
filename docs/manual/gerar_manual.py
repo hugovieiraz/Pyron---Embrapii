@@ -32,7 +32,7 @@ IMAGENS = AQUI / "imagens"
 LOGO = PROJETO / "app" / "estatico" / "marca" / "logo.png"
 SIMBOLO = PROJETO / "app" / "estatico" / "marca" / "simbolo.png"
 SAIDA = PROJETO / "docs" / "Pyron_Funcionalidades.pdf"
-VERSAO = "0.7.5"
+VERSAO = "0.7.6"
 
 # Cores dos tokens da interface (app/estatico/tokens.css).
 TINTA = colors.HexColor("#171B33")

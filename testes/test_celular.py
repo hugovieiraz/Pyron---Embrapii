@@ -136,11 +136,17 @@ def test_transmissao_por_websocket_responde_com_o_quadro_analisado(tmp_path) -> 
         r2 = ws.receive_json()
         ws.send_bytes(celular.cabecalho(3, None) + b"isto nao e imagem")
         r3 = ws.receive_json()
+        ws.send_text('{"tipo": "medidas", "camera_por_s": 29.5, "enviados_por_s": 7, "rastro_ms": 3.2, "jpeg_ms": 24, "invasor": "x"}')
+        ws.send_text("lixo que não é JSON")
+        ws.send_bytes(celular.cabecalho(4, None) + b"isto nao e imagem")  # garante que as mensagens anteriores chegaram
+        ws.receive_json()
     assert r1["tipo"] == "resultado" and r1["quadro"] == 1 and r1["deteccoes"] == []  # um quadro só não confirma
     assert r2["quadro"] == 2 and r2["posicao"] == {"x": 0.02, "y": -0.01, "trecho": 1}
     assert r2["deteccoes"][0]["caixa"] == [0.0, 0.0, 0.25, 0.5]
     assert r3["tipo"] == "erro" and r3["quadro"] == 3
-    assert modo.vivo.quadro == 3 and modo.estado()["ultimo"]["quadros_por_s"] is not None
+    assert modo.vivo.quadro == 4 and modo.estado()["ultimo"]["quadros_por_s"] is not None
+    medidas = modo.medidas
+    assert medidas["camera_por_s"] == 29.5 and medidas["jpeg_ms"] == 24 and "invasor" not in medidas
 
 
 def test_transmissao_pula_os_quadros_que_chegam_durante_a_analise(tmp_path) -> None:

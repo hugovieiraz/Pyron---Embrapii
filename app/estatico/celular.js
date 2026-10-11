@@ -2,7 +2,7 @@
 
 // Página do celular: a câmera traseira transmitida ao Pyron, com as peças marcadas por cima, ao vivo.
 //
-// Transmissão: um WebSocket. Os quadros saem sem parar (até QUADROS_POR_S), sem fila: se a rede ainda
+// Transmissão: um WebSocket. Os quadros saem no ritmo das análises (até 15/s), sem fila: se a rede ainda
 // não deu conta do anterior, o quadro é pulado. O Pyron analisa sempre o mais novo que tiver.
 // Fluidez: a análise leva uns 300 ms e volta atrasada em relação à câmera. Entre uma e outra, o próprio
 // celular acompanha o movimento da câmera (compara miniaturas em cinza com um quadro de referência) e
@@ -17,7 +17,13 @@ const BASE = `/c/${TOKEN}`;
 const LADO_QUADRO = 960;
 const LADO_CAPTURA = 1280; // a captura vira inspeção e merece mais detalhe
 const QUALIDADE_JPEG = 0.72;
-const QUADROS_POR_S = 15; // vídeo para o computador; o detector analisa o mais novo que tiver (na placa de vídeo, quase todos)
+// Quadros por segundo para o computador: acompanha o ritmo das análises (o dobro, mais 2), entre os
+// limites. Na CPU (~2,5 análises/s) são ~7; na placa de vídeo, 15. Mandar mais que o computador
+// analisa só gasta o celular: cada quadro é um JPEG a codificar.
+const QUADROS_POR_S_MIN = 5;
+const QUADROS_POR_S_MAX = 15;
+const MEDIR_A_CADA_MS = 2000; // o celular conta ao computador quanto gasta em cada etapa
+const RASTRO_PESADO_MS = 6; // seguir a câmera passou disso por quadro: segue um quadro sim, outro não
 const FILA_MAXIMA = 192 * 1024; // bytes ainda presos no WebSocket: acima disso a rede não deu conta, pula o quadro
 const CABECALHO = 16; // número do quadro, trecho do rastro e posição da câmera (x, y), antes do JPEG
 const POSICOES_GUARDADAS = 90; // posição da câmera de cada quadro enviado, até a resposta dele chegar
@@ -48,6 +54,8 @@ const estado = {
 };
 // Transmissão: o WebSocket, o número do último quadro e a posição da câmera em cada quadro enviado.
 const envio = { ws: null, abriu: false, falhas: 0, http: false, numero: 0, ultimo: 0, ocupado: false, posicoes: new Map() };
+// Medidas do próprio celular, somadas desde o último envio ao computador.
+const medidas = { desde: performance.now(), camera: 0, enviados: 0, rastroMs: 0, rastros: 0, jpegMs: 0, jpegs: 0, pular: false, vez: 0 };
 // Rastro da câmera, em pixels da miniatura: quanto a cena andou desde o começo do trecho (x, y), a
 // miniatura de referência e onde a cena estava nela (rx, ry), e o último passo (vx, vy) para prever o próximo.
 const rastro = { tela: null, ctx: null, w: 0, h: 0, referencia: null, rx: 0, ry: 0, x: 0, y: 0, vx: 0, vy: 0, trecho: 0 };
@@ -287,9 +295,46 @@ function aCadaQuadro() {
   if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(proximo);
   else requestAnimationFrame(proximo);
   if (document.hidden) return;
-  rastrear();
+  medidas.camera += 1;
+  medidas.vez += 1;
+  if (!medidas.pular || medidas.vez % 2 === 0) {
+    const t = performance.now();
+    rastrear();
+    medidas.rastroMs += performance.now() - t;
+    medidas.rastros += 1;
+  }
   if (!estado.pausado && !envio.http) talvezEnviar();
   moverCamadas();
+  enviarMedidas();
+}
+
+/** Quadros por segundo a mandar: o dobro do ritmo das análises, mais 2, entre os limites. */
+function quadrosPorSegundo() {
+  if (!estado.ritmo) return 8;
+  return Math.max(QUADROS_POR_S_MIN, Math.min(QUADROS_POR_S_MAX, 2 * estado.ritmo + 2));
+}
+
+/** A cada tanto, conta ao computador o que o celular está gastando (para achar onde está lento). */
+function enviarMedidas() {
+  const agora = performance.now();
+  const dt = (agora - medidas.desde) / 1000;
+  if (dt * 1000 < MEDIR_A_CADA_MS) return;
+  const rastroMs = medidas.rastros ? medidas.rastroMs / medidas.rastros : 0;
+  medidas.pular = rastroMs > RASTRO_PESADO_MS;
+  const ws = envio.ws;
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      tipo: "medidas",
+      camera_por_s: +(medidas.camera / dt).toFixed(1),
+      enviados_por_s: +(medidas.enviados / dt).toFixed(1),
+      alvo_por_s: +quadrosPorSegundo().toFixed(1),
+      rastro_ms: +rastroMs.toFixed(1),
+      rastro_metade: medidas.pular,
+      jpeg_ms: medidas.jpegs ? +(medidas.jpegMs / medidas.jpegs).toFixed(1) : null,
+      lado: [video.videoWidth, video.videoHeight],
+    }));
+  }
+  Object.assign(medidas, { desde: agora, camera: 0, enviados: 0, rastroMs: 0, rastros: 0, jpegMs: 0, jpegs: 0 });
 }
 
 // ------------------------------------------------------------------ transmissão (WebSocket) e respostas
@@ -340,7 +385,7 @@ function guardarPosicao(numeroQuadro, posicao) {
 function talvezEnviar() {
   const ws = envio.ws;
   const agora = performance.now();
-  if (!ws || ws.readyState !== WebSocket.OPEN || envio.ocupado || agora - envio.ultimo < 1000 / QUADROS_POR_S) return;
+  if (!ws || ws.readyState !== WebSocket.OPEN || envio.ocupado || agora - envio.ultimo < 1000 / quadrosPorSegundo()) return;
   if (ws.bufferedAmount > FILA_MAXIMA) return;
   envio.ocupado = true;
   envio.ultimo = agora;
@@ -350,7 +395,10 @@ function talvezEnviar() {
   quadroAtual(LADO_QUADRO)
     .then((blob) => (blob ? blob.arrayBuffer() : null))
     .then((jpeg) => {
+      medidas.jpegMs += performance.now() - agora;
+      medidas.jpegs += 1;
       if (!jpeg || ws.readyState !== WebSocket.OPEN) return;
+      medidas.enviados += 1;
       const msg = new Uint8Array(CABECALHO + jpeg.byteLength);
       const cab = new DataView(msg.buffer);
       cab.setUint32(0, n, true);

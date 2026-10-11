@@ -159,6 +159,16 @@ os pesos do PyTorch (`pesos.pth` e `pytorch` no cartão; o treino local já grav
 ONNX: 223 de 225 em 31 fotos (as outras duas no limite da confiança); a captura que vira inspeção
 continua no ONNX.
 
+O PyTorch não tem assinatura digital e o Controle Inteligente de Aplicativos do Windows às vezes barra
+as DLLs dele (`c10.dll`, WinError 4551; aconteceu em 11/10/2026 à noite, depois de passar de manhã):
+aí o ao vivo fica na CPU e o computador mostra "processador; o Windows barrou a placa de vídeo".
+
+O celular manda quadros no ritmo das análises (o dobro, mais 2, entre 5 e 15 por segundo): na CPU
+são ~7, na placa 15. Mandar mais do que o computador analisa só gastava o celular. A cada 2 s ele
+conta ao computador o que está gastando, e a tela mostra: quadros da câmera por segundo, quantos
+manda, tempo para seguir o movimento e para gerar cada JPEG. Se seguir o movimento passar de 6 ms
+por quadro (celular mais simples), ele segue um quadro sim, outro não.
+
 | Análises por segundo no celular (teste com o celular falso no mesmo notebook) | CPU (INT8) | Placa de vídeo |
 |---|---|---|
 | Câmera passeando | 2,3 a 3,2 | 7,0 |

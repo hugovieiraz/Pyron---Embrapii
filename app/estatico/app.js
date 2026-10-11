@@ -7,7 +7,7 @@
 const $ = (s, raiz = document) => raiz.querySelector(s);
 const $$ = (s, raiz = document) => [...raiz.querySelectorAll(s)];
 const T = TEXTOS;
-const VERSAO_INTERFACE = "0.7.5"; // igual a VERSAO em app/servidor.py
+const VERSAO_INTERFACE = "0.7.6"; // igual a VERSAO em app/servidor.py
 
 function el(tag, props = {}, ...filhos) {
   const n = document.createElement(tag);
@@ -440,7 +440,8 @@ function desenharCelular(c) {
       el("div", { class: "cartao-cabeca" }, tituloComIcone("celular", C.espelhoTitulo), el("span", { class: "nota num", id: "celular-ritmo" })),
       el("div", { id: "celular-espelho" },
         estadoVazio({ nomeIcone: "celular", titulo: C.esperandoTitulo, texto: C.esperandoTexto, compacto: true })),
-      el("div", { class: "celular-achados", id: "celular-achados" }))));
+      el("div", { class: "celular-achados", id: "celular-achados" }),
+      el("p", { class: "nota num", id: "celular-medidas" }))));
   estado.classesCelular = (c.modelo && c.modelo.classes) || [];
   estado.capturasCelular = 0;
   abrirEspelho();
@@ -467,9 +468,17 @@ function atualizarEspelho(c) {
     el("span", {}, c.conectado ? C.conectado : u ? C.desconectado(fmt(u.ha_s, 0)) : C.esperando));
   const ritmo = [];
   if (u && c.conectado && u.quadros_por_s != null) ritmo.push(C.videoPc(fmt(u.quadros_por_s, 0)));
-  const onde = { placa: C.ondePlaca, carregando: C.ondeCarregando, cpu: C.ondeCpu }[c.modelo && c.modelo.onde && c.modelo.onde.onde];
+  const lugar = (c.modelo && c.modelo.onde) || {};
+  // WinError 4551: o Controle Inteligente de Aplicativos barrou uma DLL do PyTorch (sem assinatura)
+  const barrado = lugar.onde === "cpu" && /4551|Controle de Aplicativo/.test(lugar.motivo || "");
+  const onde = barrado ? C.ondeBarrado : { placa: C.ondePlaca, carregando: C.ondeCarregando, cpu: C.ondeCpu }[lugar.onde];
   if (u && c.conectado && u.analises_por_s != null) ritmo.push(C.ritmoPc(fmt(u.analises_por_s, 1), u.ms, onde));
   $("#celular-ritmo").textContent = ritmo.join(" · ");
+  const m = c.conectado && c.medidas_celular;
+  $("#celular-medidas").textContent = m
+    ? C.medidasCelular({ camera: fmt(m.camera_por_s, 0), enviados: fmt(m.enviados_por_s, 0), alvo: fmt(m.alvo_por_s, 0),
+      rastro: fmt(m.rastro_ms, 1), metade: m.rastro_metade, jpeg: m.jpeg_ms == null ? null : fmt(m.jpeg_ms, 0) })
+    : "";
   if (estado.capturasCelular !== c.capturas) {
     estado.capturasCelular = c.capturas;
     desenharAchadosCelular();

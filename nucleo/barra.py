@@ -517,7 +517,7 @@ class LeitorAoVivo:
 
     RELER_S = 3.0
     PROCURAR_S = 2.0  # a barra do quadro anterior é reaproveitada; a busca completa roda a cada tanto
-    SEM_BARRA_S = 0.6  # sem barra no quadro anterior: espera isso antes de procurar de novo (a busca pesa)
+    SEM_BARRA_S = 1.5  # sem barra no quadro anterior: espera isso antes de procurar de novo (a busca pesa ~100 ms)
     RELER_MUDANCA = 0.3  # mudança nas miniaturas dos números acima disso: relê
     OUTRA_IMAGEM = 0.6  # acima disso: outra escala na tela, esquece as leituras
 

@@ -10,9 +10,20 @@ import pytest
 from nucleo.detectores import Detector
 
 
+def _importar_ou_pular(nome: str):
+    """Importa o pacote ou pula o teste: o Controle Inteligente de Aplicativos do Windows às vezes barra
+    DLL sem assinatura (onnx, torch) com OSError ou ImportError, conforme o dia."""
+    import importlib
+
+    try:
+        return importlib.import_module(nome)
+    except (ImportError, OSError) as erro:
+        pytest.skip(f"{nome} não carrega neste computador: {erro}")
+
+
 def _modelo_minusculo(pasta) -> None:
     """ONNX de uma camada (imagem 8×8 → 4 números por um MatMul) com um cartão válido do Pyron."""
-    onnx = pytest.importorskip("onnx")
+    onnx = _importar_ou_pular("onnx")
     from onnx import TensorProto, helper, numpy_helper
 
     pasta.mkdir(parents=True)
@@ -120,7 +131,7 @@ def test_na_placa_de_video_as_pecas_sao_as_mesmas_do_onnx() -> None:
     pasta = Path(__file__).resolve().parents[1] / "modelos" / "para-raios-rfdetr-local-20260930-1627"
     if not (pasta / "pesos.pth").exists():
         pytest.skip("modelo com pesos do PyTorch não instalado")
-    torch = pytest.importorskip("torch")
+    torch = _importar_ou_pular("torch")
     if not torch.cuda.is_available():
         pytest.skip("sem placa de vídeo com CUDA")
     from testes.test_paleta import _cena, _imagem_sintetica

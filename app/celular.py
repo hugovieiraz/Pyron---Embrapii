@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import asyncio
 import io
+import json
 import math
 import os
 import secrets
@@ -226,6 +227,7 @@ class ModoCelular:
         self.erro: str | None = None
         self.ultimo = Ultimo()
         self.vivo = Vivo()
+        self.medidas: dict = {}  # o que o celular conta que está gastando (câmera, envio, rastro, JPEG)
         self.capturas = 0
         self._tempos: deque[float] = deque(maxlen=20)  # instantes dos últimos quadros (análises por segundo)
         self._recebidos: deque[float] = deque(maxlen=40)  # instantes dos quadros que chegaram (transmissão)
@@ -261,6 +263,7 @@ class ModoCelular:
             self.token = secrets.token_urlsafe(6)
             self.ultimo = Ultimo()
             self.vivo = Vivo()
+            self.medidas = {}
             self._tempos.clear()
             self._recebidos.clear()
             self._anteriores.clear()
@@ -290,10 +293,22 @@ class ModoCelular:
 
     # ------------------------------------------------------------ quadros
 
+    def registrar_medidas(self, texto: str) -> None:
+        """Medidas que o celular manda a cada 2 s (texto JSON); campos conhecidos, só números ou sim/não."""
+        try:
+            m = json.loads(texto[:2000])
+        except ValueError:
+            return
+        if not isinstance(m, dict) or m.get("tipo") != "medidas":
+            return
+        campos = ("camera_por_s", "enviados_por_s", "alvo_por_s", "rastro_ms", "rastro_metade", "jpeg_ms", "lado")
+        self.medidas = {k: m[k] for k in campos if isinstance(m.get(k), (int, float, bool, list))}
+        self.medidas["quando"] = time.time()
+
     def receber_quadro(self, jpeg: bytes, quadro: int = 0, posicao: dict | None = None) -> None:
         """Quadro que acabou de chegar: vira o quadro ao vivo do computador, analisado ou não."""
         agora = time.time()
-        self._recebidos.append(agora)
+        self._recebidos.append(time.perf_counter())
         self.vivo = Vivo(jpeg, self.vivo.seq + 1, agora, quadro, posicao)
 
     def processar(self, dados: bytes, quadro: int = 0, posicao: dict | None = None) -> dict:
@@ -312,7 +327,7 @@ class ModoCelular:
         atuais = [{**d, "caixa": normalizar(d["caixa"])} for d in caixas]
         deteccoes = self._suavizar(self._confirmar(atuais, area is not None, posicao), atuais, posicao, info.get("escala"))
         agora = time.time()
-        self._tempos.append(agora)
+        self._tempos.append(time.perf_counter())
         escala = info.get("escala")
         if escala and escala.get("barra"):
             escala = {**escala, "barra": normalizar(escala["barra"])}
@@ -395,6 +410,7 @@ class ModoCelular:
             "modelo": modelo,
             "conectado": conectado,
             "capturas": self.capturas,
+            "medidas_celular": self.medidas if self.medidas and time.time() - self.medidas.get("quando", 0) < CONECTADO_S else None,
             "ultimo": None if not u.quando else {
                 "deteccoes": u.deteccoes, "area": u.area, "escala": u.escala, "largura": u.largura, "altura": u.altura,
                 "ms": u.ms, "seq": u.seq, "ha_s": round(time.time() - u.quando, 1), "analises_por_s": self.analises_por_s(),
@@ -412,8 +428,9 @@ def _levar(caixa: list[float], de: dict | None, para: dict | None) -> list[float
 
 
 def _ritmo(instantes: deque) -> float | None:
-    """Eventos por segundo nos últimos 10 s."""
-    recentes = [t for t in instantes if time.time() - t < 10]
+    """Eventos por segundo nos últimos 10 s (relógio de alta resolução: no Windows, ``time.time`` anda de
+    15 em 15 ms e quadros que chegam juntos pareciam simultâneos)."""
+    recentes = [t for t in instantes if time.perf_counter() - t < 10]
     if len(recentes) < 2 or recentes[-1] <= recentes[0]:
         return None
     return round((len(recentes) - 1) / (recentes[-1] - recentes[0]), 2)
@@ -487,7 +504,13 @@ def criar_app(modo: ModoCelular) -> FastAPI:
         async def receber():
             try:
                 while True:
-                    dados = await ws.receive_bytes()
+                    mensagem = await ws.receive()
+                    if mensagem["type"] == "websocket.disconnect":
+                        break
+                    if mensagem.get("text"):
+                        modo.registrar_medidas(mensagem["text"])
+                        continue
+                    dados = mensagem.get("bytes") or b""
                     if len(dados) <= CABECALHO.size or len(dados) > LIMITE_QUADRO:
                         continue
                     quadro, posicao = ler_cabecalho(dados)
