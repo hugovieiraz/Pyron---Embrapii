@@ -5,6 +5,7 @@ Iniciar:  Pyron.exe na área de trabalho, ou  python -m app.iniciar --janela
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import csv
 import io
@@ -15,13 +16,14 @@ import threading
 import time
 import uuid
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 from time import perf_counter
 
 import numpy as np
-from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
@@ -33,9 +35,9 @@ from app import laudo, monitoramento, pendencias
 from app import treinos as treinos_mod
 from app import videos as videos_mod
 from app.armazenamento import Armazenamento, _destaque
-from nucleo import analise, detectores, enquadrar, entrada, referencias, render, video
+from nucleo import analise, barra, detectores, enquadrar, entrada, referencias, render, video
 
-VERSAO = "0.7.3"
+VERSAO = "0.7.4"
 RAIZ = Path(__file__).resolve().parents[1]
 PASTA_APP = Path(__file__).resolve().parent
 # PYRON_DADOS (ou app.iniciar --dados) aponta outra pasta: demonstrações e testes sem tocar nas inspeções reais.
@@ -1442,6 +1444,10 @@ def _celular_modelo() -> dict:
 
 
 CONFIANCA_CELULAR = 0.5  # foto de tela tem reflexo e moiré: só caixas com boa confiança
+# Barra de cores no quadro do celular: lida em paralelo com o detector (outro fio), com os números
+# guardados entre quadros (o OCR só roda quando eles parecem ter mudado).
+leitor_escala_celular = barra.LeitorAoVivo()
+_fio_escala = ThreadPoolExecutor(max_workers=1, thread_name_prefix="pyron-escala")
 
 
 def _celular_detectar(rgb: np.ndarray) -> tuple[list[dict], dict]:
@@ -1454,17 +1460,36 @@ def _celular_detectar(rgb: np.ndarray) -> tuple[list[dict], dict]:
     area = enquadrar.achar_termograma(rgb)
     if area is None:
         return [], {"area": None}
-    recorte = rgb[area.y0:area.y1, area.x0:area.x1]
+    recorte = np.ascontiguousarray(rgb[area.y0:area.y1, area.x0:area.x1])
     h, w = recorte.shape[:2]
+    img_lab = barra.lab(recorte)
+    leitura = _fio_escala.submit(leitor_escala_celular.ler, recorte, img_lab)
     saida = []
     for d in det.detectar(np.zeros((h, w), dtype=np.float32), recorte):
         if d.confianca < CONFIANCA_CELULAR:
             continue
-        x0, y0, x1, y1 = (float(v) for v in d.caixa)
         nome = det.nomes.get(d.classe) or NOMES_CLASSES.get(d.classe, d.classe)
-        saida.append({"classe": d.classe, "nome": nome, "confianca": round(float(d.confianca), 3),
-                      "caixa": [x0 + area.x0, y0 + area.y0, x1 + area.x0, y1 + area.y0]})
-    return saida, {"area": area.caixa()}
+        saida.append({"classe": d.classe, "nome": nome, "confianca": round(float(d.confianca), 3), "caixa": [float(v) for v in d.caixa]})
+    escala, achada, estado = leitura.result()
+    for s in saida:
+        if escala is not None:
+            t, acima = barra.maxima(img_lab, escala, s["caixa"])
+            if t is not None:
+                s["tmax"], s["tmax_acima"] = round(t, 1), acima
+        x0, y0, x1, y1 = s["caixa"]
+        s["caixa"] = [x0 + area.x0, y0 + area.y0, x1 + area.x0, y1 + area.y0]
+    return saida, {"area": area.caixa(), "escala": _escala_celular(escala, achada, estado, area)}
+
+
+def _escala_celular(escala, achada, estado: str, area) -> dict | None:
+    """O que o celular e o computador mostram da barra: onde está, se os números já foram lidos e os limites."""
+    if achada is None:
+        return None
+    x0, y0, x1, y1 = achada.caixa()
+    info = {"estado": estado, "barra": [x0 + area.x0, y0 + area.y0, x1 + area.x0, y1 + area.y0]}
+    if escala is not None:
+        info.update(min=round(escala.t_min, 1), max=round(escala.t_max, 1))
+    return info
 
 
 def _celular_capturar(dados: bytes, nome: str) -> dict:
@@ -1482,6 +1507,7 @@ def _celular_capturar(dados: bytes, nome: str) -> dict:
 
 
 celular_modo = celular.ModoCelular(PASTA_DADOS / "celular", _celular_detectar, _celular_capturar, _celular_modelo)
+INTERVALO_ESPELHO_S = 1 / 30  # o espelho confere se chegou quadro novo até 30 vezes por segundo
 
 
 @app.get("/api/celular")
@@ -1494,6 +1520,7 @@ def celular_ligar() -> dict:
     """Abre o servidor do celular na rede local (HTTPS, só as rotas do celular, com código no link)."""
     try:
         _detector_imagem()
+        leitor_escala_celular.reiniciar()
         celular_modo.ligar()
     except ValueError as erro:
         raise HTTPException(409, str(erro)) from erro
@@ -1515,11 +1542,41 @@ def celular_qr() -> Response:
     return Response(celular.qr_png(celular_modo.url), media_type="image/png", headers={"Cache-Control": "no-store"})
 
 
-@app.get("/api/celular/quadro.jpg")
-def celular_quadro() -> Response:
-    if not celular_modo.ultimo.jpeg:
-        raise HTTPException(404, "Nenhum quadro do celular ainda.")
-    return Response(celular_modo.ultimo.jpeg, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
+@app.websocket("/api/celular/ws")
+async def celular_ao_vivo(ws: WebSocket) -> None:
+    """Vídeo ao vivo do celular no computador: cada quadro novo e cada resultado novo.
+
+    Quadro: mensagem binária com o cabeçalho do celular (número e posição da câmera) e o JPEG.
+    Resultado: JSON com as peças e o número e a posição do quadro analisado, para o computador levar
+    as caixas junto com a câmera nos quadros seguintes. Só o próprio computador alcança este servidor;
+    o celular fala com o servidor à parte (outro laço de eventos), por isso aqui se confere o estado.
+    """
+    await ws.accept()
+
+    async def mandar() -> None:
+        visto_quadro = visto_resultado = -1
+        while True:
+            vivo, ultimo = celular_modo.vivo, celular_modo.ultimo
+            if vivo.seq != visto_quadro and vivo.jpeg:
+                visto_quadro = vivo.seq
+                await ws.send_bytes(celular.cabecalho(vivo.quadro, vivo.posicao) + vivo.jpeg)
+            if ultimo.seq != visto_resultado and ultimo.quando:
+                visto_resultado = ultimo.seq
+                await ws.send_json({"deteccoes": ultimo.deteccoes, "area": ultimo.area, "escala": ultimo.escala,
+                                    "seq": ultimo.seq, "ms": ultimo.ms, "quadro": ultimo.quadro, "posicao": ultimo.posicao})
+            await asyncio.sleep(INTERVALO_ESPELHO_S)
+
+    async def ouvir() -> None:  # só para saber quando a tela fecha: o computador não manda nada
+        while (await ws.receive())["type"] != "websocket.disconnect":
+            pass
+
+    tarefas = [asyncio.create_task(mandar()), asyncio.create_task(ouvir())]
+    try:
+        await asyncio.wait(tarefas, return_when=asyncio.FIRST_COMPLETED)
+    finally:
+        for t in tarefas:
+            t.cancel()
+        await asyncio.gather(*tarefas, return_exceptions=True)
 
 
 # ---------------------------------------------------------------- ciclo de vida (janela do aplicativo)

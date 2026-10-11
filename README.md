@@ -104,14 +104,16 @@ que verifica a correção. O Painel mostra as pendências vencidas e as próxima
 ## Câmera do celular
 
 Aponte a câmera do celular para uma imagem térmica (na tela do computador, por exemplo) e o Pyron
-marca os componentes ao vivo, sem instalar nada no celular. Só identificação: a foto do celular não
-traz os números do sensor nem a escala.
+marca os componentes ao vivo, sem instalar nada no celular. A foto do celular não traz os números do
+sensor; quando a barra de cores aparece no quadro, o Pyron estima a temperatura de cada peça pelas
+cores dela (veja "Temperatura pela barra de cores", abaixo).
 
 1. Celular e computador no mesmo Wi-Fi.
 2. No Pyron, **Câmera do celular › Ligar conexão com o celular**, e leia o QR code com o celular.
 3. O celular avisa que a conexão não é particular (o certificado é do próprio Pyron): **Avançado › Continuar**.
-4. Permita a câmera e aponte. **Capturar** salva o quadro como inspeção "Sem medida", com as peças marcadas.
-   O computador mostra ao vivo o que o celular está vendo.
+4. Permita a câmera e aponte. **Capturar** salva o quadro como inspeção, com as peças marcadas: com a
+   barra lida, a temperatura vem estimada pelas cores; sem ela, a inspeção fica "Sem medida".
+   O computador mostra ao vivo o vídeo do celular, com as mesmas caixas.
 
 Por dentro: um segundo servidor, só com as rotas do celular (ninguém na rede alcança inspeções,
 backups ou configurações), em HTTPS, porque o navegador só libera a câmera assim. Ele ouve a rede
@@ -135,6 +137,65 @@ simulado tem moldura, perspectiva, moiré, cor deslocada e tremor; as imagens s�
 modelo treinou, então o número real tende a ser menor. Segure o celular na mesma orientação da imagem.
 Velocidade neste notebook, na tomada: cerca de 0,25 s por quadro com a versão rápida (INT8) do
 modelo, que o celular usa sozinho quando ela existe (veja abaixo).
+
+**Transmissão e fluidez.** O celular transmite por WebSocket: uns 12 quadros JPEG por segundo, sem
+fila (se a rede não deu conta do anterior, o quadro é pulado). O Pyron analisa sempre o mais novo e
+descarta os que chegaram enquanto o detector trabalhava; o computador recebe todos os quadros por
+outro WebSocket e mostra o vídeo do celular, não uma foto a cada análise. Se a rede bloquear o
+WebSocket, a página volta sozinha para um quadro por vez por HTTP.
+
+A análise volta uns 300 ms atrasada em relação à câmera. Para as caixas não ficarem para trás, o
+celular acompanha o movimento da câmera entre uma análise e outra: compara uma miniatura em cinza de
+cada quadro (72 pixels de largura) com a de um quadro de referência e leva as caixas junto, no
+celular e no computador (cada quadro enviado leva essa posição; a resposta diz qual quadro foi
+analisado). A confirmação em dois quadros também desconta o quanto a câmera andou. Se a cena muda
+demais (sacudiu, trocou o zoom, outra imagem), as caixas somem até a próxima análise.
+
+| Medida (câmera falsa do Edge, vídeo com deslocamento conhecido) | Antes | Agora |
+|---|---|---|
+| Vídeo no computador | ~2 quadros/s (um por análise) | 11 a 12 quadros/s |
+| Análises por segundo | ~2 | 2,3 a 3,2 |
+| Erro das caixas na tela com a câmera passeando | ~100 px | 0,3 px |
+| Peças confirmadas com a câmera passeando | 0% dos quadros | 100% |
+| Depois de trocar de imagem, caixas antigas somem e as novas voltam em | — | 0,5 a 0,8 s |
+
+## Temperatura pela barra de cores
+
+Uma foto do termograma (tirada da tela ou o quadro do celular) não tem os dados do sensor, mas tem a
+barra de cores com os números da escala. O Pyron (`nucleo/barra.py`) acha a barra em qualquer lugar
+da imagem, um pouco inclinada ou de lado, lê os números das pontas e converte a cor de cada pixel em
+temperatura pela cor mais parecida da barra. As cores da barra são medidas na própria foto: a cor
+puxada pela câmera do celular puxa a barra do mesmo jeito, e a comparação continua valendo.
+
+- **Achar a barra:** faixa estreita e comprida, de cor igual de um lado ao outro e que percorre a
+  paleta inteira sem voltar atrás. Achada em 299 de 299 termogramas do acervo (5 tipos de
+  equipamento), sem nenhuma barra falsa em 149 fotos comuns.
+- **Ler os números:** OCR só perto das pontas, com a detecção de texto limitada (30 ms por número,
+  em vez de 700). Vale o número mais perto da ponta (não a leitura do ponto central). O cadeado da
+  escala travada na FLIR, que de longe vira um "8" ("830.0"), é tirado. Ao vivo, uma leitura só vale
+  depois de aparecer duas vezes; até lá o celular mostra "lendo os números da escala".
+- **Máxima de cada peça:** percentil 99 da temperatura dentro da caixa, depois de apagar linhas finas
+  desenhadas pela câmera (a moldura da área de medição é branca como o topo da escala). Quando bate no
+  topo da escala, aparece "≥": a temperatura real pode ser maior e não dá para saber quanto.
+- **Barra cortada** pela beira do quadro não vale: a ponta cortada não é o limite da escala. Pelo mesmo
+  motivo, a cada quadro as pontas saem da imagem nova (a busca roda numa janela em volta de onde a
+  barra estava, ~10 ms), nunca da posição antiga: uma ponta deslocada estica ou encolhe a escala.
+
+Validação contra a temperatura radiométrica dos arquivos originais (47 termogramas de para-raios,
+celular simulado filmando a tela com perspectiva, moiré, cor puxada, ruído, redução a 960 px e JPEG):
+
+| Situação | Peças | Erro mediano | 90% das peças até | Sem escala lida (um quadro) |
+|---|---|---|---|---|
+| Imagem original (sem celular) | 306 | 0,53 °C | 1,22 °C | 0 de 47 |
+| Celular perto (termograma com 660 px) | 283 | 0,57 °C | 1,38 °C | 1 de 47 |
+| Celular longe (termograma com 470 px) | 236 | 0,57 °C | 1,35 °C | 8 de 47 (e 1 leitura errada) |
+
+Cerca de 1 peça em 25 passa de 3 °C de erro (6 de 236 longe, 10 de 283 perto), na maioria para menos.
+A mira do ponto central e a moldura da área de medição desenhadas pela câmera podem cair em cima da
+peça; a mediana apaga as linhas finas, mas, borradas pelo celular, às vezes sobram: desligar a
+medição de ponto na câmera ao filmar ajuda. É estimativa: serve para ver qual peça está mais quente e se algo está fora do normal, não
+substitui o arquivo original da câmera. O mesmo caminho vale para imagens enviadas por **Nova análise**
+fora do leiaute da FLIR C5 (outra câmera, captura de tela, foto da tela).
 
 ## Diagnóstico honesto
 

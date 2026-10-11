@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 import numpy as np
 from PIL import Image
 
+from nucleo import barra as barra_livre
 from nucleo import flir, paleta
 
 FATOR_ESTIMADA = 2  # a matriz estimada tem metade da resolução da imagem exibida
@@ -110,16 +111,24 @@ def _reduzir(mapa: np.ndarray, fator: int) -> np.ndarray:
         return np.nanmedian(blocos, axis=2).astype(np.float32)
 
 
-AVISO_CELULAR = ("Foto da câmera do celular: o Pyron identifica os componentes, mas a foto não traz temperatura. "
-                 "Para medir, use o arquivo original da câmera térmica.")
+AVISO_CELULAR = ("Foto da câmera do celular sem a barra de cores no quadro: o Pyron identifica os componentes, mas "
+                 "sem a barra não há como estimar a temperatura. Enquadre a barra junto ou use o arquivo original da câmera.")
+AVISO_CELULAR_SEM_NUMEROS = ("Foto da câmera do celular: achei a barra de cores, mas não consegui ler os números da "
+                             "escala. Informe o mínimo e o máximo da escala para estimar a temperatura.")
+AVISO_ESTIMADA = ("Temperatura estimada pelas cores. Erro típico de 0,5 °C na mediana; "
+                  "acima do topo da escala a temperatura real não pode ser recuperada.")
+AVISO_ESTIMADA_FOTO = ("Temperatura estimada pelas cores da barra, numa foto da imagem térmica. Em testes com termogramas "
+                       "filmados na tela, o erro ficou em 0,5 °C na mediana e até 1,3 °C em 9 de 10 peças; reflexo, "
+                       "brilho da tela e moiré pioram. Acima do topo da escala a temperatura real não pode ser recuperada.")
 
 
 def carregar(dados: bytes, ocr=None, limites: tuple[float, float] | None = None, ajustes: dict | None = None,
              somente_imagem: bool = False) -> ImagemTermica:
     """Abre a imagem e devolve a temperatura de cada pixel.
 
-    ``somente_imagem`` (câmera do celular) pula a temperatura: as cores de uma foto de tela não são
-    as da câmera térmica, então nem a leitura pela barra seria confiável.
+    ``somente_imagem`` (câmera do celular) não procura dados radiométricos nem o leiaute fixo da FLIR:
+    a temperatura, se houver, vem da barra de cores achada em qualquer lugar da foto, com as cores dela
+    medidas na própria foto (``nucleo.barra``).
 
     ``ocr`` só é usado quando a imagem não é radiométrica (para ler os limites da escala).
     ``limites`` (mínimo, máximo) já conhecidos da escala dispensam o OCR, como num quadro de vídeo.
@@ -136,7 +145,8 @@ def carregar(dados: bytes, ocr=None, limites: tuple[float, float] | None = None,
     modelo_exif = str(img.getexif().get(272, "") or "")
     orientacao = int(img.getexif().get(274, 1) or 1)
     if somente_imagem:
-        return _sem_temperatura(rgb, data, modelo_exif, orientacao, barra=False, aviso=AVISO_CELULAR)
+        livre = _pela_barra_livre(rgb, ocr, limites, data, modelo_exif, orientacao, foto=True)
+        return livre or _sem_temperatura(rgb, data, modelo_exif, orientacao, barra=False, aviso=AVISO_CELULAR)
 
     try:
         termo = flir.ler_bytes(dados, **(ajustes or {}))
@@ -167,11 +177,16 @@ def carregar(dados: bytes, ocr=None, limites: tuple[float, float] | None = None,
     try:
         esc = paleta.escala(rgb, ocr, t_max=t_max, t_min=t_min)
     except ValueError:
+        # Fora do leiaute da FLIR C5 (outra câmera, captura de tela, foto da tela): a barra em qualquer lugar.
+        livre = _pela_barra_livre(rgb, ocr, limites, data, modelo_exif, orientacao, foto=False)
+        if livre is not None:
+            return livre
         if limites:
             raise ValueError("Não encontrei a barra de cores nesta imagem; sem ela, as cores não viram temperatura.") from None
         return _sem_temperatura(rgb, data, modelo_exif, orientacao, barra=False)
     if esc.t_max is None or esc.t_min is None:
-        return _sem_temperatura(rgb, data, modelo_exif, orientacao, barra=True, lidos=(esc.t_min, esc.t_max))
+        livre = _pela_barra_livre(rgb, ocr, None, data, modelo_exif, orientacao, foto=False, so_lida=True)
+        return livre or _sem_temperatura(rgb, data, modelo_exif, orientacao, barra=True, lidos=(esc.t_min, esc.t_max))
     if esc.t_max <= esc.t_min:
         raise ValueError("Escala inválida: o máximo precisa ser maior que o mínimo.")
     # A leitura da escala e da paleta foi validada nos pixels como estão gravados; o giro vem no fim.
@@ -187,8 +202,48 @@ def carregar(dados: bytes, ocr=None, limites: tuple[float, float] | None = None,
             "escala_lida_c": [esc.t_min, esc.t_max],
             **({"escala_informada": True} if limites else {}),
             "pixels_saturados": round(float(inv.saturado.mean()), 3),
-            "aviso": "Temperatura estimada pelas cores. Erro típico de 0,5 °C na mediana; "
-            "acima do topo da escala a temperatura real não pode ser recuperada.",
+            "aviso": AVISO_ESTIMADA,
+        },
+    )
+
+
+def _pela_barra_livre(rgb: np.ndarray, ocr, limites, data: str, modelo_exif: str, orientacao: int, foto: bool,
+                      so_lida: bool = False) -> ImagemTermica | None:
+    """Temperatura pela barra achada em qualquer lugar da imagem (``nucleo.barra``), ou None sem barra.
+
+    Achou a barra mas não leu os números: imagem sem temperatura que pede a escala (ou None com
+    ``so_lida``, para quem chamou decidir).
+    """
+    achada = barra_livre.achar(rgb)
+    if achada is None:
+        return None
+    if limites:
+        escala = barra_livre.escala_informada(achada, limites[0], limites[1])
+    else:
+        lidos = barra_livre.ler_numeros(rgb, achada, ocr) if ocr is not None else (None, None)
+        escala = barra_livre.montar_escala(achada, *lidos)
+    if escala is None:
+        if so_lida:
+            return None
+        return _sem_temperatura(rgb, data, modelo_exif, orientacao, barra=True,
+                                aviso=AVISO_CELULAR_SEM_NUMEROS if foto else None)
+    img_lab = barra_livre.lab(rgb)
+    temp, quente, _ = barra_livre.temperaturas(img_lab, escala)
+    fora = barra_livre.mascara_sobreposicao(achada, rgb.shape) | paleta.mascara_estruturas_finas(img_lab)
+    temp = np.where(fora, np.nan, temp).astype(np.float32)
+    return ImagemTermica(
+        temperatura_c=orientar(_reduzir(temp, FATOR_ESTIMADA), orientacao),
+        radiometrica=False,
+        exibida_rgb=orientar(rgb, orientacao),
+        foto_visivel=None,
+        metadados={
+            "camera": modelo_exif or "desconhecida",
+            "data_hora": data,
+            "escala_lida_c": [escala.t_min, escala.t_max],
+            **({"escala_informada": True} if limites else {}),
+            "barra_livre": True,
+            "pixels_saturados": round(float((quente & ~fora).mean()), 3),
+            "aviso": AVISO_ESTIMADA_FOTO if foto else AVISO_ESTIMADA,
         },
     )
 

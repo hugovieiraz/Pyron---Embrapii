@@ -96,6 +96,83 @@ def test_rotas_do_celular_pedem_o_codigo_e_devolvem_caixas_normalizadas(tmp_path
     assert e["ultimo"]["seq"] == 2 and e["capturas"] == 1 and e["ultimo"]["deteccoes"][0]["nome"] == "Para-raio"
 
 
+def _modo(tmp_path, espera_s: float = 0.0) -> celular.ModoCelular:
+    """Modo celular com um detector que acha um para-raio no quarto esquerdo de qualquer quadro."""
+    import time
+
+    def detectar(rgb):
+        time.sleep(espera_s)
+        return ([{"classe": "para_raio", "nome": "Para-raio", "confianca": 0.9,
+                  "caixa": [0.0, 0.0, rgb.shape[1] / 4, rgb.shape[0] / 2]}], {"area": [0, 0, rgb.shape[1], rgb.shape[0]]})
+
+    modo = celular.ModoCelular(tmp_path, detectar=detectar, capturar=None, modelo=lambda: {"id": "teste", "nome": "Teste"})
+    modo.token = "codigo-certo"
+    return modo
+
+
+def test_cabecalho_do_quadro_vai_e_volta() -> None:
+    dados = celular.cabecalho(7, {"x": 0.125, "y": -0.25, "trecho": 3}) + b"jpeg"
+    assert celular.ler_cabecalho(dados) == (7, {"x": 0.125, "y": -0.25, "trecho": 3})
+    assert celular.ler_cabecalho(celular.cabecalho(8, None)) == (8, None)  # sem rastro (envio por HTTP)
+
+
+def test_transmissao_por_websocket_responde_com_o_quadro_analisado(tmp_path) -> None:
+    from fastapi.testclient import TestClient
+    from starlette.websockets import WebSocketDisconnect
+
+    modo = _modo(tmp_path)
+    c = TestClient(celular.criar_app(modo))
+    with pytest.raises(WebSocketDisconnect) as fechou:
+        with c.websocket_connect("/c/errado/ws") as ws:
+            ws.receive_json()
+    assert fechou.value.code == 4404
+
+    with c.websocket_connect("/c/codigo-certo/ws") as ws:
+        ws.send_bytes(b"curto")  # menor que o cabeçalho: ignorado
+        ws.send_bytes(celular.cabecalho(1, {"x": 0.0, "y": 0.0, "trecho": 1}) + _jpeg())
+        r1 = ws.receive_json()
+        ws.send_bytes(celular.cabecalho(2, {"x": 0.02, "y": -0.01, "trecho": 1}) + _jpeg())
+        r2 = ws.receive_json()
+        ws.send_bytes(celular.cabecalho(3, None) + b"isto nao e imagem")
+        r3 = ws.receive_json()
+    assert r1["tipo"] == "resultado" and r1["quadro"] == 1 and r1["deteccoes"] == []  # um quadro só não confirma
+    assert r2["quadro"] == 2 and r2["posicao"] == {"x": 0.02, "y": -0.01, "trecho": 1}
+    assert r2["deteccoes"][0]["caixa"] == [0.0, 0.0, 0.25, 0.5]
+    assert r3["tipo"] == "erro" and r3["quadro"] == 3
+    assert modo.vivo.quadro == 3 and modo.estado()["ultimo"]["quadros_por_s"] is not None
+
+
+def test_transmissao_pula_os_quadros_que_chegam_durante_a_analise(tmp_path) -> None:
+    from fastapi.testclient import TestClient
+
+    modo = _modo(tmp_path, espera_s=0.4)
+    c = TestClient(celular.criar_app(modo))
+    with c.websocket_connect("/c/codigo-certo/ws") as ws:
+        for n in (1, 2, 3):  # 2 e 3 chegam enquanto o 1 é analisado: só o mais novo (3) é analisado depois
+            ws.send_bytes(celular.cabecalho(n, {"x": 0.0, "y": 0.0, "trecho": 1}) + _jpeg())
+        analisados = [ws.receive_json()["quadro"]]
+        while analisados[-1] != 3:
+            analisados.append(ws.receive_json()["quadro"])
+    assert analisados == [1, 3]
+    assert modo.vivo.quadro == 3  # o vídeo do computador recebeu todos
+
+
+def test_computador_recebe_o_video_e_os_resultados_pelo_websocket(cliente, tmp_path, monkeypatch) -> None:
+    from app import servidor
+
+    modo = _modo(tmp_path)
+    monkeypatch.setattr(servidor, "celular_modo", modo)
+    posicao = {"x": 0.1, "y": 0.2, "trecho": 2}
+    with cliente.websocket_connect("/api/celular/ws") as ws:
+        modo.receber_quadro(b"jpeg-do-celular", 5, posicao)
+        quadro = ws.receive_bytes()
+        assert celular.ler_cabecalho(quadro) == (5, posicao)
+        assert quadro[celular.CABECALHO.size:] == b"jpeg-do-celular"
+        modo.processar(_jpeg(), 5, posicao)
+        r = ws.receive_json()
+    assert r["quadro"] == 5 and r["posicao"] == posicao and r["seq"] == 1 and "deteccoes" in r
+
+
 def test_peca_so_aparece_confirmada_e_some_sem_termograma(tmp_path) -> None:
     modo = celular.ModoCelular(tmp_path, detectar=None, capturar=None, modelo=None)
     para_raio = {"classe": "para_raio", "caixa": [0.1, 0.1, 0.3, 0.6]}
@@ -105,6 +182,17 @@ def test_peca_so_aparece_confirmada_e_some_sem_termograma(tmp_path) -> None:
     assert modo._confirmar([{"classe": "terminal_superior", "caixa": [0.5, 0.5, 0.6, 0.6]}], True) == []
     assert modo._confirmar([mexeu], False) == []  # sem termograma: esquece o histórico
     assert modo._confirmar([mexeu], True) == []
+
+
+def test_confirmacao_desconta_o_quanto_a_camera_andou(tmp_path) -> None:
+    modo = celular.ModoCelular(tmp_path, detectar=None, capturar=None, modelo=None)
+    antes = {"classe": "para_raio", "caixa": [0.10, 0.10, 0.20, 0.40]}
+    depois = {"classe": "para_raio", "caixa": [0.25, 0.15, 0.35, 0.45]}  # a câmera andou: sem sobreposição
+    assert modo._confirmar([antes], True, {"x": 0.0, "y": 0.0, "trecho": 1}) == []
+    assert modo._confirmar([depois], True, {"x": 0.15, "y": 0.05, "trecho": 1}) == [depois]
+    modo._anteriores.clear()
+    modo._confirmar([antes], True, {"x": 0.0, "y": 0.0, "trecho": 1})
+    assert modo._confirmar([depois], True, {"x": 0.15, "y": 0.05, "trecho": 2}) == []  # rastro perdido: não compara
 
 
 @pytest.fixture()
@@ -150,6 +238,26 @@ def test_captura_do_celular_vira_inspecao_sem_temperatura(cliente, monkeypatch) 
     assert a["sem_temperatura"] is True and a["resumo"]["severidade"] == "sem_medida"
     assert "celular" in a["metadados"]["aviso"]
     assert a["regioes"][0]["nome"] == "Para-raio 1"
+
+
+def test_celular_estima_a_temperatura_de_cada_peca_pela_barra_do_quadro(cliente, monkeypatch) -> None:
+    from app import servidor
+    from nucleo import barra
+    from testes.test_barra import _OCRFalso, _caixa
+
+    det = _DetectorImagem()
+    monkeypatch.setattr(servidor, "_detector_imagem", lambda: det)
+    ocr = _OCRFalso([(_caixa(0, 0, 30, 15), "50.0", 0.9)], [(_caixa(0, 0, 30, 15), "10.0", 0.9)])
+    monkeypatch.setattr(servidor, "leitor_escala_celular", barra.LeitorAoVivo(lambda: ocr))
+    quadro = celular.ler_imagem(_termograma_na_sala())
+    caixas, info = servidor._celular_detectar(quadro)
+    assert info["escala"]["estado"] == "lendo" and "tmax" not in caixas[0]  # uma leitura dos números ainda não vale
+    caixas, info = servidor._celular_detectar(quadro)
+    assert info["escala"]["estado"] == "lida" and (info["escala"]["min"], info["escala"]["max"]) == (10.0, 50.0)
+    assert 10.0 <= caixas[0]["tmax"] <= 50.0
+    bx0, by0, bx1, by1 = info["escala"]["barra"]
+    # a barra em pixels do quadro: o termograma foi posto em (40, 400) e a barra fica em x 20..27, y 122..415 dele
+    assert abs(bx0 - 60) < 6 and abs(by0 - 522) < 6 and abs(by1 - 815) < 6
 
 
 @pytest.mark.skipif(celular._openssl() is None, reason="sem OpenSSL neste computador")

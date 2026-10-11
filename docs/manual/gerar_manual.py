@@ -32,7 +32,7 @@ IMAGENS = AQUI / "imagens"
 LOGO = PROJETO / "app" / "estatico" / "marca" / "logo.png"
 SIMBOLO = PROJETO / "app" / "estatico" / "marca" / "simbolo.png"
 SAIDA = PROJETO / "docs" / "Pyron_Funcionalidades.pdf"
-VERSAO = "0.7.3"
+VERSAO = "0.7.4"
 
 # Cores dos tokens da interface (app/estatico/tokens.css).
 TINTA = colors.HexColor("#171B33")
@@ -540,20 +540,23 @@ def conteudo() -> list:
     ]
 
     # 13
-    c += secao(13, "Câmera do celular", "Identificação ao vivo")
+    c += secao(13, "Câmera do celular", "Identificação e temperatura ao vivo")
     c += [
         p("Aponte a câmera do celular para uma imagem térmica (na tela do computador, por exemplo) e o Pyron marca os componentes ao vivo, "
-          "sem instalar nada no celular. <b>Só identificação:</b> a foto do celular não traz os números do sensor nem a escala."),
+          "sem instalar nada no celular. A foto do celular não traz os números do sensor; <b>com a barra de cores no quadro</b>, o Pyron "
+          "estima a temperatura de cada peça pelas cores dela."),
         tabela(["Passo", "O que fazer"], [
             ["1", "Celular e computador no mesmo Wi-Fi."],
             ["2", "No Pyron, <b>Câmera do celular › Ligar conexão com o celular</b> e leia o QR code com o celular."],
             ["3", "O celular avisa que a conexão não é particular (o certificado é do próprio Pyron): <b>Avançado › Continuar</b>."],
-            ["4", "Permita a câmera e aponte. <b>Capturar</b> salva o quadro como inspeção Sem medida, com as peças marcadas."],
+            ["4", "Permita a câmera e aponte, com a barra de cores no quadro. <b>Capturar</b> salva o quadro como inspeção: com a temperatura "
+                  "estimada quando a barra foi lida, Sem medida quando não."],
         ], [16, LARGURA / mm - 16]),
         Spacer(1, 6),
     ]
-    c += figura("m_celular_pc.png", "No computador: o QR code e o link do celular, e o espelho ao vivo do que o celular vê, com as peças e o ritmo de análise.")
-    c += figura("m_celular.png", "No celular: área do termograma tracejada, peças com rótulos sem sobreposição e a legenda com a confiança.", 70 * mm)
+    c += figura("m_celular_pc.png", "No computador: o QR code e o link do celular, e o vídeo ao vivo do celular, com as peças, a máxima "
+                "estimada de cada uma, a escala lida e o ritmo (quadros de vídeo e análises por segundo).")
+    c += figura("m_celular.png", "No celular: área do termograma tracejada, a barra de cores achada, peças com a máxima estimada e a escala lida.", 70 * mm)
     c += [
         lista([
             "<b>Só olha o termograma:</b> antes de detectar, o Pyron acha no quadro a área com cara de paleta (cores fortes de várias matizes) "
@@ -564,6 +567,14 @@ def conteudo() -> list:
             "Segurança: um servidor à parte, só com as rotas do celular, em HTTPS, ouvindo a rede local só enquanto o modo está ligado e com um "
             "código novo no link a cada vez. Na primeira vez o Windows pergunta se o Pyron pode usar a rede: permita em redes privadas.",
             "Usa a versão rápida (INT8) do modelo: cerca de 0,25 s por quadro neste notebook, na tomada.",
+            "<b>Vídeo fluido:</b> o celular transmite uns 12 quadros por segundo (WebSocket) e o computador mostra esse vídeo. Entre uma análise "
+            "e outra, o celular acompanha o movimento da câmera e leva as caixas junto (erro de 0,3 pixel na tela num teste com a câmera "
+            "passeando, contra cerca de 100 sem isso). Se a cena muda demais, as caixas somem até a próxima análise.",
+            "<b>Temperatura pela barra:</b> o Pyron acha a barra em qualquer lugar do quadro, lê os números das pontas e converte cada cor "
+            "na temperatura da cor mais parecida da barra, com as cores medidas no próprio quadro. Contra a temperatura radiométrica dos "
+            "arquivos originais, com o celular simulado filmando a tela: erro de 0,5 a 0,7 °C na mediana e até 1,4 °C em 9 de cada 10 peças. "
+            "<b>≥</b> no rótulo: a peça bate no topo da escala e pode estar mais quente. Desligue a medição de ponto da câmera ao filmar: a mira "
+            "vermelha em cima da peça aumenta a máxima. É estimativa; para medir, o arquivo original da câmera.",
         ]),
     ]
 
@@ -642,7 +653,7 @@ def conteudo() -> list:
         lista([
             "Detector de IA só para para-raios, treinado com fotos de uma só subestação; falta validar com termografistas em outros lugares.",
             "Para os outros equipamentos, a regra de pontos quentes dá uma classificação indicativa.",
-            "A câmera do celular só identifica: a foto do celular não traz temperatura.",
+            "Pela câmera do celular, a temperatura é estimada pelas cores da barra (erro típico de 0,5 °C, às vezes bem mais): não substitui o arquivo original.",
             "As máximas admissíveis e as faixas precisam ser conferidas na edição vigente da NBR 15866, com os fabricantes e com termografista certificado.",
             "A tendência só é confiável comparando inspeções em condições parecidas, ou com ambiente e carga informados (série a plena carga).",
             "Na imagem só colorida, o ponto quente precisa estar dentro da escala de cores.",

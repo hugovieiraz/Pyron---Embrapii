@@ -11,10 +11,13 @@ button { font: inherit; }
 .cel-foto { object-fit: contain; }
 
 /* caixas brancas com contorno escuro: legíveis em qualquer paleta. Andam com transform, não pulam. */
-.cel-caixas, .cel-rotulos { position: absolute; inset: 0; pointer-events: none; }
-.cel-caixa, .cel-area, .cel-rotulo { position: absolute; left: 0; top: 0; transition: transform var(--dur-rapida) var(--ease-padrao); }
+/* as duas camadas andam juntas com a câmera entre uma análise e outra (celular.js) */
+.cel-caixas, .cel-rotulos { position: absolute; inset: 0; pointer-events: none; will-change: transform; transition: opacity var(--dur-rapida) var(--ease-padrao); }
+.cel-caixas.sumido, .cel-rotulos.sumido { opacity: 0; }
+.cel-caixa, .cel-area, .cel-barra, .cel-rotulo { position: absolute; left: 0; top: 0; transition: transform var(--dur-rapida) var(--ease-padrao); }
 .cel-caixa { border: 2px solid var(--branco); border-radius: var(--r-p); box-shadow: 0 0 0 1px var(--contorno-imagem), inset 0 0 0 1px var(--contorno-imagem); }
 .cel-area { border: 2px dashed var(--realce-imagem); border-radius: var(--r-m); }
+.cel-barra { border: 2px solid var(--realce-imagem); border-radius: var(--r-p); } /* a barra de cores achada */
 .cel-rotulo { display: inline-flex; align-items: center; gap: var(--e-1); padding: 0 var(--e-2); border-radius: var(--r-p); background: var(--rotulo-imagem);
   color: var(--branco); font-size: var(--t-1); line-height: var(--a-2); font-weight: var(--p-forte); white-space: nowrap; }
 .cel-rotulo i, .cel-chip i { width: var(--e-2); height: var(--e-2); border-radius: 50%; flex: none; }
@@ -84,6 +87,6 @@ button { font: inherit; }
 
 @media (prefers-reduced-motion: reduce) {
   .cel-flash.ativo, .cel-aviso { animation: none; }
-  .cel-caixa, .cel-area, .cel-rotulo, .cel-captura i { transition: none; }
+  .cel-caixas, .cel-rotulos, .cel-caixa, .cel-area, .cel-barra, .cel-rotulo, .cel-captura i { transition: none; }
   .cel-btn:active, .cel-redondo:active, .cel-captura:active i { transform: none; }
 }

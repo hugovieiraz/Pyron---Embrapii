@@ -7,7 +7,7 @@
 const $ = (s, raiz = document) => raiz.querySelector(s);
 const $$ = (s, raiz = document) => [...raiz.querySelectorAll(s)];
 const T = TEXTOS;
-const VERSAO_INTERFACE = "0.7.3"; // igual a VERSAO em app/servidor.py
+const VERSAO_INTERFACE = "0.7.4"; // igual a VERSAO em app/servidor.py
 
 function el(tag, props = {}, ...filhos) {
   const n = document.createElement(tag);
@@ -386,7 +386,9 @@ function rota() {
 
 // ================================================================= câmera do celular
 
-const INTERVALO_CELULAR_MS = 800; // espelho do que o celular vê: o detector faz ~1,5 quadro/s
+const INTERVALO_CELULAR_MS = 800; // estado da conexão; o vídeo chega pelo WebSocket, quadro a quadro
+const CABECALHO_CELULAR = 16; // antes do JPEG: número do quadro, trecho do rastro e posição da câmera (x, y)
+const DESLOCAMENTO_MAXIMO_CELULAR = 0.5; // a câmera andou mais que meia tela desde o quadro analisado: esconde
 
 async function carregarCelular() {
   const caixa = $("#celular-conteudo");
@@ -401,16 +403,15 @@ async function carregarCelular() {
 function pararRelogioCelular() {
   clearInterval(estado.relogioCelular);
   estado.relogioCelular = null;
+  fecharEspelho();
 }
 
-/** Desligado: como conectar. Ligado: QR code e link à esquerda, o que o celular vê à direita. */
+/** Desligado: como conectar. Ligado: QR code e link à esquerda, o vídeo do celular à direita. */
 function desenharCelular(c) {
   const C = T.celular;
   const caixa = $("#celular-conteudo");
   pararRelogioCelular();
   $("#nav-celular-ponto").hidden = !c.ligado;
-  estado.seqCelular = null;
-  estado.lugaresCelular = new Map(); // lugar de cada rótulo no quadro passado: não pulam a cada quadro
   if (!c.ligado) {
     const semModelo = c.modelo && c.modelo.erro;
     const botao = el("button", { class: "btn btn-primaria", type: "button", disabled: semModelo ? true : null, onclick: (ev) => ligarCelular(ev.currentTarget) }, icone("ligar"), C.ligar);
@@ -437,8 +438,12 @@ function desenharCelular(c) {
       el("div", { class: "acoes" }, el("button", { class: "btn", type: "button", onclick: (ev) => desligarCelular(ev.currentTarget) }, icone("x"), C.desligar))),
     el("div", { class: "cartao" },
       el("div", { class: "cartao-cabeca" }, tituloComIcone("celular", C.espelhoTitulo), el("span", { class: "nota num", id: "celular-ritmo" })),
-      el("div", { id: "celular-espelho" }),
+      el("div", { id: "celular-espelho" },
+        estadoVazio({ nomeIcone: "celular", titulo: C.esperandoTitulo, texto: C.esperandoTexto, compacto: true })),
       el("div", { class: "celular-achados", id: "celular-achados" }))));
+  estado.classesCelular = (c.modelo && c.modelo.classes) || [];
+  estado.capturasCelular = 0;
+  abrirEspelho();
   atualizarEspelho(c);
   estado.relogioCelular = setInterval(atualizarCelular, INTERVALO_CELULAR_MS);
 }
@@ -454,63 +459,174 @@ async function atualizarCelular() {
   }
 }
 
+/** Estado da conexão e ritmo (o vídeo e as caixas chegam pelo WebSocket, em abrirEspelho). */
 function atualizarEspelho(c) {
   const C = T.celular;
   const u = c.ultimo;
   $("#celular-status").replaceChildren(el("span", { class: `ponto${c.conectado ? " ok" : ""}` }),
     el("span", {}, c.conectado ? C.conectado : u ? C.desconectado(fmt(u.ha_s, 0)) : C.esperando));
-  $("#celular-ritmo").textContent = u && c.conectado && u.analises_por_s != null ? C.ritmoPc(fmt(u.analises_por_s, 1), u.ms) : "";
-  const capturas = c.capturas
-    ? [el("span", { class: "nota" }, C.capturas(c.capturas)), el("a", { class: "btn btn-sm btn-fantasma", href: "#inspecoes" }, C.verInspecoes)]
-    : [];
-  const espelho = $("#celular-espelho");
-  if (!u) {
-    if (!espelho.querySelector(".vazio")) {
-      espelho.replaceChildren(estadoVazio({ nomeIcone: "celular", titulo: C.esperandoTitulo, texto: C.esperandoTexto, compacto: true }));
-    }
-    $("#celular-achados").replaceChildren(...capturas);
-    return;
+  const ritmo = [];
+  if (u && c.conectado && u.quadros_por_s != null) ritmo.push(C.videoPc(fmt(u.quadros_por_s, 0)));
+  if (u && c.conectado && u.analises_por_s != null) ritmo.push(C.ritmoPc(fmt(u.analises_por_s, 1), u.ms));
+  $("#celular-ritmo").textContent = ritmo.join(" · ");
+  if (estado.capturasCelular !== c.capturas) {
+    estado.capturasCelular = c.capturas;
+    desenharAchadosCelular();
   }
-  if (estado.seqCelular === u.seq) return;
-  estado.seqCelular = u.seq;
-  const pct = (v) => `${v * 100}%`;
-  const classes = (c.modelo && c.modelo.classes) || [];
-  const img = new Image();
-  img.onload = async () => {
-    let quadro = espelho.querySelector(".celular-quadro");
-    if (!quadro) {
-      quadro = el("div", { class: "celular-quadro" }, el("img", { alt: C.espelhoAlt }), el("div", { class: "celular-caixas" }));
-      espelho.replaceChildren(quadro);
+}
+
+// O espelho: um WebSocket com o servidor do próprio computador. Mensagem binária é um quadro (cabeçalho
+// do celular + JPEG); texto é o resultado de uma análise. Quadro que chega enquanto o anterior ainda está
+// sendo decodificado substitui o que esperava: sempre o mais novo, sem fila.
+
+function abrirEspelho() {
+  fecharEspelho();
+  const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/celular/ws`);
+  ws.binaryType = "arraybuffer";
+  const esp = { ws, pendente: null, decodificando: false, posicao: null, resultado: null, lugares: new Map(), largura: 0, altura: 0 };
+  estado.espelho = esp;
+  ws.addEventListener("message", (ev) => {
+    if (estado.espelho !== esp) return;
+    if (typeof ev.data === "string") {
+      esp.resultado = JSON.parse(ev.data);
+      desenharResultadoCelular(esp);
+      desenharAchadosCelular();
+      return;
     }
-    const foto = $("img", quadro);
-    foto.src = img.src;
-    await foto.decode().catch(() => {});
-    const caixaEm = (b) => ({ left: pct(b[0]), top: pct(b[1]), width: pct(b[2] - b[0]), height: pct(b[3] - b[1]) });
-    const rotulos = u.deteccoes.map((d) => el("span", { class: "celular-rotulo" }, el("i", { style: { background: corDaClasse(d.classe, classes) } }), d.nome));
-    $(".celular-caixas", quadro).replaceChildren(
-      ...(u.area ? [el("div", { class: "celular-area", style: caixaEm(u.area) })] : []),
-      ...u.deteccoes.map((d) => el("div", { class: "celular-caixa", style: caixaEm(d.caixa) })),
-      ...rotulos);
-    // Rótulos fora das caixas e sem cobrir uns aos outros (rotulos.js, o mesmo do celular).
-    const W = quadro.clientWidth;
-    const H = quadro.clientHeight;
-    const m = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--e-1")) || 0;
-    const chaves = chavesDasDeteccoes(u.deteccoes);
-    const itens = u.deteccoes.map((d, i) => ({
-      chave: chaves[i], largura: rotulos[i].offsetWidth, altura: rotulos[i].offsetHeight,
-      caixa: { x: d.caixa[0] * W, y: d.caixa[1] * H, w: (d.caixa[2] - d.caixa[0]) * W, h: (d.caixa[3] - d.caixa[1]) * H },
-    }));
-    posicionarRotulos(itens, { x0: m, y0: m, x1: W - m, y1: H - m }, estado.lugaresCelular, m)
-      .forEach((p, i) => { rotulos[i].style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px)`; });
-    const vazio = u.area ? C.nenhumNoQuadro : C.semTermograma;
-    const ordenadas = [...u.deteccoes].sort((a, b) => a.caixa[1] - b.caixa[1]);
-    $("#celular-achados").replaceChildren(
-      ...(ordenadas.length
-        ? ordenadas.map((d) => el("span", { class: "etiqueta" }, el("i", { class: "ponto-classe", style: { background: corDaClasse(d.classe, classes) } }), C.rotulo(d.nome, Math.round(d.confianca * 100))))
-        : [el("span", { class: "nota" }, vazio)]),
-      ...capturas);
-  };
-  img.src = `/api/celular/quadro.jpg?seq=${u.seq}`;
+    esp.pendente = ev.data;
+    if (!esp.decodificando) mostrarQuadrosCelular(esp);
+  });
+  ws.addEventListener("close", () => {
+    if (estado.espelho === esp) setTimeout(() => { if (estado.espelho === esp) abrirEspelho(); }, INTERVALO_CELULAR_MS * 2);
+  });
+}
+
+function fecharEspelho() {
+  const esp = estado.espelho;
+  estado.espelho = null;
+  if (esp) esp.ws.close();
+}
+
+async function mostrarQuadrosCelular(esp) {
+  esp.decodificando = true;
+  try {
+    while (esp.pendente && estado.espelho === esp) {
+      const dados = esp.pendente;
+      esp.pendente = null;
+      if (dados.byteLength <= CABECALHO_CELULAR) continue;
+      const cab = new DataView(dados, 0, CABECALHO_CELULAR);
+      const x = cab.getFloat32(8, true);
+      const y = cab.getFloat32(12, true);
+      let imagem;
+      try {
+        imagem = await createImageBitmap(new Blob([new Uint8Array(dados, CABECALHO_CELULAR)], { type: "image/jpeg" }));
+      } catch {
+        continue; // quadro que não decodificou: fica o anterior
+      }
+      esp.posicao = Number.isFinite(x) && Number.isFinite(y) ? { x, y, trecho: cab.getUint32(4, true) } : null;
+      desenharQuadroCelular(esp, imagem);
+    }
+  } finally {
+    esp.decodificando = false;
+  }
+}
+
+function desenharQuadroCelular(esp, imagem) {
+  const espelho = $("#celular-espelho");
+  if (!espelho) return imagem.close();
+  let quadro = espelho.querySelector(".celular-quadro");
+  if (!quadro) {
+    quadro = el("div", { class: "celular-quadro" },
+      el("canvas", { role: "img", "aria-label": T.celular.espelhoAlt }), el("div", { class: "celular-caixas" }));
+    espelho.replaceChildren(quadro);
+  }
+  const tela = $("canvas", quadro);
+  const mudou = tela.width !== imagem.width || tela.height !== imagem.height;
+  if (mudou) {
+    tela.width = imagem.width;
+    tela.height = imagem.height;
+  }
+  tela.getContext("2d").drawImage(imagem, 0, 0);
+  imagem.close();
+  if (mudou || esp.largura !== tela.clientWidth) desenharResultadoCelular(esp);
+  else moverCaixasCelular(esp);
+}
+
+/** Quanto a câmera andou do quadro analisado ao quadro na tela (fração), ou null se não dá para saber. */
+function deslocamentoCelular(esp) {
+  const r = esp.resultado;
+  if (!r || !r.posicao || !esp.posicao) return { x: 0, y: 0 }; // sem rastro (envio por HTTP): no lugar
+  if (r.posicao.trecho !== esp.posicao.trecho) return null;
+  const d = { x: esp.posicao.x - r.posicao.x, y: esp.posicao.y - r.posicao.y };
+  return Math.hypot(d.x, d.y) > DESLOCAMENTO_MAXIMO_CELULAR ? null : d;
+}
+
+function moverCaixasCelular(esp) {
+  const camada = $("#celular-espelho .celular-caixas");
+  if (!camada) return;
+  const d = deslocamentoCelular(esp);
+  camada.classList.toggle("sumido", !d);
+  if (d) camada.style.transform = `translate3d(${(d.x * esp.largura).toFixed(1)}px, ${(d.y * esp.altura).toFixed(1)}px, 0)`;
+}
+
+/** Nome da peça e, com a barra de cores lida, a máxima estimada ("≥" quando bate no topo da escala). */
+const temperaturaCelular = (d) => T.celular.temperatura(fmt(d.tmax, 1), d.tmax_acima);
+const textoDaPecaCelular = (d) => (d.tmax != null ? T.celular.comTemperatura(d.nome, temperaturaCelular(d)) : d.nome);
+
+/** Caixas e rótulos no lugar do quadro analisado; a camada anda com a câmera (moverCaixasCelular). */
+function desenharResultadoCelular(esp) {
+  const quadro = $("#celular-espelho .celular-quadro");
+  const r = esp.resultado;
+  if (!quadro || !r) return;
+  const classes = estado.classesCelular || [];
+  const pct = (v) => `${v * 100}%`;
+  const caixaEm = (b) => ({ left: pct(b[0]), top: pct(b[1]), width: pct(b[2] - b[0]), height: pct(b[3] - b[1]) });
+  const rotulos = r.deteccoes.map((d) => el("span", { class: "celular-rotulo" }, el("i", { style: { background: corDaClasse(d.classe, classes) } }), textoDaPecaCelular(d)));
+  const barra = r.escala && r.escala.barra;
+  $(".celular-caixas", quadro).replaceChildren(
+    ...(r.area ? [el("div", { class: "celular-area", style: caixaEm(r.area) })] : []),
+    ...(barra ? [el("div", { class: "celular-barra", style: caixaEm(barra) })] : []),
+    ...r.deteccoes.map((d) => el("div", { class: "celular-caixa", style: caixaEm(d.caixa) })),
+    ...rotulos);
+  // Rótulos fora das caixas e sem cobrir uns aos outros (rotulos.js, o mesmo do celular).
+  const W = quadro.clientWidth;
+  const H = quadro.clientHeight;
+  esp.largura = W;
+  esp.altura = H;
+  const m = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--e-1")) || 0;
+  const chaves = chavesDasDeteccoes(r.deteccoes);
+  const itens = r.deteccoes.map((d, i) => ({
+    chave: chaves[i], largura: rotulos[i].offsetWidth, altura: rotulos[i].offsetHeight,
+    caixa: { x: d.caixa[0] * W, y: d.caixa[1] * H, w: (d.caixa[2] - d.caixa[0]) * W, h: (d.caixa[3] - d.caixa[1]) * H },
+  }));
+  posicionarRotulos(itens, { x0: m, y0: m, x1: W - m, y1: H - m }, esp.lugares, m)
+    .forEach((p, i) => { rotulos[i].style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px)`; });
+  moverCaixasCelular(esp);
+}
+
+/** Embaixo do vídeo: as peças do último quadro analisado, a barra lida e as capturas salvas. */
+function desenharAchadosCelular() {
+  const C = T.celular;
+  const lista = $("#celular-achados");
+  if (!lista) return;
+  const r = estado.espelho && estado.espelho.resultado;
+  const classes = estado.classesCelular || [];
+  const itens = [];
+  if (r) {
+    const ordenadas = [...r.deteccoes].sort((a, b) => a.caixa[1] - b.caixa[1]);
+    if (ordenadas.length) {
+      itens.push(...ordenadas.map((d) => el("span", { class: "etiqueta" },
+        el("i", { class: "ponto-classe", style: { background: corDaClasse(d.classe, classes) } }),
+        d.tmax != null ? C.comTemperatura(C.rotulo(d.nome, Math.round(d.confianca * 100)), temperaturaCelular(d)) : C.rotulo(d.nome, Math.round(d.confianca * 100)))));
+    } else {
+      itens.push(el("span", { class: "nota" }, r.area ? C.nenhumNoQuadro : C.semTermograma));
+    }
+    if (r.escala) itens.push(el("span", { class: "nota" }, r.escala.estado === "lida" ? C.escalaLida(fmt(r.escala.min, 1), fmt(r.escala.max, 1)) : C.escalaLendo));
+  }
+  if (estado.capturasCelular) {
+    itens.push(el("span", { class: "nota" }, C.capturas(estado.capturasCelular)), el("a", { class: "btn btn-sm btn-fantasma", href: "#inspecoes" }, C.verInspecoes));
+  }
+  lista.replaceChildren(...itens);
 }
 
 async function ligarCelular(botao) {

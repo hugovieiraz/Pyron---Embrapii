@@ -1,8 +1,19 @@
 """Câmera do celular: o celular aponta para uma imagem térmica e o Pyron identifica os componentes ao vivo.
 
-O celular abre uma página do Pyron no navegador, no mesmo Wi-Fi, manda os quadros da câmera e recebe
-as caixas de volta. Só identificação: uma foto tirada pelo celular (da tela do computador, por exemplo)
-não traz os números do sensor nem a escala, então não há temperatura.
+O celular abre uma página do Pyron no navegador, no mesmo Wi-Fi, transmite a câmera e recebe as caixas
+de volta. Uma foto tirada pelo celular não traz os números do sensor; a temperatura só sai quando a
+barra de cores aparece no quadro (estimada pelas cores dela).
+
+Transmissão: um WebSocket por celular. O celular manda quadros JPEG sem parar (uns 12 por segundo,
+sem acumular fila); o servidor guarda sempre o mais novo e analisa um por vez, descartando os que
+chegaram enquanto o detector trabalhava. É o arranjo usual para visão em rede local: sem o custo de
+um pedido HTTP por quadro e sem o atraso de uma fila crescendo. O computador recebe os quadros por
+outro WebSocket e mostra o vídeo ao vivo.
+
+Cada quadro leva na frente o número dele e a posição da câmera que o celular estimou (quanto a cena
+andou no quadro desde o início, comparando miniaturas). A resposta da análise volta com o número do
+quadro analisado: com as duas posições, o celular e o computador levam as caixas junto com a câmera
+enquanto a próxima análise não chega.
 
 Três cuidados:
 
@@ -16,11 +27,14 @@ Três cuidados:
 
 from __future__ import annotations
 
+import asyncio
 import io
+import math
 import os
 import secrets
 import shutil
 import socket
+import struct
 import subprocess
 import threading
 import time
@@ -30,7 +44,7 @@ from pathlib import Path
 from typing import Callable
 
 import numpy as np
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
@@ -42,6 +56,23 @@ LADO_MAXIMO = 1280  # o quadro é reduzido a isso antes do detector
 CONECTADO_S = 4.0  # sem quadro há mais que isso: o celular saiu da página ou perdeu a rede
 IOU_MESMA_PECA = 0.3  # caixas de quadros seguidos com essa sobreposição são a mesma peça
 DIAS_CERTIFICADO = 825
+# Antes do JPEG de cada quadro transmitido: número do quadro, trecho do rastro e posição da câmera em x
+# e y (fração da largura e da altura do quadro), little-endian. O trecho muda quando o celular perde o
+# rastro da câmera (sacudiu, trocou o zoom): posições de trechos diferentes não se comparam.
+CABECALHO = struct.Struct("<IIff")
+
+
+def cabecalho(quadro: int, posicao: dict | None) -> bytes:
+    if not posicao:
+        return CABECALHO.pack(quadro & 0xFFFFFFFF, 0, math.nan, math.nan)
+    return CABECALHO.pack(quadro & 0xFFFFFFFF, posicao["trecho"] & 0xFFFFFFFF, posicao["x"], posicao["y"])
+
+
+def ler_cabecalho(dados: bytes) -> tuple[int, dict | None]:
+    quadro, trecho, x, y = CABECALHO.unpack_from(dados)
+    if not (math.isfinite(x) and math.isfinite(y)):
+        return quadro, None
+    return quadro, {"x": round(x, 5), "y": round(y, 5), "trecho": trecho}
 
 
 # ---------------------------------------------------------------- rede e certificado
@@ -152,14 +183,29 @@ def iou(a: list[float], b: list[float]) -> float:
 
 @dataclass
 class Ultimo:
-    jpeg: bytes = b""
+    """A última análise de um quadro do celular."""
+
     deteccoes: list = field(default_factory=list)
     largura: int = 0
     altura: int = 0
     quando: float = 0.0
     ms: int = 0
-    seq: int = 0  # número do quadro: o espelho no computador só baixa a imagem quando ele muda
+    seq: int = 0  # número da análise: o espelho no computador só redesenha as caixas quando ele muda
     area: list | None = None  # onde está o termograma no quadro (0 a 1), ou None se não há
+    escala: dict | None = None  # barra de cores achada e lida no quadro (temperatura estimada)
+    quadro: int = 0  # número do quadro analisado, como o celular mandou
+    posicao: dict | None = None  # posição da câmera nesse quadro, como o celular estimou
+
+
+@dataclass
+class Vivo:
+    """O quadro mais novo que chegou do celular (para o vídeo ao vivo no computador)."""
+
+    jpeg: bytes = b""
+    seq: int = 0
+    quando: float = 0.0
+    quadro: int = 0
+    posicao: dict | None = None
 
 
 class ModoCelular:
@@ -178,9 +224,12 @@ class ModoCelular:
         self.ip: str | None = None
         self.erro: str | None = None
         self.ultimo = Ultimo()
+        self.vivo = Vivo()
         self.capturas = 0
         self._tempos: deque[float] = deque(maxlen=20)  # instantes dos últimos quadros (análises por segundo)
-        self._anteriores: deque[list] = deque(maxlen=2)  # peças dos quadros anteriores, para confirmar
+        self._recebidos: deque[float] = deque(maxlen=40)  # instantes dos quadros que chegaram (transmissão)
+        # peças dos quadros anteriores, com a posição da câmera em cada um, para confirmar
+        self._anteriores: deque[tuple[list, dict | None]] = deque(maxlen=2)
         self._servidor = None
         self._fio: threading.Thread | None = None
         self._trava = threading.Lock()  # um quadro por vez no detector
@@ -208,7 +257,9 @@ class ModoCelular:
             self.porta = porta_livre(host=self.host)
             self.token = secrets.token_urlsafe(6)
             self.ultimo = Ultimo()
+            self.vivo = Vivo()
             self._tempos.clear()
+            self._recebidos.clear()
             self._anteriores.clear()
             config = uvicorn.Config(criar_app(self), host=self.host, port=self.porta, ssl_certfile=str(cert),
                                     ssl_keyfile=str(chave), log_level="warning", log_config=None)
@@ -235,7 +286,13 @@ class ModoCelular:
 
     # ------------------------------------------------------------ quadros
 
-    def processar(self, dados: bytes) -> dict:
+    def receber_quadro(self, jpeg: bytes, quadro: int = 0, posicao: dict | None = None) -> None:
+        """Quadro que acabou de chegar: vira o quadro ao vivo do computador, analisado ou não."""
+        agora = time.time()
+        self._recebidos.append(agora)
+        self.vivo = Vivo(jpeg, self.vivo.seq + 1, agora, quadro, posicao)
+
+    def processar(self, dados: bytes, quadro: int = 0, posicao: dict | None = None) -> dict:
         rgb = ler_imagem(dados)
         h, w = rgb.shape[:2]
         if not self._trava.acquire(timeout=10):
@@ -248,23 +305,29 @@ class ModoCelular:
             self._trava.release()
         normalizar = lambda c: [round(c[0] / w, 4), round(c[1] / h, 4), round(c[2] / w, 4), round(c[3] / h, 4)]  # noqa: E731
         area = normalizar(info["area"]) if info.get("area") else None
-        deteccoes = self._confirmar([{**d, "caixa": normalizar(d["caixa"])} for d in caixas], area is not None)
+        deteccoes = self._confirmar([{**d, "caixa": normalizar(d["caixa"])} for d in caixas], area is not None, posicao)
         agora = time.time()
         self._tempos.append(agora)
-        buf = io.BytesIO()
-        Image.fromarray(rgb).save(buf, format="JPEG", quality=80)
-        self.ultimo = Ultimo(buf.getvalue(), deteccoes, w, h, agora, ms, self.ultimo.seq + 1, area)
-        return {"deteccoes": deteccoes, "area": area, "ms": ms, "largura": w, "altura": h}
+        escala = info.get("escala")
+        if escala and escala.get("barra"):
+            escala = {**escala, "barra": normalizar(escala["barra"])}
+        self.ultimo = Ultimo(deteccoes, w, h, agora, ms, self.ultimo.seq + 1, area, escala, quadro, posicao)
+        return {"deteccoes": deteccoes, "area": area, "escala": escala, "ms": ms, "largura": w, "altura": h,
+                "quadro": quadro, "posicao": posicao}
 
-    def _confirmar(self, atuais: list[dict], com_termograma: bool) -> list[dict]:
-        """Só mostra a peça que aparece em dois quadros seguidos: engano costuma surgir num quadro e sumir."""
+    def _confirmar(self, atuais: list[dict], com_termograma: bool, posicao: dict | None = None) -> list[dict]:
+        """Só mostra a peça que aparece em dois quadros seguidos: engano costuma surgir num quadro e sumir.
+
+        Com a câmera andando, a mesma peça muda de lugar entre um quadro analisado e o seguinte: a caixa
+        antiga é levada pelo tanto que a câmera andou (posição que o celular mandou) antes de comparar.
+        """
         if not com_termograma:
             self._anteriores.clear()
             return []
         confirmadas = [d for d in atuais
-                       if any(a["classe"] == d["classe"] and iou(a["caixa"], d["caixa"]) >= IOU_MESMA_PECA
-                              for quadro in self._anteriores for a in quadro)]
-        self._anteriores.append(atuais)
+                       if any(a["classe"] == d["classe"] and iou(_levar(a["caixa"], antes, posicao), d["caixa"]) >= IOU_MESMA_PECA
+                              for quadro, antes in self._anteriores for a in quadro)]
+        self._anteriores.append((atuais, posicao))
         return confirmadas
 
     def capturar(self, dados: bytes) -> dict:
@@ -275,15 +338,16 @@ class ModoCelular:
         return resumo
 
     def analises_por_s(self) -> float | None:
-        recentes = [t for t in self._tempos if time.time() - t < 10]
-        if len(recentes) < 2:
-            return None
-        return round((len(recentes) - 1) / (recentes[-1] - recentes[0]), 2) if recentes[-1] > recentes[0] else None
+        return _ritmo(self._tempos)
+
+    def quadros_por_s(self) -> float | None:
+        return _ritmo(self._recebidos)
 
     def estado(self) -> dict:
         ligado = self.ligado
         u = self.ultimo
-        conectado = ligado and u.quando > 0 and time.time() - u.quando < CONECTADO_S
+        visto = max(u.quando, self.vivo.quando)
+        conectado = ligado and visto > 0 and time.time() - visto < CONECTADO_S
         try:
             modelo = self._modelo()
         except ValueError as erro:
@@ -298,10 +362,27 @@ class ModoCelular:
             "conectado": conectado,
             "capturas": self.capturas,
             "ultimo": None if not u.quando else {
-                "deteccoes": u.deteccoes, "area": u.area, "largura": u.largura, "altura": u.altura, "ms": u.ms, "seq": u.seq,
-                "ha_s": round(time.time() - u.quando, 1), "analises_por_s": self.analises_por_s(),
+                "deteccoes": u.deteccoes, "area": u.area, "escala": u.escala, "largura": u.largura, "altura": u.altura,
+                "ms": u.ms, "seq": u.seq, "ha_s": round(time.time() - u.quando, 1), "analises_por_s": self.analises_por_s(),
+                "quadros_por_s": self.quadros_por_s(),
             },
         }
+
+
+def _levar(caixa: list[float], de: dict | None, para: dict | None) -> list[float]:
+    """Caixa (fração do quadro) levada pelo tanto que a cena andou entre duas posições da câmera."""
+    if not de or not para or de["trecho"] != para["trecho"]:
+        return caixa
+    dx, dy = para["x"] - de["x"], para["y"] - de["y"]
+    return [caixa[0] + dx, caixa[1] + dy, caixa[2] + dx, caixa[3] + dy]
+
+
+def _ritmo(instantes: deque) -> float | None:
+    """Eventos por segundo nos últimos 10 s."""
+    recentes = [t for t in instantes if time.time() - t < 10]
+    if len(recentes) < 2 or recentes[-1] <= recentes[0]:
+        return None
+    return round((len(recentes) - 1) / (recentes[-1] - recentes[0]), 2)
 
 
 # ---------------------------------------------------------------- servidor do celular (só estas rotas)
@@ -339,12 +420,63 @@ def criar_app(modo: ModoCelular) -> FastAPI:
     async def quadro(token: str, request: Request) -> dict:
         conferir(token)
         dados = await request.body()
+        modo.receber_quadro(dados)  # sem WebSocket (rede que bloqueia): o computador também vê o quadro
         try:
             return await _em_fio(modo.processar, dados)
         except ValueError as erro:
             raise HTTPException(422, str(erro)) from erro
         except RuntimeError as erro:
             raise HTTPException(503, str(erro)) from erro
+
+    @app.websocket("/c/{token}/ws")
+    async def ao_vivo(ws: WebSocket, token: str):
+        """Transmissão do celular: quadros chegam sem parar; analisa sempre o mais novo, um por vez.
+
+        Cada mensagem do celular: o cabeçalho (número do quadro e posição da câmera) e o JPEG. A
+        resposta vai em JSON com o número do quadro analisado.
+        """
+        if not modo.token or not secrets.compare_digest(token, modo.token):
+            await ws.close(code=4404)
+            return
+        await ws.accept()
+        novo = asyncio.Event()
+        pendente: dict = {"jpeg": None, "quadro": 0, "posicao": None, "fim": False}
+
+        async def receber():
+            try:
+                while True:
+                    dados = await ws.receive_bytes()
+                    if len(dados) <= CABECALHO.size or len(dados) > LIMITE_QUADRO:
+                        continue
+                    quadro, posicao = ler_cabecalho(dados)
+                    jpeg = dados[CABECALHO.size:]
+                    modo.receber_quadro(jpeg, quadro, posicao)
+                    pendente.update(jpeg=jpeg, quadro=quadro, posicao=posicao)
+                    novo.set()
+            except (WebSocketDisconnect, RuntimeError):
+                pass
+            finally:
+                pendente["fim"] = True
+                novo.set()
+
+        async def analisar():
+            while True:
+                await novo.wait()
+                novo.clear()
+                if pendente["fim"]:
+                    return
+                jpeg, quadro, posicao = pendente["jpeg"], pendente["quadro"], pendente["posicao"]
+                try:
+                    r = await _em_fio(modo.processar, jpeg, quadro, posicao)
+                    resposta = {"tipo": "resultado", **r}
+                except (ValueError, RuntimeError) as erro:
+                    resposta = {"tipo": "erro", "quadro": quadro, "mensagem": str(erro)}
+                try:
+                    await ws.send_json(resposta)
+                except (WebSocketDisconnect, RuntimeError):
+                    return
+
+        await asyncio.gather(receber(), analisar())
 
     @app.post("/c/{token}/capturar")
     async def capturar(token: str, request: Request) -> dict:
