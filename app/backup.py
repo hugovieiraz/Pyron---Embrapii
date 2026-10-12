@@ -21,7 +21,10 @@ from datetime import datetime
 from pathlib import Path
 
 BANCO = "inspecoes.sqlite"
-FORA = {"videos", "treinos", "backups", "__pycache__"}
+# Fora do backup: vídeos e treinos (grandes, refazíveis), backups antigos, o perfil do Edge onde a
+# interface roda ("janela": ~500 MB de componentes que o próprio Edge baixa, e arquivos que ele trava
+# com a janela aberta) e o certificado do celular ("celular": chave privada, refeita sozinha).
+FORA = {"videos", "treinos", "backups", "__pycache__", "janela", "celular"}
 RESTAURAVEIS = {"config.json", "logo.png", "monitor_vistos.json", "imagens", "matrizes", "avaliacoes"}
 
 
@@ -55,8 +58,9 @@ def gerar(pasta: Path) -> bytes:
 
 
 def contar(pasta: Path) -> dict:
-    """Tamanho dos dados e quantas imagens guardadas, para a tela."""
-    total = sum(p.stat().st_size for p in pasta.rglob("*") if p.is_file()) if pasta.exists() else 0
+    """Tamanho dos dados e quantas imagens guardadas, para a tela (sem o perfil do navegador nem o certificado)."""
+    total = sum(p.stat().st_size for p in pasta.rglob("*")
+                if p.is_file() and p.relative_to(pasta).parts[0] not in {"janela", "celular"}) if pasta.exists() else 0
     videos = sum(p.stat().st_size for p in (pasta / "videos").rglob("*") if p.is_file()) if (pasta / "videos").exists() else 0
     imagens = len(list((pasta / "imagens").glob("*.jpg"))) if (pasta / "imagens").exists() else 0
     return {"bytes": total, "bytes_videos": videos, "arquivos_imagem": imagens}

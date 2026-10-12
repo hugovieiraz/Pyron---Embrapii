@@ -65,3 +65,21 @@ def test_restaurar_arquivo_errado_nao_mexe_em_nada(cliente) -> None:
     r = cliente.post("/api/backup/restaurar", files={"arquivo": ("x.zip", buf.getvalue(), "application/zip")})
     assert r.status_code == 422 and "backup do Pyron" in r.json()["erro"]
     assert [x["id"] for x in cliente.get("/api/analises").json()] == [a["id"]]
+
+
+def test_backup_deixa_de_fora_o_perfil_do_navegador_e_o_certificado(tmp_path) -> None:
+    import io
+    import zipfile
+
+    from app import backup
+
+    (tmp_path / "imagens").mkdir()
+    (tmp_path / "imagens" / "a.jpg").write_bytes(b"foto")
+    (tmp_path / "janela" / "component_crx_cache").mkdir(parents=True)
+    (tmp_path / "janela" / "component_crx_cache" / "modelo.crx").write_bytes(b"x" * 1000)
+    (tmp_path / "celular").mkdir()
+    (tmp_path / "celular" / "chave.pem").write_bytes(b"segredo")
+    nomes = zipfile.ZipFile(io.BytesIO(backup.gerar(tmp_path))).namelist()
+    assert "imagens/a.jpg" in nomes
+    assert not any(n.startswith(("janela/", "celular/")) for n in nomes)
+    assert backup.contar(tmp_path)["bytes"] == len(b"foto")
