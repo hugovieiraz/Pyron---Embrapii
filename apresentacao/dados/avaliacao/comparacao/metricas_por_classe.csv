@@ -1,0 +1,6 @@
+,Faster R-CNN,Faster R-CNN,Faster R-CNN,YOLO26S,YOLO26S,YOLO26S,RF-DETR Medium,RF-DETR Medium,RF-DETR Medium
+,AP50,AP50-95,revocacao,AP50,AP50-95,revocacao,AP50,AP50-95,revocacao
+Para-raio,0.99,0.677,1.0,0.987,0.651,1.0,0.99,0.685,1.0
+Aletas Isoladoras,1.0,0.693,0.957,1.0,0.749,1.0,1.0,0.735,1.0
+Terminal Superior,0.854,0.239,0.744,0.924,0.38,0.953,0.896,0.324,0.884
+Terminal Inferior,0.729,0.415,0.744,0.725,0.4,0.744,0.757,0.454,0.767

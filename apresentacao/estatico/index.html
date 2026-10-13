@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pyron · Apresentação</title>
+<link rel="icon" href="/e/marca/icone-64.png">
+<link rel="stylesheet" href="/e/tokens.css">
+<link rel="stylesheet" href="/e/estilo.css">
+</head>
+<body>
+<header class="topo">
+  <div class="marca">
+    <img src="/e/marca/icone-64.png" alt="">
+    <div><b>Pyron</b><span>Identificação de para-raios por termografia</span></div>
+  </div>
+  <nav class="abas" role="tablist" aria-label="Seções">
+    <button type="button" role="tab" id="tab-analise" aria-controls="aba-analise" aria-selected="true">Análise</button>
+    <button type="button" role="tab" id="tab-modelo" aria-controls="aba-modelo" aria-selected="false">Modelo</button>
+    <button type="button" role="tab" id="tab-avaliacao" aria-controls="aba-avaliacao" aria-selected="false">Avaliação</button>
+  </nav>
+  <span class="motor" id="motor" role="status"><i></i><span>Carregando o modelo…</span></span>
+</header>
+
+<main>
+  <section class="aba" id="aba-analise" role="tabpanel" aria-labelledby="tab-analise">
+    <div class="galeria-cabeca">
+      <div>
+        <h2>Fotos de teste</h2>
+        <p class="nota" id="galeria-nota">Fotos que o modelo nunca viu no treino. Clique numa para analisar.</p>
+      </div>
+      <label class="btn">
+        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0-5 5m5-5 5 5M5 20h14"/></svg>
+        Enviar foto
+        <input type="file" id="arquivo" accept="image/jpeg" multiple hidden>
+      </label>
+    </div>
+    <div class="galeria" id="galeria" aria-label="Fotos de teste"></div>
+    <div id="analise"></div>
+  </section>
+
+  <section class="aba" id="aba-modelo" role="tabpanel" aria-labelledby="tab-modelo" hidden></section>
+  <section class="aba" id="aba-avaliacao" role="tabpanel" aria-labelledby="tab-avaliacao" hidden></section>
+</main>
+
+<div class="soltar" id="soltar" hidden><p>Solte a foto da câmera para analisar</p></div>
+<div class="dica" id="dica" role="tooltip" hidden></div>
+<dialog class="lupa" id="lupa"><button type="button" class="btn btn-fantasma lupa-fechar" id="lupa-fechar">Fechar</button><img alt=""><p class="nota"></p></dialog>
+
+<script src="/e/rotulos.js"></script>
+<script src="/e/app.js"></script>
+</body>
+</html>

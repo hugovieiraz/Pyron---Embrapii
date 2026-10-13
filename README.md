@@ -20,6 +20,12 @@ Todas as funcionalidades, tela por tela: [`docs/Pyron_Funcionalidades.pdf`](docs
 > ([ScienceDB 10185](https://doi.org/10.57760/sciencedb.10185)), licença
 > [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/): uso não comercial, para estudo.
 
+## Aplicativo de apresentação
+
+Para apresentar só a identificação de para-raios (análise das fotos com o ponto mais quente, o modelo
+e a avaliação), sem o resto do Pyron: atalho **Pyron Apresentação** na área de trabalho ou
+`.venv/Scripts/python.exe -m apresentacao`. Veja [`apresentacao/README.md`](apresentacao/README.md).
+
 ## Abrir o aplicativo
 
 Dois cliques em **`Pyron.exe`** na área de trabalho. Aparece a tela de abertura, o motor carrega
@@ -425,6 +431,7 @@ Demonstração sem tocar nas inspeções reais:
 | `nucleo/` | Motor sem interface: leitura radiométrica FLIR (`flir.py`), inversão de paleta (`paleta.py`), entrada única (`entrada.py`), referências de temperatura (`referencias.py`), medição e severidade (`analise.py`), desenho (`render.py`), detectores (`detectores/`) |
 | `app/` | Servidor local (FastAPI), laudo em PDF, inspeções e alertas salvos, equipamentos e tendência (`equipamentos.py`), pendências (`pendencias.py`), vídeo (`videos.py`), monitoramento de pasta (`monitoramento.py`) e interface web (`estatico/`) |
 | `lancador/` | `Pyron.exe`: fonte C# e script de construção; `atalho.py` cria o atalho que abre sem o `.exe` |
+| `apresentacao/` | aplicativo separado e enxuto para apresentação (análise, modelo e avaliação) |
 | `marca/` | Logo original e o script que gera símbolo, ícones e favicon (`gerar_marca.py`) |
 | `ml/` | Treino de detectores a partir de rótulos do CVAT, avaliação e exportação ONNX |
 | `modelos/` | Modelos treinados instalados (ver `modelos/LEIA-ME.md`) |

@@ -1,0 +1,94 @@
+"""Abre o aplicativo de apresentação: sobe o servidor local e mostra a janela (Edge em modo aplicativo).
+
+Uso, na pasta do projeto: ``.venv\\Scripts\\pythonw.exe -m apresentacao`` (o atalho "Pyron
+Apresentação" da área de trabalho faz isso). O servidor desliga sozinho quando a janela fecha.
+"""
+
+from __future__ import annotations
+
+import os
+import socket
+import subprocess
+import sys
+import threading
+import time
+import webbrowser
+from pathlib import Path
+
+AQUI = Path(__file__).resolve().parent
+sys.path.insert(0, str(AQUI.parent))
+
+EDGE = [
+    Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")) / "Microsoft/Edge/Application/msedge.exe",
+    Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Microsoft/Edge/Application/msedge.exe",
+]
+SEM_SINAL_S = 45  # a janela manda um sinal a cada 10 s; sem sinal por isso, ela fechou
+SEM_JANELA_S = 600  # ninguém abriu a janela
+
+
+def porta_livre(inicio: int = 8770) -> int:
+    for porta in range(inicio, inicio + 20):
+        with socket.socket() as s:
+            if s.connect_ex(("127.0.0.1", porta)) != 0:
+                return porta
+    raise RuntimeError("Nenhuma porta livre entre 8770 e 8789.")
+
+
+def abrir_janela(url: str) -> None:
+    for edge in EDGE:
+        if edge.exists():
+            subprocess.Popen(
+                [str(edge), f"--app={url}", f"--user-data-dir={AQUI / '.janela'}", "--window-size=1480,920",
+                 "--no-first-run", "--no-default-browser-check", "--disable-features=Translate",
+                 "--disable-component-update"],  # sem os ~500 MB de componentes que o Edge baixa sozinho
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+            return
+    webbrowser.open(url)
+
+
+def vigiar(servidor, sinais: dict, inicio: float) -> None:
+    while not servidor.should_exit:
+        time.sleep(2)
+        agora = time.time()
+        if sinais["ultimo"] == 0.0:
+            servidor.should_exit = agora - inicio > SEM_JANELA_S
+        elif agora - sinais["ultimo"] > SEM_SINAL_S:
+            servidor.should_exit = True
+
+
+def main() -> None:
+    sem_janela = "--sem-janela" in sys.argv  # diagnóstico: só o servidor, o endereço vai para o registro
+    sem_console = sys.stdout is None or "pythonw" in Path(sys.executable).name.lower()
+    if sem_console:
+        registro = open(AQUI / "registro.log", "a", encoding="utf-8", buffering=1)
+        sys.stdout = sys.stderr = registro
+    print(f"\n--- {time.strftime('%Y-%m-%d %H:%M:%S')} início")
+
+    import uvicorn
+
+    from apresentacao import servidor as srv
+
+    srv.iniciar_carga()
+    porta = porta_livre()
+    url = f"http://127.0.0.1:{porta}"
+    print("Pyron · Apresentação em", url)
+    config = uvicorn.Config(srv.app, host="127.0.0.1", port=porta, log_level="warning", log_config=None)
+    servidor = uvicorn.Server(config)
+    threading.Thread(target=vigiar, args=(servidor, srv.sinais, time.time()), daemon=True).start()
+
+    def abrir_quando_pronto() -> None:
+        for _ in range(150):
+            if servidor.started:
+                if not sem_janela:
+                    abrir_janela(url)
+                return
+            time.sleep(0.1)
+
+    threading.Thread(target=abrir_quando_pronto, daemon=True).start()
+    servidor.run()
+    print(f"--- {time.strftime('%Y-%m-%d %H:%M:%S')} fim")
+
+
+if __name__ == "__main__":
+    main()

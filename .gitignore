@@ -18,3 +18,8 @@ modelos/*/
 
 # Planejamento local do GSD (gerado da versão antiga do plano)
 .planning/
+
+# aplicativo de apresentação: perfil do Edge e registro
+apresentacao/.janela/
+apresentacao/registro.log
+!apresentacao/dados/
