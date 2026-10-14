@@ -89,3 +89,4 @@ O **Metabase** é a opção mais produtiva para compras e diretoria:
 3. Insira o servidor e o banco de dados.
 4. Selecione as tabelas/views que começam com `vw_`.
 5. Arraste os campos de data limite e equipamento para criar um gráfico de Gantt ou tabela de prioridade com formatação condicional (Vermelho para $\le$ 7 dias, Laranja para 30 dias).
+

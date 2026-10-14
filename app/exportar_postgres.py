@@ -45,6 +45,389 @@ def escape_sql(valor) -> str:
     return "'" + txt.replace("'", "''") + "'"
 
 
+DDL_POSTGRES = """-- =============================================================================
+-- ESTRUTURA DO BANCO DE DADOS (DDL IDEMPOTENTE)
+-- =============================================================================
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+DO $$ BEGIN
+    CREATE TYPE tipo_severidade AS ENUM (
+        'sem_medida', 'nao_avaliado', 'normal', 'atencao', 'programar', 'urgente', 'imediato'
+    );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+    CREATE TYPE tipo_referencia_delta_t AS ENUM (
+        'semelhantes', 'entorno', 'ambiente'
+    );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+    CREATE TYPE status_alerta AS ENUM (
+        'pendente', 'enviado', 'resolvido'
+    );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+    CREATE TYPE status_pendencia AS ENUM (
+        'aberta', 'programada', 'corrigida', 'verificada', 'descartada'
+    );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+    CREATE TYPE status_job_processamento AS ENUM (
+        'na_fila', 'executando', 'processando', 'concluido', 'erro', 'cancelado'
+    );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+    CREATE TYPE modo_processamento_video AS ENUM (
+        'ao_vivo', 'intervalo'
+    );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- -----------------------------------------------------------------------------
+-- Tabelas Principais
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS empresas (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nome VARCHAR(255) NOT NULL,
+    cnpj VARCHAR(20) UNIQUE,
+    logo_storage_uri TEXT,
+    criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS usuarios_responsaveis (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    empresa_id UUID REFERENCES empresas(id) ON DELETE RESTRICT,
+    nome VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    cargo VARCHAR(120),
+    registro_crea VARCHAR(60),
+    ativo BOOLEAN NOT NULL DEFAULT TRUE,
+    criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS instalacoes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    empresa_id UUID NOT NULL REFERENCES empresas(id) ON DELETE RESTRICT,
+    codigo_instalacao VARCHAR(100) NOT NULL,
+    nome VARCHAR(255) NOT NULL,
+    subestacao VARCHAR(255),
+    setor VARCHAR(150),
+    ambiente VARCHAR(100),
+    latitude NUMERIC(9, 6),
+    longitude NUMERIC(9, 6),
+    criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (empresa_id, codigo_instalacao)
+);
+
+CREATE TABLE IF NOT EXISTS normas_tecnicas (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    codigo_norma VARCHAR(80) UNIQUE NOT NULL,
+    descricao TEXT NOT NULL,
+    versao VARCHAR(40),
+    criterios_padrao JSONB NOT NULL DEFAULT '{}'::JSONB,
+    ativa BOOLEAN NOT NULL DEFAULT TRUE,
+    criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS catalogo_tipos_componente (
+    codigo_classe VARCHAR(80) PRIMARY KEY,
+    nome_exibicao VARCHAR(150) NOT NULL,
+    tipo_aquecimento VARCHAR(80),
+    mta_padrao_c NUMERIC(6, 2),
+    fonte TEXT
+);
+
+CREATE TABLE IF NOT EXISTS equipamentos (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    instalacao_id UUID NOT NULL REFERENCES instalacoes(id) ON DELETE RESTRICT,
+    tag_codigo VARCHAR(120) NOT NULL,
+    nome VARCHAR(255) NOT NULL,
+    tipo_equipamento VARCHAR(100) NOT NULL,
+    fabricante VARCHAR(150),
+    modelo_fabricante VARCHAR(150),
+    numero_serie VARCHAR(120),
+    fase VARCHAR(20),
+    tensao_nominal_kv NUMERIC(8, 2),
+    corrente_nominal_a NUMERIC(10, 2),
+    ativo BOOLEAN NOT NULL DEFAULT TRUE,
+    metadados_extras JSONB NOT NULL DEFAULT '{}'::JSONB,
+    criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (instalacao_id, tag_codigo)
+);
+
+CREATE TABLE IF NOT EXISTS modelos_ml (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nome_identificador VARCHAR(150) UNIQUE NOT NULL,
+    arquitetura VARCHAR(80) NOT NULL,
+    versao VARCHAR(50) NOT NULL,
+    onnx_storage_uri TEXT NOT NULL,
+    onnx_sha256 CHAR(64),
+    tamanho_entrada_px INTEGER,
+    classes_suportadas JSONB NOT NULL DEFAULT '[]'::JSONB,
+    metricas_cartao JSONB NOT NULL DEFAULT '{}'::JSONB,
+    em_producao BOOLEAN NOT NULL DEFAULT FALSE,
+    instalado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS treinos_ml (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    codigo_externo VARCHAR(100) UNIQUE,
+    solicitado_por UUID REFERENCES usuarios_responsaveis(id),
+    rotulo_arquivo_uri TEXT NOT NULL,
+    modelo_base VARCHAR(150) NOT NULL,
+    nome_saida VARCHAR(150) NOT NULL,
+    epocas_total INTEGER NOT NULL,
+    tamanho_imagem INTEGER NOT NULL,
+    batch_size INTEGER NOT NULL,
+    dispositivo VARCHAR(50) NOT NULL,
+    status status_job_processamento NOT NULL DEFAULT 'na_fila',
+    epoca_atual INTEGER NOT NULL DEFAULT 0,
+    porcentagem_conclusao NUMERIC(5, 2) NOT NULL DEFAULT 0.00,
+    perda_atual NUMERIC(10, 6),
+    map50_atual NUMERIC(6, 4),
+    tempo_decorrido_s INTEGER DEFAULT 0,
+    tempo_restante_s INTEGER,
+    mensagem_status TEXT,
+    log_storage_uri TEXT,
+    modelo_gerado_id UUID REFERENCES modelos_ml(id),
+    criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    iniciado_em TIMESTAMPTZ,
+    finalizado_em TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS treinos_metricas_epoca (
+    treino_id UUID NOT NULL REFERENCES treinos_ml(id) ON DELETE CASCADE,
+    epoca INTEGER NOT NULL,
+    perda_treino NUMERIC(10, 6),
+    perda_validacao NUMERIC(10, 6),
+    map50 NUMERIC(6, 4),
+    map50_95 NUMERIC(6, 4),
+    tempo_epoca_s NUMERIC(8, 2),
+    registrado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (treino_id, epoca)
+);
+
+CREATE TABLE IF NOT EXISTS avaliacoes_ml (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    codigo_externo VARCHAR(100) UNIQUE,
+    arquivo_pacote_uri TEXT NOT NULL,
+    melhor_modelo_nome VARCHAR(150),
+    map50_melhor NUMERIC(6, 4),
+    total_fotos_teste INTEGER,
+    gpu_utilizada VARCHAR(120),
+    modelo_instalado_id UUID REFERENCES modelos_ml(id),
+    modelos_avaliados JSONB NOT NULL DEFAULT '[]'::JSONB,
+    resumo_metricas_classes JSONB NOT NULL DEFAULT '{}'::JSONB,
+    figuras_storage_uris JSONB NOT NULL DEFAULT '[]'::JSONB,
+    tabelas_storage_uris JSONB NOT NULL DEFAULT '[]'::JSONB,
+    importado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS inspecoes_termograficas (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    codigo_legado VARCHAR(100) UNIQUE,
+    instalacao_id UUID NOT NULL REFERENCES instalacoes(id) ON DELETE RESTRICT,
+    equipamento_id UUID NOT NULL REFERENCES equipamentos(id) ON DELETE RESTRICT,
+    inspetor_id UUID REFERENCES usuarios_responsaveis(id),
+    modelo_ml_id UUID REFERENCES modelos_ml(id),
+    norma_id UUID REFERENCES normas_tecnicas(id),
+    capturado_em TIMESTAMPTZ NOT NULL,
+    criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    sincronizado_nuvem_em TIMESTAMPTZ,
+    origem_captura VARCHAR(40) NOT NULL DEFAULT 'upload_flir',
+    arquivo_original_nome VARCHAR(255) NOT NULL,
+    imagem_termica_uri TEXT NOT NULL,
+    imagem_visivel_uri TEXT,
+    matriz_temperatura_uri TEXT NOT NULL,
+    matriz_largura_px INTEGER,
+    matriz_altura_px INTEGER,
+    t_min_cena_c NUMERIC(6, 2),
+    t_max_cena_c NUMERIC(6, 2),
+    t_media_cena_c NUMERIC(6, 2),
+    hotspot_global_x INTEGER,
+    hotspot_global_y INTEGER,
+    t_referencia_c NUMERIC(6, 2),
+    tipo_referencia tipo_referencia_delta_t,
+    delta_t_global_c NUMERIC(6, 2),
+    mta_aplicada_c NUMERIC(6, 2),
+    severidade tipo_severidade NOT NULL,
+    acoes_recomendadas TEXT,
+    observacoes TEXT
+);
+
+CREATE TABLE IF NOT EXISTS parametros_radiometricos_flir (
+    inspecao_id UUID PRIMARY KEY REFERENCES inspecoes_termograficas(id) ON DELETE CASCADE,
+    modelo_camera VARCHAR(120),
+    faixa_camera_min_c NUMERIC(6, 2),
+    faixa_camera_max_c NUMERIC(6, 2),
+    emissividade NUMERIC(5, 4) CHECK (emissividade > 0 AND emissividade <= 1.0),
+    distancia_m NUMERIC(6, 2),
+    temp_refletida_c NUMERIC(6, 2),
+    temp_atmosfera_c NUMERIC(6, 2),
+    temp_janela_c NUMERIC(6, 2),
+    transmissao_janela NUMERIC(5, 4),
+    umidade_relativa NUMERIC(5, 4),
+    planck_r1 DOUBLE PRECISION,
+    planck_r2 DOUBLE PRECISION,
+    planck_b DOUBLE PRECISION,
+    planck_f DOUBLE PRECISION,
+    planck_o DOUBLE PRECISION,
+    atm_alpha1 DOUBLE PRECISION,
+    atm_alpha2 DOUBLE PRECISION,
+    atm_beta1 DOUBLE PRECISION,
+    atm_beta2 DOUBLE PRECISION,
+    atm_x DOUBLE PRECISION
+);
+
+CREATE TABLE IF NOT EXISTS deteccoes_regioes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    inspecao_id UUID NOT NULL REFERENCES inspecoes_termograficas(id) ON DELETE CASCADE,
+    indice_regiao INTEGER NOT NULL,
+    classe_componente VARCHAR(80) NOT NULL REFERENCES catalogo_tipos_componente(codigo_classe),
+    rotulo_regiao VARCHAR(150),
+    confianca_ml NUMERIC(5, 4) CHECK (confianca_ml >= 0 AND confianca_ml <= 1.0),
+    bbox_x_min NUMERIC(8, 2) NOT NULL,
+    bbox_y_min NUMERIC(8, 2) NOT NULL,
+    bbox_x_max NUMERIC(8, 2) NOT NULL,
+    bbox_y_max NUMERIC(8, 2) NOT NULL,
+    t_min_c NUMERIC(6, 2),
+    t_max_c NUMERIC(6, 2),
+    t_media_c NUMERIC(6, 2),
+    delta_t_regiao_c NUMERIC(6, 2),
+    hotspot_x INTEGER,
+    hotspot_y INTEGER,
+    severidade_regiao tipo_severidade NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS alertas (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    codigo_legado VARCHAR(100) UNIQUE,
+    inspecao_id UUID NOT NULL REFERENCES inspecoes_termograficas(id) ON DELETE CASCADE,
+    deteccao_regiao_id UUID REFERENCES deteccoes_regioes(id) ON DELETE SET NULL,
+    equipamento_id UUID NOT NULL REFERENCES equipamentos(id) ON DELETE RESTRICT,
+    severidade tipo_severidade NOT NULL,
+    temperatura_excedida_c NUMERIC(6, 2) NOT NULL,
+    delta_t_excedido_c NUMERIC(6, 2),
+    status status_alerta NOT NULL DEFAULT 'pendente',
+    mensagem_formatada TEXT NOT NULL,
+    canal_notificacao VARCHAR(60),
+    criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    enviado_em TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS pendencias_manutencao (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    inspecao_origem_id UUID NOT NULL REFERENCES inspecoes_termograficas(id) ON DELETE CASCADE,
+    instalacao_id UUID REFERENCES instalacoes(id) ON DELETE RESTRICT,
+    equipamento_id UUID REFERENCES equipamentos(id) ON DELETE RESTRICT,
+    responsavel_nome VARCHAR(150),
+    severidade tipo_severidade NOT NULL,
+    regiao_afetada VARCHAR(150),
+    t_max_detectada_c NUMERIC(6, 2),
+    detectada_em TIMESTAMPTZ NOT NULL,
+    prazo_padrao BOOLEAN NOT NULL DEFAULT TRUE,
+    data_limite DATE NOT NULL,
+    status status_pendencia NOT NULL DEFAULT 'aberta',
+    ordem_servico_codigo VARCHAR(100),
+    nota_tecnica TEXT,
+    inspecao_reinspecao_id UUID REFERENCES inspecoes_termograficas(id) ON DELETE SET NULL,
+    resolvida_em TIMESTAMPTZ,
+    atualizado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS historico_pendencias (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    pendencia_id UUID NOT NULL REFERENCES pendencias_manutencao(id) ON DELETE CASCADE,
+    usuario_id UUID REFERENCES usuarios_responsaveis(id),
+    status_anterior status_pendencia,
+    status_novo status_pendencia NOT NULL,
+    ordem_servico_informada VARCHAR(100),
+    comentario TEXT,
+    registrado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS laudos_tecnicos (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    numero_relatorio VARCHAR(60) UNIQUE NOT NULL,
+    empresa_id UUID NOT NULL REFERENCES empresas(id) ON DELETE RESTRICT,
+    instalacao_id UUID REFERENCES instalacoes(id) ON DELETE RESTRICT,
+    responsavel_tecnico_id UUID NOT NULL REFERENCES usuarios_responsaveis(id),
+    codigo_art VARCHAR(80),
+    versao_emissor VARCHAR(30) NOT NULL,
+    criterios_utilizados JSONB NOT NULL DEFAULT '{}'::JSONB,
+    pdf_storage_uri TEXT NOT NULL,
+    html_storage_uri TEXT,
+    emitido_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS laudo_inspecoes (
+    laudo_id UUID NOT NULL REFERENCES laudos_tecnicos(id) ON DELETE CASCADE,
+    inspecao_id UUID NOT NULL REFERENCES inspecoes_termograficas(id) ON DELETE RESTRICT,
+    ordem_exibicao INTEGER NOT NULL DEFAULT 1,
+    PRIMARY KEY (laudo_id, inspecao_id)
+);
+
+CREATE TABLE IF NOT EXISTS sessoes_video (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    codigo_externo VARCHAR(100) UNIQUE,
+    instalacao_id UUID REFERENCES instalacoes(id),
+    equipamento_id UUID REFERENCES equipamentos(id),
+    modelo_ml_id UUID REFERENCES modelos_ml(id),
+    origem VARCHAR(30) NOT NULL DEFAULT 'arquivo_video',
+    nome_arquivo VARCHAR(255),
+    video_storage_uri TEXT,
+    tamanho_bytes BIGINT,
+    duracao_s NUMERIC(10, 2),
+    fps_original NUMERIC(6, 2),
+    largura_px INTEGER,
+    altura_px INTEGER,
+    modo modo_processamento_video NOT NULL DEFAULT 'intervalo',
+    intervalo_amostragem_s NUMERIC(6, 2),
+    fator_velocidade NUMERIC(5, 2) DEFAULT 1.0,
+    status status_job_processamento NOT NULL DEFAULT 'na_fila',
+    total_quadros_processados INTEGER NOT NULL DEFAULT 0,
+    fps_processamento NUMERIC(6, 2),
+    alertas_gerados INTEGER NOT NULL DEFAULT 0,
+    progresso_porcentagem NUMERIC(5, 2) NOT NULL DEFAULT 0.00,
+    dispositivo_cliente_ip VARCHAR(60),
+    criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    finalizado_em TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS telemetria_quadros_video (
+    sessao_video_id UUID NOT NULL REFERENCES sessoes_video(id) ON DELETE CASCADE,
+    capturado_em TIMESTAMPTZ NOT NULL,
+    numero_quadro INTEGER NOT NULL,
+    tempo_video_s NUMERIC(10, 3) NOT NULL,
+    latencia_inferencia_ms NUMERIC(8, 2),
+    t_max_quadro_c NUMERIC(6, 2),
+    t_min_quadro_c NUMERIC(6, 2),
+    escala_conversao JSONB,
+    caixas_detectadas JSONB NOT NULL DEFAULT '[]'::JSONB,
+    posicao_dispositivo JSONB,
+    quadro_imagem_uri TEXT,
+    PRIMARY KEY (sessao_video_id, capturado_em, numero_quadro)
+);
+
+-- -----------------------------------------------------------------------------
+-- Índices
+-- -----------------------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS idx_inspecoes_equipamento_data ON inspecoes_termograficas (equipamento_id, capturado_em DESC);
+CREATE INDEX IF NOT EXISTS idx_inspecoes_instalacao_severidade ON inspecoes_termograficas (instalacao_id, severidade, capturado_em DESC);
+CREATE INDEX IF NOT EXISTS idx_deteccoes_classe_severidade ON deteccoes_regioes (classe_componente, severidade_regiao);
+CREATE INDEX IF NOT EXISTS idx_pendencias_status_limite ON pendencias_manutencao (status, data_limite ASC);
+CREATE INDEX IF NOT EXISTS idx_alertas_status_criado ON alertas (status, criado_em DESC);
+"""
+
+
 class ExportadorPostgres:
     def __init__(self, armazenamento: Armazenamento, empresa_padrao: str = "Empresa Padrão"):
         self.arm = armazenamento
@@ -58,6 +441,9 @@ class ExportadorPostgres:
             f"-- Dump gerado automaticamente pelo Pyron em {datetime.now().isoformat()}",
             "-- Compatível com PostgreSQL 16+ conforme arquitetura_banco_dados_pyron_cloud.md",
             "-- =============================================================================",
+            "",
+            DDL_POSTGRES,
+            "",
             "BEGIN;",
             "",
         ]

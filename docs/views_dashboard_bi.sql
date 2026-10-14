@@ -107,3 +107,4 @@ SELECT
     (SELECT COUNT(*) FROM pendencias_manutencao WHERE status IN ('aberta', 'programada') AND data_limite < CURRENT_DATE) AS reparos_vencidos,
     (SELECT COUNT(*) FROM pendencias_manutencao WHERE status IN ('aberta', 'programada') AND (data_limite - CURRENT_DATE) <= 7) AS reparos_urgencia_7_dias,
     (SELECT COUNT(*) FROM alertas WHERE status = 'pendente') AS alertas_nao_atendidos;
+
