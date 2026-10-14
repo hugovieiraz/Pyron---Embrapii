@@ -9,6 +9,8 @@ dependencies = ["numpy", "pillow", "scipy"]
 ocr = ["rapidocr-onnxruntime"]
 # placa de vídeo no ao vivo (celular e vídeo); substitui o pacote "onnxruntime" (o mesmo módulo, com o DirectML)
 placa = ["onnxruntime-directml"]
+# arquivos das inspeções num bucket S3 ou compatível (PYRON_OBJETOS=s3://bucket/prefixo); sem isso, a pasta local
+nuvem = ["boto3"]
 dev = ["pytest", "matplotlib"]
 
 [tool.setuptools]

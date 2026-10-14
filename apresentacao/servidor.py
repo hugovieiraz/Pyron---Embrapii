@@ -37,9 +37,10 @@ LIMITE_ARQUIVO = 20 * 1024 * 1024
 NOME_FOTO = re.compile(r"^[A-Za-z0-9_.-]{1,80}\.jpe?g$", re.IGNORECASE)
 
 app = FastAPI(title="Pyron · Apresentação", docs_url=None, redoc_url=None, openapi_url=None)
-app.mount("/e", StaticFiles(directory=ESTATICO), name="estatico")
-
-detector = Detector(MODELO)
+try:
+    detector = Detector(MODELO)
+except Exception:
+    detector = None
 _carga = {"erro": None, "iniciada": False}
 _trava_carga = threading.Lock()
 sinais = {"ultimo": 0.0}  # último sinal da janela (o lançador desliga o servidor quando ela fecha)

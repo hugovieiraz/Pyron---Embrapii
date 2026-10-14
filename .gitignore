@@ -23,3 +23,6 @@ modelos/*/
 apresentacao/.janela/
 apresentacao/registro.log
 !apresentacao/dados/
+
+# Dumps e backups SQL
+*.sql
