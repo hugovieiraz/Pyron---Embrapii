@@ -263,6 +263,11 @@ class ExportadorPostgres:
 
         linhas.append("")
         linhas.append("COMMIT;")
+        linhas.append("")
+        # Incluir views analíticas de BI e Logística/Suprimentos se o arquivo de views existir
+        caminho_views = Path(__file__).resolve().parents[1] / "docs" / "views_dashboard_bi.sql"
+        if caminho_views.exists():
+            linhas.append(caminho_views.read_text(encoding="utf-8"))
         return "\n".join(linhas) + "\n"
 
     def exportar_para_arquivo(self, caminho_arquivo: Path) -> int:
