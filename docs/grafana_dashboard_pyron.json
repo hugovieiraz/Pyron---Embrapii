@@ -1,0 +1,315 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "Visão Geral & Indicadores de Alerta (SLA NBR 15866)",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+          "format": "table",
+          "rawSql": "SELECT reparos_vencidos AS \"Reparos Vencidos\" FROM vw_kpis_estrategicos_diretoria;",
+          "refId": "A"
+        }
+      ],
+      "title": "Reparos em Atraso (Parada Crítica)",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+          "format": "table",
+          "rawSql": "SELECT reparos_urgencia_7_dias AS \"Janela <= 7 Dias\" FROM vw_kpis_estrategicos_diretoria;",
+          "refId": "A"
+        }
+      ],
+      "title": "Compras / Reparos Urgentes (≤ 7 Dias)",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+          "format": "table",
+          "rawSql": "SELECT total_reparos_pendentes AS \"Pendências em Aberto\" FROM vw_kpis_estrategicos_diretoria;",
+          "refId": "A"
+        }
+      ],
+      "title": "Total de Ordens de Reparo Pendentes",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "purple", "value": null }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": { "calcs": ["lastNotNull"], "values": false }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+          "format": "table",
+          "rawSql": "SELECT total_ativos_monitorados AS \"Ativos Monitorados\" FROM vw_kpis_estrategicos_diretoria;",
+          "refId": "A"
+        }
+      ],
+      "title": "Total de Ativos Elétricos Monitorados",
+      "type": "stat"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "id": 101,
+      "title": "Logística & Suprimentos: Cronograma de Reparo e Aquisição de Peças",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "hideFrom": { "legend": false, "tooltip": false, "viz": false }
+          }
+        }
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 6 },
+      "id": 5,
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "pieType": "donut",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "tooltip": { "mode": "single" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+          "format": "table",
+          "rawSql": "SELECT tipo_peca_material AS metric, total_pecas_necessarias AS value FROM vw_demanda_compras_pecas;",
+          "refId": "A"
+        }
+      ],
+      "title": "Demanda de Peças por Tipo de Componente",
+      "type": "piechart"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "custom": {
+            "align": "auto",
+            "cellOptions": { "type": "auto" },
+            "inspect": false
+          },
+          "mappings": [],
+          "overrides": [
+            {
+              "matcher": { "id": "byName", "options": "Prioridade / Janela Logística" },
+              "properties": [
+                {
+                  "id": "custom.cellOptions",
+                  "value": { "mode": "gradient", "type": "color-background" }
+                }
+              ]
+            },
+            {
+              "matcher": { "id": "byName", "options": "Severidade" },
+              "properties": [
+                {
+                  "id": "custom.cellOptions",
+                  "value": { "mode": "basic", "type": "color-background" }
+                }
+              ]
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 7 },
+              { "color": "red", "value": 30 }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 8, "w": 16, "x": 8, "y": 6 },
+      "id": 6,
+      "options": {
+        "cellHeight": "sm",
+        "footer": { "countRows": false, "fields": "", "reducer": ["sum"], "show": false },
+        "showHeader": true,
+        "sortBy": [
+          { "desc": false, "displayName": "Data Limite" }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+          "format": "table",
+          "rawSql": "SELECT ordem_servico AS \"OS\", subestacao_instalacao AS \"Subestação\", equipamento AS \"Equipamento\", peca_a_reparar_substituir AS \"Peça / Ponto\", severidade AS \"Severidade\", t_max_detectada_c AS \"T.Máx (°C)\", data_limite AS \"Data Limite\", dias_restantes_para_reparo AS \"Dias Restantes\", janela_logistica_prioridade AS \"Prioridade / Janela Logística\", equipe_responsavel AS \"Responsável\" FROM vw_logistica_suprimentos_reparos;",
+          "refId": "A"
+        }
+      ],
+      "title": "Tabela de Despacho Logístico & Compras de Sobressalentes",
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "id": 102,
+      "title": "Engenharia & Degradação Térmica de Ativos",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Temperatura Máxima (°C)",
+            "axisPlacement": "auto"
+          }
+        }
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 15 },
+      "id": 7,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.6,
+        "groupWidth": 0.7,
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
+        "orientation": "auto",
+        "showValue": "always",
+        "tooltip": { "mode": "single" },
+        "xField": "Equipamento"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "postgres", "uid": "${DS_POSTGRES}" },
+          "format": "table",
+          "rawSql": "SELECT equipamento AS \"Equipamento\", pico_temperatura_historico_c AS \"Pico (°C)\", max_delta_t_registrado_c AS \"Delta T Máx (°C)\" FROM vw_engenharia_saude_ativos LIMIT 10;",
+          "refId": "A"
+        }
+      ],
+      "title": "Top 10 Ativos com Maior Estresse Térmico",
+      "type": "barchart"
+    }
+  ],
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["pyron", "termografia", "logistica", "engenharia"],
+  "time": { "from": "now-90d", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Pyron · Gestão Estratégica, Engenharia e Logística",
+  "uid": "pyron-estrategico",
+  "version": 1
+}
