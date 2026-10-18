@@ -509,10 +509,10 @@ async function desenharAvaliacao() {
       el("div", { class: "modelo-numero" }, el("b", {}, pct(m.mAP50)), el("span", {}, "acerto médio (mAP50)")),
       medidor(m.mAP50, m.cor),
       indicador("Precisão", m.precisao, null, m.cor),
-      indicador("Revocação", m.revocacao, null, m.cor),
+      indicador("Recall", m.revocacao, null, m.cor),
       el("p", { class: "modelo-rodape" }, `${m.acertos} de ${m.acertos + m.perdidos} peças achadas · ${fmt(m.ms_por_foto, 0)} ms por foto`));
 
-    const colunas = [["mAP50", "mAP50", 3], ["mAP50-95", "mAP50-95", 3], ["Precisão", "precisao", 3], ["Revocação", "revocacao", 3], ["F1", "F1", 3],
+    const colunas = [["mAP50", "mAP50", 3], ["mAP50-95", "mAP50-95", 3], ["Precisão", "precisao", 3], ["Recall", "revocacao", 3], ["F1", "F1", 3],
       ["Acertos", "acertos", 0], ["Falsos", "falsos", 0], ["Perdidos", "perdidos", 0]];
     const melhorDe = (chave) => (["falsos", "perdidos"].includes(chave) ? Math.min : Math.max)(...modelos.map((m) => m[chave]));
     const tabela = el("table", { class: "tabela" },
@@ -557,7 +557,7 @@ async function desenharAvaliacao() {
               el("span", { class: "chave" }, el("i", { class: "casa-chave" }), `perdida (${local.perdidos})`))),
           el("div", { class: "resumo-indicadores" },
             indicador("Precisão", local.precisao, "Das caixas que o modelo marcou, quantas estavam certas.", "var(--serie-1)"),
-            indicador("Revocação", local.revocacao, "Das peças que existiam na foto, quantas ele achou.", "var(--serie-1)"),
+            indicador("Recall", local.revocacao, "Das peças que existiam na foto, quantas ele achou.", "var(--serie-1)"),
             indicador("Acerto médio (mAP50)", local.mAP50, "Conta como certa a caixa que cobre ao menos metade da peça.", "var(--serie-1)")))),
       el("div", { class: "cartao" },
         el("h2", {}, "Acerto por tipo de peça"),

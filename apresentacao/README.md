@@ -12,7 +12,7 @@ quatro telas, sem alertas, severidade, laudos ou monitoramento:
   identificação → matriz de temperatura → ponto mais quente), a ficha do RF-DETR Medium e o treino
   (163 fotos, 1.183 peças marcadas, a divisão em treino, validação e teste).
 - **Avaliação.** Os três detectores treinados no Colab (Faster R-CNN, YOLO26s, RF-DETR), cada um com
-  acerto médio, precisão e revocação em destaque; o modelo deste aplicativo nas 27 fotos de teste
+  acerto médio, precisão e recall em destaque; o modelo deste aplicativo nas 27 fotos de teste
   (159 de 177 peças achadas, uma casinha por peça); o acerto por tipo de peça; as figuras do teste.
   A tabela completa fica em "Ver todos os números".
 - **Câmera do celular.** Identificação em tempo real: **Ligar** mostra um QR code; o celular (na
