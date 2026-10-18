@@ -6,7 +6,10 @@ Roda só neste computador (127.0.0.1). Rotas:
 - ``/api/estado``: o modelo, onde ele roda (placa de vídeo ou processador) e se já está pronto;
 - ``/api/exemplos``: as 27 fotos de teste (nunca vistas no treino), lidas do acervo deste computador;
 - ``/api/exemplos/{nome}/analisar`` e ``/api/analisar``: a análise de uma foto do acervo ou enviada;
-- ``/api/avaliacao`` e ``/api/figuras/...``: as métricas e as figuras da avaliação dos modelos.
+- ``/api/avaliacao`` e ``/api/figuras/...``: as métricas e as figuras da avaliação dos modelos;
+- ``/api/celular/...``: a câmera do celular (o modo celular do Pyron, ``app/celular.py``: um servidor
+  HTTPS à parte na rede local, com código no link, só enquanto ligado) e ``/api/celular/ws``, o vídeo
+  do celular no computador.
 """
 
 from __future__ import annotations
@@ -17,15 +20,22 @@ import os
 import re
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+import numpy as np
+from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from PIL import Image, ImageOps
 
 from apresentacao import analise
 from apresentacao.detector import Detector
+
+# O modo celular é o mesmo do Pyron completo: a página do celular, a transmissão por WebSocket, o rastro
+# da câmera e a leitura da barra de cores (app/celular.py, nucleo/enquadrar.py, nucleo/barra.py).
+from app import celular  # noqa: E402
+from nucleo import barra, enquadrar  # noqa: E402
 
 AQUI = Path(__file__).resolve().parent
 RAIZ = AQUI.parent
@@ -164,3 +174,128 @@ def figura(grupo: str, arquivo: str) -> FileResponse:
     if not caminho.exists():
         raise HTTPException(404, "Figura não encontrada.")
     return FileResponse(caminho, headers={"Cache-Control": "max-age=3600"})
+
+
+# ---------------------------------------------------------------- câmera do celular
+
+leitor_escala = barra.LeitorAoVivo()
+_fio_escala = ThreadPoolExecutor(max_workers=1, thread_name_prefix="escala")
+
+
+def _celular_detectar(rgb: np.ndarray) -> tuple[list[dict], dict]:
+    """Peças no quadro do celular: só dentro da área do termograma, com a máxima pela barra de cores.
+
+    O modelo foi treinado só com termogramas: no quadro inteiro (a sala, a mesa) ele vê para-raios em
+    qualquer coisa. A barra é lida em paralelo com o detector, noutro fio.
+    """
+    area = enquadrar.achar_termograma(rgb)
+    if area is None:
+        return [], {"area": None}
+    recorte = np.ascontiguousarray(rgb[area.y0:area.y1, area.x0:area.x1])
+    h, w = recorte.shape[:2]
+    img_lab = barra.lab(recorte)
+    leitura = _fio_escala.submit(leitor_escala.ler, recorte, img_lab)
+    pecas = []
+    for d in detector.detectar(recorte):
+        x0, y0, x1, y1 = d["caixa"]
+        pecas.append({**d, "caixa": [x0 * w, y0 * h, x1 * w, y1 * h]})
+    escala, achada, estado_escala = leitura.result()
+    for p in pecas:
+        if escala is not None:
+            t, acima = barra.maxima(img_lab, escala, p["caixa"])
+            if t is not None:
+                p["tmax"], p["tmax_acima"] = round(t, 1), acima
+        x0, y0, x1, y1 = p["caixa"]
+        p["caixa"] = [x0 + area.x0, y0 + area.y0, x1 + area.x0, y1 + area.y0]
+    info_escala = None
+    if achada is not None:
+        bx0, by0, bx1, by1 = achada.caixa()
+        info_escala = {"estado": estado_escala, "barra": [bx0 + area.x0, by0 + area.y0, bx1 + area.x0, by1 + area.y0]}
+        if escala is not None:
+            info_escala.update(min=round(escala.t_min, 1), max=round(escala.t_max, 1))
+    return pecas, {"area": area.caixa(), "escala": info_escala}
+
+
+def _celular_capturar(_dados: bytes, _nome: str) -> dict:
+    raise ValueError("A versão de apresentação não salva capturas.")
+
+
+def _celular_modelo() -> dict:
+    iniciar_carga()
+    if _carga["erro"]:
+        raise ValueError(_carga["erro"])
+    return {"id": detector.cartao.get("id"), "nome": detector.cartao.get("nome"), "classes": detector.classes,
+            "captura": False, "motor": detector.motor}
+
+
+celular_modo = celular.ModoCelular(AQUI / ".celular", _celular_detectar, _celular_capturar, _celular_modelo)
+INTERVALO_ESPELHO_S = 1 / 30
+
+
+@app.get("/api/celular")
+def celular_estado() -> dict:
+    return celular_modo.estado()
+
+
+@app.post("/api/celular/ligar")
+def celular_ligar() -> dict:
+    """Abre o servidor do celular na rede local (HTTPS, só as rotas do celular, com código no link)."""
+    try:
+        _celular_modelo()
+        leitor_escala.reiniciar()
+        celular_modo.ligar()
+    except ValueError as erro:
+        raise HTTPException(409, str(erro)) from erro
+    except (RuntimeError, OSError) as erro:
+        raise HTTPException(503, str(erro)) from erro
+    return celular_modo.estado()
+
+
+@app.post("/api/celular/desligar")
+def celular_desligar() -> dict:
+    celular_modo.desligar()
+    return celular_modo.estado()
+
+
+@app.get("/api/celular/qr.png")
+def celular_qr() -> Response:
+    if not celular_modo.url:
+        raise HTTPException(404, "A câmera do celular está desligada.")
+    return Response(celular.qr_png(celular_modo.url), media_type="image/png", headers={"Cache-Control": "no-store"})
+
+
+@app.websocket("/api/celular/ws")
+async def celular_ao_vivo(ws: WebSocket) -> None:
+    """Vídeo do celular no computador: cada quadro novo (cabeçalho + JPEG) e cada resultado novo (JSON)."""
+    import anyio
+
+    await ws.accept()
+    async with anyio.create_task_group() as grupo:
+
+        async def mandar() -> None:
+            visto_quadro = visto_resultado = -1
+            try:
+                while True:
+                    vivo, ultimo = celular_modo.vivo, celular_modo.ultimo
+                    if vivo.seq != visto_quadro and vivo.jpeg:
+                        visto_quadro = vivo.seq
+                        await ws.send_bytes(celular.cabecalho(vivo.quadro, vivo.posicao) + vivo.jpeg)
+                    if ultimo.seq != visto_resultado and ultimo.quando:
+                        visto_resultado = ultimo.seq
+                        await ws.send_json({"deteccoes": ultimo.deteccoes, "area": ultimo.area, "escala": ultimo.escala,
+                                            "seq": ultimo.seq, "ms": ultimo.ms, "quadro": ultimo.quadro, "posicao": ultimo.posicao})
+                    await anyio.sleep(INTERVALO_ESPELHO_S)
+            except (WebSocketDisconnect, RuntimeError):
+                pass
+            finally:
+                grupo.cancel_scope.cancel()
+
+        async def ouvir() -> None:  # só para saber quando a tela fecha
+            try:
+                while (await ws.receive())["type"] != "websocket.disconnect":
+                    pass
+            finally:
+                grupo.cancel_scope.cancel()
+
+        grupo.start_soon(mandar)
+        grupo.start_soon(ouvir)

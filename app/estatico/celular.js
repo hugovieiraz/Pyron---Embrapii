@@ -662,6 +662,7 @@ api("/modelo")
   .then((m) => {
     $("#modelo").textContent = m.nome;
     estado.classes = m.classes || [];
+    $("#btn-capturar").hidden = m.captura === false; // a versão de apresentação não guarda inspeções
     status("", T.pronto);
   })
   .catch((e) => {

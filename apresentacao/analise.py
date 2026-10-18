@@ -4,7 +4,7 @@
    pixel do sensor (os dados radiométricos gravados junto).
 2. O detector olha a imagem colorida e marca as peças.
 3. Dentro da caixa de cada para-raio, o pixel mais quente da matriz de temperatura é o ponto mais
-   quente; diz-se em qual peça ele caiu (terminal superior, aletas ou terminal inferior).
+   quente; diz-se em qual peça ele caiu (terminal superior, saias ou terminal inferior).
 
 Foto sem dados radiométricos (print, foto de tela): só a identificação, sem temperatura.
 """

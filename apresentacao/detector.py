@@ -1,7 +1,7 @@
 """O detector de para-raios: RF-DETR Medium treinado com as fotos rotuladas, exportado em ONNX.
 
 Olha a imagem colorida da câmera (como uma pessoa olha o termograma) e devolve uma caixa para cada
-peça: o para-raio inteiro, as aletas isoladoras e os terminais superior e inferior. Roda na placa de
+peça: o para-raio inteiro, as saias e os terminais superior e inferior. Roda na placa de
 vídeo pelo DirectML quando houver (~54 ms por foto na RTX 3050); senão, no processador (~400 ms).
 """
 
@@ -15,6 +15,9 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
+# Nomes exibidos na apresentação. As abas do corpo do para-raio se chamam saias (IEC 60099-4,
+# catálogos); o modelo continua com a classe "aletas_isoladoras", só o nome na tela muda.
+NOMES = {"aletas_isoladoras": "Saias"}
 # Placa de alto desempenho (a RTX), não a Intel integrada, que seria mais lenta que o processador.
 OPCOES_DIRECTML = {"performance_preference": "high_performance", "device_filter": "gpu"}
 
@@ -26,7 +29,7 @@ class Detector:
         relatorio = self.pasta / "relatorio.json"
         self.relatorio = json.loads(relatorio.read_text(encoding="utf-8")) if relatorio.exists() else {}
         self.classes: list[str] = list(self.cartao["classes"])
-        self.nomes: dict[str, str] = dict(self.cartao.get("nomes", {}))
+        self.nomes: dict[str, str] = {**self.cartao.get("nomes", {}), **NOMES}
         self.entrada = self.cartao["entrada"]
         self.saida = self.cartao.get("saida", {})
         self.limiar = float(self.cartao.get("limiar_confianca", 0.5))

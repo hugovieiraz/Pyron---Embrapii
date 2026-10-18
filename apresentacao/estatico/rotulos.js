@@ -1,7 +1,7 @@
 "use strict";
 
 // Onde vai cada rótulo de uma caixa de detecção sem cobrir os outros: usado na página do celular e no
-// espelho do celular no computador. Peças aninhadas (o para-raio contém as aletas e os terminais)
+// espelho do celular no computador. Peças aninhadas (o para-raio contém as saias e os terminais)
 // costumam ter caixas com o mesmo canto, e o rótulo fixo no canto se sobrepunha.
 
 /** Lugares em volta da caixa, na ordem de preferência: fora acima, fora abaixo, dentro, dos lados. */

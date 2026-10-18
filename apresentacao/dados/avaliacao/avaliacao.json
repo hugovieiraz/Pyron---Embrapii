@@ -1,7 +1,7 @@
 {
  "classes": [
   "Para-raio",
-  "Aletas Isoladoras",
+  "Saias",
   "Terminal Superior",
   "Terminal Inferior"
  ],
@@ -59,7 +59,7 @@
       "AP50-95": 0.677,
       "revocacao": 1.0
      },
-     "Aletas Isoladoras": {
+     "Saias": {
       "AP50": 1.0,
       "AP50-95": 0.693,
       "revocacao": 0.957
@@ -95,7 +95,7 @@
       "AP50-95": 0.651,
       "revocacao": 1.0
      },
-     "Aletas Isoladoras": {
+     "Saias": {
       "AP50": 1.0,
       "AP50-95": 0.749,
       "revocacao": 1.0
@@ -131,7 +131,7 @@
       "AP50-95": 0.685,
       "revocacao": 1.0
      },
-     "Aletas Isoladoras": {
+     "Saias": {
       "AP50": 1.0,
       "AP50-95": 0.735,
       "revocacao": 1.0
@@ -184,7 +184,7 @@
      "AP50-95": 0.681,
      "revocacao": 1.0
     },
-    "Aletas Isoladoras": {
+    "Saias": {
      "AP50": 1.0,
      "AP50-95": 0.756,
      "revocacao": 1.0

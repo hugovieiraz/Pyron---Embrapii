@@ -17,7 +17,7 @@ const T = {
   paraRaio: (n) => `Para-raio ${n}`,
   confianca: (p) => `confiança ${p}%`,
   pontoQuente: "ponto mais quente",
-  onde: (parte) => (/^Aletas/.test(parte) ? `nas ${parte}` : `no ${parte}`),
+  onde: (parte) => (/^Saias/.test(parte) ? `nas ${parte}` : `no ${parte}`),
   maxPorParte: "Máxima em cada peça",
   pecas: "Peças",
   pontoMaisQuente: "Ponto mais quente",
@@ -63,7 +63,7 @@ async function api(caminho, opcoes) {
 
 // ------------------------------------------------------------------ abas
 
-const ABAS = ["analise", "modelo", "avaliacao"];
+const ABAS = ["analise", "modelo", "avaliacao", "celular"];
 const carregadas = new Set();
 function mostrarAba(nome) {
   for (const a of ABAS) {
@@ -72,11 +72,13 @@ function mostrarAba(nome) {
   }
   if (nome === "modelo" && !carregadas.has(nome)) { carregadas.add(nome); desenharModelo(); }
   if (nome === "avaliacao" && !carregadas.has(nome)) { carregadas.add(nome); desenharAvaliacao(); }
+  if (nome === "celular") carregarCelular();
+  else pararCelular();
 }
 ABAS.forEach((a) => $(`#tab-${a}`).addEventListener("click", () => mostrarAba(a)));
 document.addEventListener("keydown", (ev) => {
   if (ev.target.closest("input, textarea") || ev.ctrlKey || ev.altKey) return;
-  const i = ["1", "2", "3"].indexOf(ev.key);
+  const i = ["1", "2", "3", "4"].indexOf(ev.key);
   if (i >= 0) mostrarAba(ABAS[i]);
 });
 
@@ -222,7 +224,7 @@ function mostrarAnalise(r) {
 }
 
 function nomeDaClasse(classe) {
-  return { para_raio: "Para-raio", aletas_isoladoras: "Aletas Isoladoras", terminal_superior: "Terminal Superior", terminal_inferior: "Terminal Inferior" }[classe] || classe;
+  return { para_raio: "Para-raio", aletas_isoladoras: "Saias", terminal_superior: "Terminal Superior", terminal_inferior: "Terminal Inferior" }[classe] || classe;
 }
 
 /** Caixas, rótulos (sem cobrir uns aos outros, rotulos.js) e o ponto mais quente de cada para-raio. */
@@ -396,7 +398,7 @@ async function desenharModelo() {
         el("h2", {}, "Como funciona"),
         el("div", { class: "etapas" },
           etapa(1, "Foto da câmera", "O JPEG da FLIR traz a imagem colorida e, gravada junto, a temperatura de cada ponto do sensor (160 × 120 na FLIR C5)."),
-          etapa(2, "Identificação", `O RF-DETR olha a imagem colorida (reduzida para ${est.modelo.entrada.join(" × ")}) e marca o para-raio, as aletas e os terminais.`),
+          etapa(2, "Identificação", `O RF-DETR olha a imagem colorida (reduzida para ${est.modelo.entrada.join(" × ")}) e marca o para-raio, as saias e os terminais.`),
           etapa(3, "Temperatura", "Cada caixa é levada para a matriz de temperatura do sensor, no mesmo lugar da imagem."),
           etapa(4, "Ponto mais quente", "Dentro da caixa de cada para-raio, o ponto de maior temperatura e a peça onde ele está."))),
       el("div", { class: "cartao" },
@@ -453,7 +455,7 @@ async function desenharAvaliacao() {
     const classes = av.classes;
     const grafico = graficoColunas({
       titulo: "Acerto por peça (AP50), nas 27 fotos de teste",
-      nota: "O para-raio e as aletas quase sempre; o terminal inferior, pequeno e às vezes escondido pela estrutura, é o ponto fraco dos três.",
+      nota: "O para-raio e as saias quase sempre; o terminal inferior, pequeno e às vezes escondido pela estrutura, é o ponto fraco dos três.",
       grupos: classes, series: modelos, valor: (s, classe) => s.por_classe[classe].AP50 });
     const tabelaClasses = el("table", { class: "tabela" },
       el("thead", {}, el("tr", {}, el("th", {}, "Peça"), ...modelos.map((m) => el("th", {}, m.nome)), el("th", {}, "RF-DETR (este notebook)"))),
@@ -502,6 +504,240 @@ function ampliar(src, legenda) {
 }
 $("#lupa-fechar").addEventListener("click", () => $("#lupa").close());
 $("#lupa").addEventListener("click", (ev) => { if (ev.target === ev.currentTarget) ev.currentTarget.close(); });
+
+// ------------------------------------------------------------------ aba Câmera do celular
+// O celular abre uma página do Pyron pelo QR code, transmite a câmera e recebe as caixas; aqui aparece o
+// vídeo dele (WebSocket: mensagem binária = quadro com o cabeçalho do celular; texto = resultado).
+
+const C = {
+  passos: [
+    "Deixe o celular e o computador no mesmo Wi-Fi.",
+    "Ligue a conexão aqui e leia o QR code com a câmera do celular.",
+    "O celular avisa que a conexão não é particular (o certificado é do próprio Pyron): toque em Avançado › Continuar.",
+    "Permita a câmera e aponte para uma imagem térmica, na tela do computador por exemplo, com a barra de cores no quadro.",
+  ],
+  ligar: "Ligar conexão com o celular",
+  desligar: "Desligar",
+  copiar: "Copiar",
+  abra: "Abra no celular",
+  avisoCertificado: "No aviso de conexão não particular, toque em Avançado › Continuar.",
+  conectado: "Celular conectado",
+  esperando: "Esperando o celular abrir a página",
+  desconectado: (s) => `Sem quadros há ${s} s: o celular saiu da página ou perdeu o Wi-Fi`,
+  espelho: "O que o celular está vendo",
+  esperandoTitulo: "Esperando o celular",
+  esperandoTexto: "Abra o link no celular e ligue a câmera. O vídeo aparece aqui.",
+  ritmo: (q, a, ms) => [q != null ? `vídeo ${fmt(q, 0)} quadros/s` : "", a != null ? `${fmt(a, 1)} análises/s` : "", ms != null ? `detector ${ms} ms` : ""].filter(Boolean).join(" · "),
+  nenhuma: "Nenhuma peça confirmada no último quadro.",
+  semTermograma: "Nenhuma imagem térmica no quadro.",
+  escalaLida: (min, max) => `Barra de cores lida: ${min} a ${max} °C. Temperaturas estimadas pelas cores.`,
+  escalaLendo: "Barra de cores achada: lendo os números da escala…",
+  nota: "A foto do celular não traz os dados do sensor: a temperatura é estimada pelas cores da barra (erro típico de 0,5 °C), não medida.",
+  rede: "O Windows pode perguntar se o Pyron pode usar a rede: permita em redes privadas. A conexão fica só na sua rede, com um código no link, e desliga quando você desligar aqui ou fechar o aplicativo.",
+};
+const CABECALHO_CELULAR = 16;
+const celularEstado = { relogio: null, esp: null };
+
+async function carregarCelular() {
+  const aba = $("#aba-celular");
+  if (!aba.childElementCount) aba.replaceChildren(el("div", { class: "cartao esqueleto", style: { height: "var(--apr-visor-max)" } }));
+  try {
+    desenharCelular(await api("/api/celular"));
+  } catch (e) {
+    aba.replaceChildren(el("div", { class: "erro-caixa", role: "alert" }, e.message));
+  }
+}
+
+function pararCelular() {
+  clearInterval(celularEstado.relogio);
+  celularEstado.relogio = null;
+  const esp = celularEstado.esp;
+  celularEstado.esp = null;
+  if (esp) esp.ws.close();
+}
+
+function desenharCelular(c) {
+  const aba = $("#aba-celular");
+  pararCelular();
+  if (!c.ligado) {
+    const botao = el("button", { type: "button", class: "btn", onclick: (ev) => ligarCelular(ev.currentTarget) }, C.ligar);
+    aba.replaceChildren(el("div", { class: "cartao celular-ligar" },
+      el("h2", {}, "Câmera do celular"),
+      el("p", {}, "Aponte a câmera do celular para uma imagem térmica e o modelo identifica o para-raio e as peças ao vivo, sem instalar nada no celular."),
+      el("ol", { class: "lista" }, ...C.passos.map((p) => el("li", {}, p))),
+      el("div", {}, botao),
+      el("p", { class: "nota" }, C.nota),
+      el("p", { class: "nota" }, C.rede)));
+    return;
+  }
+  aba.replaceChildren(el("div", { class: "celular-grade" },
+    el("div", { class: "cartao celular-conectar" },
+      el("h2", {}, C.abra),
+      el("img", { class: "celular-qr", src: `/api/celular/qr.png?v=${encodeURIComponent(c.url)}`, alt: "QR code com o endereço para o celular" }),
+      el("div", { class: "celular-link" }, el("code", { class: "celular-url" }, c.url),
+        el("button", { type: "button", class: "btn btn-fantasma", onclick: () => navigator.clipboard.writeText(c.url).catch(() => {}) }, C.copiar)),
+      el("p", { class: "nota" }, C.avisoCertificado),
+      el("span", { class: "linha-estado", id: "celular-status" }),
+      el("button", { type: "button", class: "btn btn-fantasma", onclick: (ev) => desligarCelular(ev.currentTarget) }, C.desligar)),
+    el("div", { class: "cartao" },
+      el("div", { class: "cartao-cabeca" }, el("h2", {}, C.espelho), el("span", { class: "nota num", id: "celular-ritmo" })),
+      el("div", { id: "celular-espelho" }, el("div", { class: "vazio" }, el("h3", {}, C.esperandoTitulo), el("p", {}, C.esperandoTexto))),
+      el("div", { class: "celular-achados", id: "celular-achados" }),
+      el("p", { class: "nota" }, C.nota))));
+  abrirEspelho();
+  atualizarCelular(c);
+  celularEstado.relogio = setInterval(async () => {
+    try {
+      const novo = await api("/api/celular");
+      if (!novo.ligado) return desenharCelular(novo);
+      atualizarCelular(novo);
+    } catch { /* tenta de novo no próximo ciclo */ }
+  }, 800);
+}
+
+function atualizarCelular(c) {
+  const u = c.ultimo;
+  const s = $("#celular-status");
+  if (!s) return;
+  s.className = `linha-estado${c.conectado ? " ok" : ""}`;
+  s.replaceChildren(el("i"), el("span", {}, c.conectado ? C.conectado : u ? C.desconectado(fmt(u.ha_s, 0)) : C.esperando));
+  $("#celular-ritmo").textContent = u && c.conectado ? C.ritmo(u.quadros_por_s, u.analises_por_s, u.ms) : "";
+}
+
+async function ligarCelular(botao) {
+  botao.disabled = true;
+  try {
+    desenharCelular(await api("/api/celular/ligar", { method: "POST" }));
+  } catch (e) {
+    botao.disabled = false;
+    $("#aba-celular .cartao").append(el("p", { class: "erro-caixa", role: "alert" }, e.message));
+  }
+}
+
+async function desligarCelular(botao) {
+  botao.disabled = true;
+  desenharCelular(await api("/api/celular/desligar", { method: "POST" }));
+}
+
+function abrirEspelho() {
+  const ws = new WebSocket(`ws://${location.host}/api/celular/ws`);
+  ws.binaryType = "arraybuffer";
+  const esp = { ws, pendente: null, decodificando: false, posicao: null, resultado: null, lugares: new Map(), largura: 0, altura: 0 };
+  celularEstado.esp = esp;
+  ws.addEventListener("message", (ev) => {
+    if (celularEstado.esp !== esp) return;
+    if (typeof ev.data === "string") {
+      esp.resultado = JSON.parse(ev.data);
+      desenharResultadoCelular(esp);
+      desenharAchadosCelular(esp);
+      return;
+    }
+    esp.pendente = ev.data; // o mais novo substitui o que esperava: sem fila
+    if (!esp.decodificando) mostrarQuadros(esp);
+  });
+  ws.addEventListener("close", () => {
+    if (celularEstado.esp === esp) setTimeout(() => { if (celularEstado.esp === esp) abrirEspelho(); }, 1600);
+  });
+}
+
+async function mostrarQuadros(esp) {
+  esp.decodificando = true;
+  try {
+    while (esp.pendente && celularEstado.esp === esp) {
+      const dados = esp.pendente;
+      esp.pendente = null;
+      if (dados.byteLength <= CABECALHO_CELULAR) continue;
+      const cab = new DataView(dados, 0, CABECALHO_CELULAR);
+      const x = cab.getFloat32(8, true);
+      const y = cab.getFloat32(12, true);
+      let imagem;
+      try {
+        imagem = await createImageBitmap(new Blob([new Uint8Array(dados, CABECALHO_CELULAR)], { type: "image/jpeg" }));
+      } catch {
+        continue;
+      }
+      esp.posicao = Number.isFinite(x) && Number.isFinite(y) ? { x, y, trecho: cab.getUint32(4, true) } : null;
+      desenharQuadro(esp, imagem);
+    }
+  } finally {
+    esp.decodificando = false;
+  }
+}
+
+function desenharQuadro(esp, imagem) {
+  const espelho = $("#celular-espelho");
+  if (!espelho) return imagem.close();
+  let quadro = $(".celular-quadro", espelho);
+  if (!quadro) {
+    quadro = el("div", { class: "celular-quadro" }, el("canvas", { role: "img", "aria-label": "Vídeo da câmera do celular" }), el("div", { class: "celular-caixas" }));
+    espelho.replaceChildren(quadro);
+  }
+  const tela = $("canvas", quadro);
+  const mudou = tela.width !== imagem.width || tela.height !== imagem.height;
+  if (mudou) { tela.width = imagem.width; tela.height = imagem.height; }
+  tela.getContext("2d").drawImage(imagem, 0, 0);
+  imagem.close();
+  if (mudou || esp.largura !== tela.clientWidth) desenharResultadoCelular(esp);
+  else moverCaixas(esp);
+}
+
+/** Quanto a câmera andou do quadro analisado ao quadro na tela (fração), ou null se não dá para saber. */
+function deslocamento(esp) {
+  const r = esp.resultado;
+  if (!r || !r.posicao || !esp.posicao) return { x: 0, y: 0 };
+  if (r.posicao.trecho !== esp.posicao.trecho) return null;
+  const d = { x: esp.posicao.x - r.posicao.x, y: esp.posicao.y - r.posicao.y };
+  return Math.hypot(d.x, d.y) > 0.5 ? null : d;
+}
+
+function moverCaixas(esp) {
+  const camada = $("#celular-espelho .celular-caixas");
+  if (!camada) return;
+  const d = deslocamento(esp);
+  camada.classList.toggle("sumido", !d);
+  if (d) camada.style.transform = `translate3d(${(d.x * esp.largura).toFixed(1)}px, ${(d.y * esp.altura).toFixed(1)}px, 0)`;
+}
+
+const temperaturaPeca = (d) => (d.tmax != null ? `${d.tmax_acima ? "≥ " : ""}${fmt(d.tmax)} °C` : null);
+
+function desenharResultadoCelular(esp) {
+  const quadro = $("#celular-espelho .celular-quadro");
+  const r = esp.resultado;
+  if (!quadro || !r) return;
+  const pct = (v) => `${v * 100}%`;
+  const caixaEm = (b) => ({ left: pct(b[0]), top: pct(b[1]), width: pct(b[2] - b[0]), height: pct(b[3] - b[1]) });
+  const rotulos = r.deteccoes.map((d) => el("span", { class: "rotulo" }, el("i", { style: { background: COR_PECA[d.classe] } }),
+    temperaturaPeca(d) ? `${d.nome} · ${temperaturaPeca(d)}` : d.nome));
+  const barra = r.escala && r.escala.barra;
+  $(".celular-caixas", quadro).replaceChildren(
+    ...(r.area ? [el("div", { class: "celular-area", style: caixaEm(r.area) })] : []),
+    ...(barra ? [el("div", { class: "celular-barra", style: caixaEm(barra) })] : []),
+    ...r.deteccoes.map((d) => el("div", { class: `caixa ${d.classe}`, style: caixaEm(d.caixa) })),
+    ...rotulos);
+  const W = quadro.clientWidth;
+  const H = quadro.clientHeight;
+  esp.largura = W;
+  esp.altura = H;
+  const chaves = chavesDasDeteccoes(r.deteccoes);
+  const itens = r.deteccoes.map((d, i) => ({ chave: chaves[i], largura: rotulos[i].offsetWidth, altura: rotulos[i].offsetHeight,
+    caixa: { x: d.caixa[0] * W, y: d.caixa[1] * H, w: (d.caixa[2] - d.caixa[0]) * W, h: (d.caixa[3] - d.caixa[1]) * H } }));
+  posicionarRotulos(itens, { x0: 4, y0: 4, x1: W - 4, y1: H - 4 }, esp.lugares, 4)
+    .forEach((p, i) => { rotulos[i].style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px)`; });
+  moverCaixas(esp);
+}
+
+function desenharAchadosCelular(esp) {
+  const lista = $("#celular-achados");
+  const r = esp.resultado;
+  if (!lista || !r) return;
+  const pecas = [...r.deteccoes].sort((a, b) => a.caixa[1] - b.caixa[1]);
+  const itens = pecas.length
+    ? pecas.map((d) => el("span", { class: "etiqueta" }, el("i", { style: { background: COR_PECA[d.classe] } }),
+      [d.nome, `${Math.round(d.confianca * 100)}%`, temperaturaPeca(d)].filter(Boolean).join(" · ")))
+    : [el("span", { class: "nota" }, r.area ? C.nenhuma : C.semTermograma)];
+  if (r.escala) itens.push(el("span", { class: "nota" }, r.escala.estado === "lida" ? C.escalaLida(fmt(r.escala.min), fmt(r.escala.max)) : C.escalaLendo));
+  lista.replaceChildren(...itens);
+}
 
 // ------------------------------------------------------------------ sinal para o lançador e início
 

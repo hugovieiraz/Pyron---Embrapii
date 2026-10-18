@@ -84,3 +84,48 @@ def test_rotas_da_avaliacao_e_das_figuras(monkeypatch) -> None:
     assert c.post("/api/exemplos/nao_existe.jpg/analisar").status_code == 404
     assert c.post("/api/analisar", files={"arquivo": ("vazio.jpg", b"", "image/jpeg")}).status_code == 422
     assert "Pyron" in c.get("/").text
+
+
+def test_nome_exibido_das_saias(tmp_path) -> None:
+    import json
+
+    from apresentacao.detector import Detector
+
+    (tmp_path / "cartao.json").write_text(json.dumps({
+        "id": "x", "nome": "X", "classes": ["para_raio", "aletas_isoladoras"], "entrada": {"largura": 640, "altura": 640},
+        "nomes": {"para_raio": "Para-raio", "aletas_isoladoras": "Aletas Isoladoras"}}), encoding="utf-8")
+    det = Detector(tmp_path)
+    assert det.nomes["aletas_isoladoras"] == "Saias" and det.nomes["para_raio"] == "Para-raio"
+    assert det.classes == ["para_raio", "aletas_isoladoras"]  # a classe do modelo não muda
+
+
+def test_camera_do_celular_identifica_e_estima_a_temperatura(monkeypatch) -> None:
+    from fastapi.testclient import TestClient
+
+    from apresentacao import servidor
+    from nucleo import barra
+    from testes.test_barra import _OCRFalso, _caixa
+    from testes.test_celular import _termograma_na_sala
+
+    class _Detector(_DetectorFalso):
+        classes = ["para_raio", "aletas_isoladoras"]
+        cartao = {"id": "teste", "nome": "Modelo de teste"}
+
+    monkeypatch.setattr(servidor, "detector", _Detector([
+        {"classe": "aletas_isoladoras", "nome": "Saias", "confianca": 0.9, "caixa": [0.4, 0.4, 0.6, 0.6]}]))
+    monkeypatch.setattr(servidor, "iniciar_carga", lambda: None)
+    ocr = _OCRFalso([(_caixa(0, 0, 30, 15), "50.0", 0.9)], [(_caixa(0, 0, 30, 15), "10.0", 0.9)])
+    monkeypatch.setattr(servidor, "leitor_escala", barra.LeitorAoVivo(lambda: ocr))
+    from app import celular
+
+    quadro = celular.ler_imagem(_termograma_na_sala())
+    servidor._celular_detectar(quadro)  # a primeira leitura dos números ainda não vale
+    pecas, info = servidor._celular_detectar(quadro)
+    assert info["escala"]["estado"] == "lida" and (info["escala"]["min"], info["escala"]["max"]) == (10.0, 50.0)
+    assert pecas[0]["nome"] == "Saias" and 10.0 <= pecas[0]["tmax"] <= 50.0
+    assert pecas[0]["caixa"][1] > 400  # em pixels do quadro, não do recorte do termograma (que começa em y = 400)
+
+    c = TestClient(servidor.app)
+    estado = c.get("/api/celular").json()
+    assert estado["ligado"] is False and estado["modelo"]["captura"] is False
+    assert c.get("/api/celular/qr.png").status_code == 404  # desligado: sem link

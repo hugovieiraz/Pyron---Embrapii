@@ -254,4 +254,5 @@
   --apr-figura-alta: 160px;    /* altura da miniatura das figuras da avaliação */
   --apr-dica: 260px;           /* largura máxima da dica dos gráficos */
   --apr-mira-braco: 6px;       /* quanto os braços da mira passam do círculo */
+  --apr-coluna-celular: 340px; /* coluna do QR code e do link, ao lado do vídeo do celular */
 }
