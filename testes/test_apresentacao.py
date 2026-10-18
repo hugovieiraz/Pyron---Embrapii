@@ -84,6 +84,8 @@ def test_rotas_da_avaliacao_e_das_figuras(monkeypatch) -> None:
     assert c.post("/api/exemplos/nao_existe.jpg/analisar").status_code == 404
     assert c.post("/api/analisar", files={"arquivo": ("vazio.jpg", b"", "image/jpeg")}).status_code == 422
     assert "Pyron" in c.get("/").text
+    for arquivo in ("app.js", "estilo.css", "tokens.css", "rotulos.js"):  # a página não funciona sem eles
+        assert c.get(f"/e/{arquivo}").status_code == 200
 
 
 def test_nome_exibido_das_saias(tmp_path) -> None:
@@ -97,6 +99,15 @@ def test_nome_exibido_das_saias(tmp_path) -> None:
     det = Detector(tmp_path)
     assert det.nomes["aletas_isoladoras"] == "Saias" and det.nomes["para_raio"] == "Para-raio"
     assert det.classes == ["para_raio", "aletas_isoladoras"]  # a classe do modelo não muda
+
+
+def test_sem_a_pasta_do_modelo_o_aplicativo_abre_e_avisa(tmp_path) -> None:
+    from apresentacao.detector import Detector
+
+    det = Detector(tmp_path / "nao_existe")
+    assert det.classes == [] and not det.pronto
+    with pytest.raises(FileNotFoundError, match="Modelo não encontrado"):
+        det.carregar()
 
 
 def test_camera_do_celular_identifica_e_estima_a_temperatura(monkeypatch) -> None:

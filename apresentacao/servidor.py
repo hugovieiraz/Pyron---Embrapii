@@ -49,7 +49,7 @@ NOME_FOTO = re.compile(r"^[A-Za-z0-9_.-]{1,80}\.jpe?g$", re.IGNORECASE)
 app = FastAPI(title="Pyron · Apresentação", docs_url=None, redoc_url=None, openapi_url=None)
 app.mount("/e", StaticFiles(directory=ESTATICO), name="estatico")
 
-detector = Detector(MODELO)
+detector = Detector(MODELO)  # sem a pasta do modelo, abre do mesmo jeito e a tela mostra o que falta
 _carga = {"erro": None, "iniciada": False}
 _trava_carga = threading.Lock()
 sinais = {"ultimo": 0.0}  # último sinal da janela (o lançador desliga o servidor quando ela fecha)

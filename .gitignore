@@ -24,3 +24,6 @@ apresentacao/.janela/
 apresentacao/registro.log
 !apresentacao/dados/
 apresentacao/.celular/
+
+# Dumps e backups SQL
+*.sql

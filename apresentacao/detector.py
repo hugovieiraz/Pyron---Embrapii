@@ -25,7 +25,10 @@ OPCOES_DIRECTML = {"performance_preference": "high_performance", "device_filter"
 class Detector:
     def __init__(self, pasta: Path):
         self.pasta = Path(pasta)
-        self.cartao = json.loads((self.pasta / "cartao.json").read_text(encoding="utf-8"))
+        cartao = self.pasta / "cartao.json"
+        # O modelo fica fora do git: num computador sem ele, o aplicativo abre do mesmo jeito (sem classes)
+        # e o erro de carregar() aparece na tela.
+        self.cartao = json.loads(cartao.read_text(encoding="utf-8")) if cartao.exists() else {"classes": [], "entrada": {"largura": 640, "altura": 640}}
         relatorio = self.pasta / "relatorio.json"
         self.relatorio = json.loads(relatorio.read_text(encoding="utf-8")) if relatorio.exists() else {}
         self.classes: list[str] = list(self.cartao["classes"])
@@ -39,6 +42,8 @@ class Detector:
 
     def carregar(self) -> None:
         """Abre o modelo na placa de vídeo (DirectML) se der; senão no processador."""
+        if not (self.pasta / "cartao.json").exists():
+            raise FileNotFoundError(f"Modelo não encontrado em {self.pasta} (fica fora do git; PYRON_APRESENTACAO_MODELO aponta outra pasta).")
         import onnxruntime as ort
 
         arquivo = str(self.pasta / self.cartao.get("arquivo", "modelo.onnx"))

@@ -52,8 +52,7 @@ def abrir_janela(url: str, pasta_perfil: Path) -> None:
                     "--no-first-run",
                     "--no-default-browser-check",
                     "--disable-features=Translate",
-                ],
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                ]
             )
             return
     webbrowser.open(url)
