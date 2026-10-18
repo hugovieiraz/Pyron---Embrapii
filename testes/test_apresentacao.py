@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import re
 from pathlib import Path
 
 import numpy as np
@@ -83,7 +84,10 @@ def test_rotas_da_avaliacao_e_das_figuras(monkeypatch) -> None:
     assert len(c.get("/api/exemplos").json()) == 27
     assert c.post("/api/exemplos/nao_existe.jpg/analisar").status_code == 404
     assert c.post("/api/analisar", files={"arquivo": ("vazio.jpg", b"", "image/jpeg")}).status_code == 422
-    assert "Pyron" in c.get("/").text
+    pagina = c.get("/").text
+    assert "Pyron" in pagina
+    # os arquivos da tela vão com a versão no endereço: mudou o arquivo, muda o endereço (a janela não usa o antigo)
+    assert re.search(r'src="/e/app\.js\?v=\d+"', pagina) and re.search(r'href="/e/estilo\.css\?v=\d+"', pagina)
     for arquivo in ("app.js", "estilo.css", "tokens.css", "rotulos.js"):  # a página não funciona sem eles
         r = c.get(f"/e/{arquivo}")
         assert r.status_code == 200 and r.headers["cache-control"] == "no-cache"  # a janela confere a versão depois de atualizar

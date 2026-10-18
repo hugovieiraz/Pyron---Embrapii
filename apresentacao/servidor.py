@@ -25,7 +25,7 @@ from pathlib import Path
 
 import numpy as np
 from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 from PIL import Image, ImageOps
 
@@ -96,9 +96,16 @@ def _esperar_modelo() -> None:
         raise HTTPException(503, _carga["erro"] or "O modelo ainda está carregando.")
 
 
+ARQUIVO_DA_TELA = re.compile(r'"/e/([\w./-]+\.(?:js|css))"')
+
+
 @app.get("/")
-def pagina() -> FileResponse:
-    return FileResponse(ESTATICO / "index.html", headers={"Cache-Control": "no-store"})
+def pagina() -> HTMLResponse:
+    # Cada script e estilo vai com a data de alteração no endereço (?v=...): o que mudou ganha endereço novo e
+    # a janela baixa de novo, mesmo tendo guardado a versão antiga sem prazo para conferir.
+    html = (ESTATICO / "index.html").read_text(encoding="utf-8")
+    html = ARQUIVO_DA_TELA.sub(lambda m: f'"/e/{m.group(1)}?v={(ESTATICO / m.group(1)).stat().st_mtime_ns // 1_000_000}"', html)
+    return HTMLResponse(html, headers={"Cache-Control": "no-store"})
 
 
 @app.post("/api/sinal")
