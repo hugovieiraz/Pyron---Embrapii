@@ -303,54 +303,18 @@ function dica(ev, html) {
 }
 const semDica = () => { $("#dica").hidden = true; };
 
-/** Gráfico de linha de uma série: eixo y de 0 (ou do mínimo) ao máximo, mira e dica ao passar o mouse. */
-function graficoLinha({ titulo, nota, xs, ys, formato, casasValor = 2, destaque, yMin = 0 }) {
-  const L = 560, A = 220, m = { e: 44, d: 16, c: 12, b: 28 };
-  // eixo em números redondos: passo de 1, 2, 2,5 ou 5 (× potência de 10), até 5 intervalos
-  const bruto = (Math.max(...ys) - yMin) / 5;
-  const potencia = 10 ** Math.floor(Math.log10(bruto));
-  const passo = [1, 2, 2.5, 5, 10].map((k) => k * potencia).find((p) => p >= bruto);
-  const y0 = Math.floor(yMin / passo) * passo;
-  const yMax = Math.ceil(Math.max(...ys) / passo) * passo;
-  const escalaX = (x) => m.e + ((x - xs[0]) / (xs[xs.length - 1] - xs[0])) * (L - m.e - m.d);
-  const escalaY = (y) => A - m.b - ((y - y0) / (yMax - y0)) * (A - m.b - m.c);
-  const grade = Array.from({ length: Math.round((yMax - y0) / passo) + 1 }, (_, i) => y0 + i * passo);
-  const caminho = xs.map((x, i) => `${i ? "L" : "M"}${escalaX(x).toFixed(1)},${escalaY(ys[i]).toFixed(1)}`).join(" ");
-  const mira = svg("line", { class: "mira-grafico", y1: m.c, y2: A - m.b, visibility: "hidden" });
-  const ponto = svg("circle", { class: "ponto", r: 5, fill: "var(--serie-1)", visibility: "hidden" });
-  const fig = svg("svg", { viewBox: `0 0 ${L} ${A}`, role: "img", "aria-label": titulo },
-    ...grade.map((g) => svg("line", { class: "grade", x1: m.e, x2: L - m.d, y1: escalaY(g), y2: escalaY(g) })),
-    ...grade.map((g) => svg("text", { class: "eixo", x: m.e - 8, y: escalaY(g) + 4, "text-anchor": "end" }, formato(g))),
-    ...[xs[0], xs[Math.floor(xs.length / 2)], xs[xs.length - 1]].map((x) => svg("text", { class: "eixo", x: escalaX(x), y: A - 8, "text-anchor": "middle" }, `época ${x}`)),
-    svg("path", { class: "linha", d: caminho, stroke: "var(--serie-1)" }),
-    destaque ? svg("circle", { class: "ponto", r: 5, fill: "var(--serie-1)", cx: escalaX(destaque.x), cy: escalaY(destaque.y) }) : null,
-    destaque ? svg("text", { class: "valor", x: escalaX(destaque.x), y: escalaY(destaque.y) - 12, "text-anchor": "middle" }, destaque.texto) : null,
-    mira, ponto);
-  const alvo = svg("rect", { class: "alvo", x: m.e, y: m.c, width: L - m.e - m.d, height: A - m.b - m.c });
-  alvo.addEventListener("mousemove", (ev) => {
-    const caixa = fig.getBoundingClientRect();
-    const xv = ((ev.clientX - caixa.left) / caixa.width) * L;
-    let i = 0;
-    xs.forEach((x, k) => { if (Math.abs(escalaX(x) - xv) < Math.abs(escalaX(xs[i]) - xv)) i = k; });
-    mira.setAttribute("x1", escalaX(xs[i])); mira.setAttribute("x2", escalaX(xs[i])); mira.setAttribute("visibility", "visible");
-    ponto.setAttribute("cx", escalaX(xs[i])); ponto.setAttribute("cy", escalaY(ys[i])); ponto.setAttribute("visibility", "visible");
-    dica(ev, `Época <b>${xs[i]}</b><br>${titulo}: <b>${fmt(ys[i], casasValor)}</b>`);
-  });
-  alvo.addEventListener("mouseleave", () => { mira.setAttribute("visibility", "hidden"); ponto.setAttribute("visibility", "hidden"); semDica(); });
-  fig.append(alvo);
-  return el("figure", { class: "grafico", style: { margin: 0 } }, el("figcaption", {}, el("b", {}, titulo), nota ? el("p", { class: "nota" }, nota) : null), fig);
-}
+const BARRA_MAX = 40; // largura máxima de cada coluna, em unidades do desenho (lida de longe no projetor)
 
 /** Colunas agrupadas: uma cor por série (legenda sempre visível), valor na dica, de 0 a 1. */
 function graficoColunas({ titulo, nota, grupos, series, valor }) {
-  const L = 560, A = 230, m = { e: 40, d: 8, c: 12, b: 34 };
+  const L = 1100, A = 260, m = { e: 44, d: 8, c: 12, b: 34 };
   const larguraGrupo = (L - m.e - m.d) / grupos.length;
-  const barra = Math.min(24, (larguraGrupo - 24) / series.length - 2);
+  const barra = Math.min(BARRA_MAX, (larguraGrupo - 24) / series.length - 2);
   const escalaY = (v) => A - m.b - v * (A - m.b - m.c);
   const filhos = [];
   [0, 0.25, 0.5, 0.75, 1].forEach((g) => {
     filhos.push(svg("line", { class: "grade", x1: m.e, x2: L - m.d, y1: escalaY(g), y2: escalaY(g) }));
-    filhos.push(svg("text", { class: "eixo", x: m.e - 8, y: escalaY(g) + 4, "text-anchor": "end" }, fmt(g, 2)));
+    filhos.push(svg("text", { class: "eixo", x: m.e - 8, y: escalaY(g) + 4, "text-anchor": "end" }, pct(g, 0)));
   });
   grupos.forEach((grupo, gi) => {
     const inicio = m.e + gi * larguraGrupo + (larguraGrupo - series.length * (barra + 2)) / 2;
@@ -365,15 +329,34 @@ function graficoColunas({ titulo, nota, grupos, series, valor }) {
       const d = `M${x},${escalaY(0)} V${y + raio} Q${x},${y} ${x + raio},${y} H${x + barra - raio} Q${x + barra},${y} ${x + barra},${y + raio} V${escalaY(0)} Z`;
       const forma = svg("path", { d, fill: s.cor });
       const alvo = svg("rect", { class: "alvo", x: x - 1, y: m.c, width: barra + 2, height: A - m.b - m.c });
-      alvo.addEventListener("mousemove", (ev) => dica(ev, `<b>${s.nome}</b><br>${grupo}: <b>${fmt(v, 3)}</b>`));
+      alvo.addEventListener("mousemove", (ev) => dica(ev, `<b>${s.nome}</b><br>${grupo}: <b>${pct(v)}</b>`));
       alvo.addEventListener("mouseleave", semDica);
       filhos.push(forma, alvo);
     });
   });
   const fig = svg("svg", { viewBox: `0 0 ${L} ${A}`, role: "img", "aria-label": titulo }, ...filhos);
-  const legenda = el("div", { class: "legenda" }, ...series.map((s) => el("span", { class: "chave nota" }, el("i", { style: { background: s.cor, borderRadius: "var(--r-p)" } }), s.nome)));
+  const legenda = el("div", { class: "legenda" }, ...series.map((s) => el("span", { class: "chave" }, el("i", { style: { background: s.cor, borderRadius: "var(--r-p)" } }), s.nome)));
   return el("figure", { class: "grafico", style: { margin: 0 } }, el("figcaption", {}, el("b", {}, titulo), nota ? el("p", { class: "nota" }, nota) : null), legenda, fig);
 }
+
+// ------------------------------------------------------------------ peças visuais (medidor, casinhas, faixa)
+
+/** Medidor de 0 a 100%: trilha neutra e a parte cheia na cor da série. O número sempre fica escrito ao lado. */
+const medidor = (valor, cor = "var(--serie-1)") =>
+  el("div", { class: "medidor", "aria-hidden": "true" }, el("i", { style: { width: `${Math.max(0, Math.min(1, valor)) * 100}%`, background: cor } }));
+
+const indicador = (nome, valor, explica, cor) => el("div", { class: "indicador" },
+  el("div", { class: "indicador-cabeca" }, el("span", {}, nome), el("b", {}, pct(valor))),
+  medidor(valor, cor),
+  explica ? el("p", { class: "nota" }, explica) : null);
+
+/** Uma casinha por peça rotulada à mão: cheia, o modelo achou; vazia, perdeu. */
+const casasDasPecas = (achadas, total) => el("div", { class: "casas", role: "img", "aria-label": `${achadas} de ${total} peças achadas` },
+  ...Array.from({ length: total }, (_, i) => el("i", { class: i < achadas ? "cheia" : null })));
+
+/** Faixa dividida em partes proporcionais (parte do todo), com o número e o nome embaixo de cada parte. */
+const faixa = (partes) => el("div", { class: "faixa" }, ...partes.map((p) => el("div", { class: "faixa-parte", style: { flexGrow: p.n } },
+  el("i", { style: { background: p.cor } }), el("b", {}, p.n.toLocaleString("pt-BR")), el("span", {}, p.nome))));
 
 // ------------------------------------------------------------------ aba Modelo
 
@@ -383,54 +366,131 @@ async function dadosAvaliacao() {
   return avaliacao;
 }
 
+const EXEMPLO_ETAPAS = "FLIR2618.jpg"; // foto de teste que ilustra o "como funciona" (um para-raio, ponto quente no terminal)
+const FAIXA_CINZA = 20; // °C abaixo da máxima que ainda aparecem na matriz em cinza; mais frio fica preto (o céu)
+
 async function desenharModelo() {
   const aba = $("#aba-modelo");
   aba.replaceChildren(el("div", { class: "cartao esqueleto", style: { height: "var(--apr-visor-max)" } }));
   try {
     const [est, av] = [estadoModelo || (await api("/api/estado")), await dadosAvaliacao()];
     const tl = av.treino_local;
-    const h = tl.historico;
-    const etapa = (n, titulo, texto) => el("div", { class: "etapa" }, el("span", { class: "passo" }, n), el("b", {}, titulo), el("p", {}, texto));
+    const figuras = [1, 2, 3, 4].map(() => el("div", { class: "etapa-figura esqueleto" }));
+    const etapa = (n, titulo, texto) => el("div", { class: "etapa" },
+      el("div", { class: "etapa-cabeca" }, el("span", { class: "passo" }, n), el("b", {}, titulo)), figuras[n - 1], el("p", {}, texto));
     const fato = (rotulo, valor) => el("div", { class: "fato" }, el("span", {}, rotulo), el("b", {}, valor));
-    const melhor = h.map50_validacao.indexOf(Math.max(...h.map50_validacao));
+    const destaque = (numero, texto) => el("div", { class: "destaque" }, el("b", {}, numero), el("span", {}, texto));
+    const exemplo = el("p", { class: "nota" });
+    const f = av.fotos;
     aba.replaceChildren(
       el("div", { class: "cartao" },
         el("h2", {}, "Como funciona"),
         el("div", { class: "etapas" },
-          etapa(1, "Foto da câmera", "O JPEG da FLIR traz a imagem colorida e, gravada junto, a temperatura de cada ponto do sensor (160 × 120 na FLIR C5)."),
+          etapa(1, "Foto da câmera", "O JPEG da FLIR traz a imagem colorida e, gravada junto, a temperatura de cada ponto do sensor."),
           etapa(2, "Identificação", `O RF-DETR olha a imagem colorida (reduzida para ${est.modelo.entrada.join(" × ")}) e marca o para-raio, as saias e os terminais.`),
-          etapa(3, "Temperatura", "Cada caixa é levada para a matriz de temperatura do sensor, no mesmo lugar da imagem."),
-          etapa(4, "Ponto mais quente", "Dentro da caixa de cada para-raio, o ponto de maior temperatura e a peça onde ele está."))),
+          etapa(3, "Temperatura", "Cada ponto do sensor é um número em °C (160 × 120 = 19.200 medidas na FLIR C5). As caixas são levadas para essa matriz."),
+          etapa(4, "Ponto mais quente", "Dentro da caixa de cada para-raio, o ponto de maior temperatura e a peça onde ele está.")),
+        exemplo),
       el("div", { class: "cartao" },
         el("h2", {}, est.modelo.nome),
-        el("p", {}, "Detector de objetos do tipo transformer (DETR) com base DINOv2, licença Apache 2.0: recebe a imagem inteira e devolve, de uma vez, as caixas e o tipo de cada peça, sem etapas de proposta de regiões."),
+        el("p", { class: "texto-medida" }, "Detector de objetos do tipo transformer (DETR) com base DINOv2, licença Apache 2.0: recebe a imagem inteira e devolve, de uma vez, as caixas e o tipo de cada peça, sem etapas de proposta de regiões."),
+        el("div", { class: "fato" }, el("span", {}, "Peças que reconhece"),
+          el("div", { class: "pecas-chaves" }, ...Object.entries(COR_PECA).map(([classe, cor]) => el("span", { class: "etiqueta" }, el("i", { style: { background: cor } }), nomeDaClasse(classe))))),
         el("div", { class: "fatos" },
-          fato("Peças que reconhece", est.modelo.classes.join(", ")),
           fato("Entrada", `imagem colorida ${est.modelo.entrada.join(" × ")} pixels`),
           fato("Confiança mínima", pct(est.modelo.limiar, 0)),
           fato("Onde roda agora", est.pronto ? est.motor : T.carregandoModelo),
-          fato("Tempo por foto", `${fmt(tl.ms_por_foto_cpu, 0)} ms no processador · ~70 ms na placa de vídeo`),
+          fato("Tempo por foto", `~70 ms na placa de vídeo · ${fmt(tl.ms_por_foto_cpu, 0)} ms no processador`),
           fato("Formato", "ONNX (o mesmo arquivo no processador ou na placa)"))),
       el("div", { class: "cartao" },
         el("h2", {}, "Treino"),
         el("div", { class: "destaques" },
-          el("div", { class: "destaque" }, el("b", { class: "num" }, av.fotos.treino + av.fotos.validacao + av.fotos.teste), el("span", {}, `fotos rotuladas no CVAT: ${av.fotos.treino} treino, ${av.fotos.validacao} validação, ${av.fotos.teste} teste`)),
-          el("div", { class: "destaque" }, el("b", { class: "num" }, tl.dados.caixas.toLocaleString("pt-BR")), el("span", {}, "peças marcadas à mão (caixas)")),
-          el("div", { class: "destaque" }, el("b", { class: "num" }, `${fmt(tl.duracao_min, 0)} min`), el("span", {}, "de treino na RTX 3050 deste notebook")),
-          el("div", { class: "destaque" }, el("b", { class: "num" }, `época ${melhor + 1}`), el("span", {}, `a melhor de ${h.epocas_map.length} (o treino para depois de ${tl.configuracao.paciencia} épocas sem melhorar)`))),
-        el("div", { class: "graficos" },
-          graficoLinha({ titulo: "Erro no treino (perda)", nota: "Cai à medida que o modelo aprende.", xs: h.epocas_perda, ys: h.perda_treino, formato: (v) => fmt(v, 0) }),
-          graficoLinha({ titulo: "Acerto na validação (mAP50)", nota: "Medido a cada época em fotos fora do treino.", xs: h.epocas_map, ys: h.map50_validacao, formato: (v) => fmt(v, 1), casasValor: 3, yMin: 0.6,
-            destaque: { x: h.epocas_map[melhor], y: h.map50_validacao[melhor], texto: fmt(h.map50_validacao[melhor], 3) } }))),
+          destaque((f.treino + f.validacao + f.teste).toLocaleString("pt-BR"), "fotos térmicas de para-raios, rotuladas no CVAT"),
+          destaque(tl.dados.caixas.toLocaleString("pt-BR"), "peças marcadas à mão, uma caixa por peça"),
+          destaque(`${fmt(tl.duracao_min, 0)} min`, "de treino na placa de vídeo deste notebook (RTX 3050)"),
+          destaque(String(av.comparacao.modelos.length), "detectores treinados e comparados (aba Avaliação)")),
+        el("h3", {}, "Como as fotos foram divididas"),
+        faixa([
+          { n: f.treino, nome: "treino: o modelo aprende com elas", cor: "var(--serie-1)" },
+          { n: f.validacao, nome: "validação: escolhe a melhor rodada", cor: "var(--serie-2)" },
+          { n: f.teste, nome: "teste: nunca vistas, medem o resultado", cor: "var(--serie-3)" }])),
       el("div", { class: "cartao" },
         el("h2", {}, "Limitações"),
         el("ul", { class: "lista" }, ...est.modelo.limitacoes.map((t) => el("li", {}, t)))));
+    ilustrarEtapas(figuras, exemplo);
   } catch (e) {
     aba.replaceChildren(el("div", { class: "erro-caixa", role: "alert" }, e.message));
   }
 }
 
+const porcento = (v) => `${v * 100}%`;
+const quadroEtapa = (src, extras = []) => el("div", { class: "etapa-quadro" }, el("img", { src, alt: "" }), el("div", { class: "camada" }, ...extras));
+const caixaEtapa = (caixa, cor) => el("div", { class: "caixa-etapa", style: {
+  left: porcento(caixa[0]), top: porcento(caixa[1]), width: porcento(caixa[2] - caixa[0]), height: porcento(caixa[3] - caixa[1]), borderColor: cor } });
+
+/** As quatro etapas com uma foto de teste de verdade. Sem o acervo ou sem o modelo, ficam só os textos. */
+async function ilustrarEtapas(figuras, legenda) {
+  try {
+    const exemplos = (await api("/api/exemplos")).filter((e) => e.disponivel);
+    if (!exemplos.length) throw new Error(T.semAcervo);
+    const nome = (exemplos.find((e) => e.nome === EXEMPLO_ETAPAS) || exemplos[0]).nome;
+    const r = await api(`/api/exemplos/${encodeURIComponent(nome)}/analisar`, { method: "POST" });
+    const pr = r.para_raios.find((x) => x.ponto);
+    figuras[0].replaceChildren(quadroEtapa(r.imagem));
+    figuras[1].replaceChildren(quadroEtapa(r.imagem, r.pecas.map((d) => caixaEtapa(d.caixa, COR_PECA[d.classe]))));
+    figuras[2].replaceChildren(r.matriz ? matrizEtapa(r.matriz, pr) : quadroEtapa(r.imagem));
+    const quente = [];
+    if (pr) {
+      const [x, y] = pr.ponto;
+      quente.push(caixaEtapa(pr.caixa, "var(--branco)"), el("div", { class: "mira", style: { left: porcento(x), top: porcento(y) } }),
+        el("span", { class: "mira-rotulo num etapa-rotulo", style: x > 0.6 ? { right: `calc(${porcento(1 - x)} + var(--e-4))`, top: porcento(y) } : { left: `calc(${porcento(x)} + var(--e-4))`, top: porcento(y) } },
+          `${fmt(pr.tmax)} °C`));
+    }
+    figuras[3].replaceChildren(quadroEtapa(r.imagem, quente));
+    figuras.forEach((fig) => fig.classList.remove("esqueleto"));
+    legenda.textContent = `Exemplo: ${nome.replace(/\.jpe?g$/i, "")}, uma das ${avaliacao.fotos.teste} fotos de teste${pr ? `. Ponto mais quente: ${fmt(pr.tmax)} °C ${T.onde(pr.onde)}` : ""}.`;
+  } catch {
+    figuras.forEach((fig) => fig.remove());
+  }
+}
+
+/** A matriz de temperatura em cinza (mais quente, mais claro) e os números em volta do ponto mais quente. */
+function matrizEtapa(m, pr) {
+  const tela = el("canvas", { width: m.largura, height: m.altura, class: "matriz-etapa" });
+  const ctx = tela.getContext("2d");
+  const pixels = ctx.createImageData(m.largura, m.altura);
+  const baixo = Math.max(m.min, m.max - FAIXA_CINZA);
+  m.valores.forEach((v, i) => {
+    const g = Math.round(255 * Math.min(1, Math.max(0, ((v ?? baixo) - baixo) / (m.max - baixo || 1))));
+    pixels.data.set([g, g, g, 255], i * 4);
+  });
+  ctx.putImageData(pixels, 0, 0);
+  const quadro = el("div", { class: "etapa-quadro" }, tela);
+  if (!pr) return quadro;
+  const cx = Math.floor(pr.ponto[0] * m.largura);
+  const cy = Math.floor(pr.ponto[1] * m.altura);
+  const celulas = [];
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const x = Math.min(m.largura - 1, Math.max(0, cx + dx));
+      const y = Math.min(m.altura - 1, Math.max(0, cy + dy));
+      celulas.push(el("span", { class: dx || dy ? null : "centro" }, fmt(m.valores[y * m.largura + x])));
+    }
+  }
+  const lado = pr.ponto[0] > 0.5 ? { left: "var(--e-2)" } : { right: "var(--e-2)" };
+  quadro.append(el("div", { class: "camada" },
+    el("div", { class: "lupa-matriz", style: { left: porcento((cx - 1) / m.largura), top: porcento((cy - 1) / m.altura), width: porcento(3 / m.largura), height: porcento(3 / m.altura) } }),
+    el("div", { class: "numeros num", style: lado, "aria-label": "Temperaturas em volta do ponto mais quente, em °C" }, ...celulas)));
+  return quadro;
+}
+
 // ------------------------------------------------------------------ aba Avaliação
+
+const FAMILIA = {
+  "Faster R-CNN": "Rede convolucional de duas etapas: primeiro propõe regiões, depois classifica. Base MobileNetV3.",
+  "YOLO26S": "Detector de uma etapa só, da família YOLO (Ultralytics), tamanho small.",
+  "RF-DETR Medium": "Transformer (DETR) com base DINOv2, da Roboflow. Licença Apache 2.0.",
+};
 
 async function desenharAvaliacao() {
   const aba = $("#aba-avaliacao");
@@ -439,8 +499,19 @@ async function desenharAvaliacao() {
     const av = await dadosAvaliacao();
     const local = av.treino_local.teste;
     const totalPecas = local.acertos + local.perdidos;
-    const modelos = [...av.comparacao.modelos.map((m, i) => ({ ...m, cor: COR_MODELO[i] }))];
-    const linhaLocal = { nome: "RF-DETR Medium · treino neste notebook (o usado aqui)", ...local, ms_por_foto: av.treino_local.ms_por_foto_cpu, usado: true };
+    const modelos = av.comparacao.modelos.map((m, i) => ({ ...m, cor: COR_MODELO[i] }));
+    const melhor = modelos.reduce((a, b) => (b.mAP50 > a.mAP50 ? b : a));
+    const diferenca = (melhor.mAP50 - Math.min(...modelos.map((m) => m.mAP50))) * 100;
+
+    const cartaoModelo = (m) => el("article", { class: `modelo${m === melhor ? " escolhido" : ""}`, style: { borderTopColor: m.cor } },
+      el("div", { class: "modelo-cabeca" }, el("h3", {}, m.nome), m === melhor ? el("span", { class: "selo" }, "o escolhido") : null),
+      el("p", { class: "modelo-familia" }, FAMILIA[m.nome] || ""),
+      el("div", { class: "modelo-numero" }, el("b", {}, pct(m.mAP50)), el("span", {}, "acerto médio (mAP50)")),
+      medidor(m.mAP50, m.cor),
+      indicador("Precisão", m.precisao, null, m.cor),
+      indicador("Revocação", m.revocacao, null, m.cor),
+      el("p", { class: "modelo-rodape" }, `${m.acertos} de ${m.acertos + m.perdidos} peças achadas · ${fmt(m.ms_por_foto, 0)} ms por foto`));
+
     const colunas = [["mAP50", "mAP50", 3], ["mAP50-95", "mAP50-95", 3], ["Precisão", "precisao", 3], ["Revocação", "revocacao", 3], ["F1", "F1", 3],
       ["Acertos", "acertos", 0], ["Falsos", "falsos", 0], ["Perdidos", "perdidos", 0]];
     const melhorDe = (chave) => (["falsos", "perdidos"].includes(chave) ? Math.min : Math.max)(...modelos.map((m) => m[chave]));
@@ -450,18 +521,15 @@ async function desenharAvaliacao() {
         ...modelos.map((m) => el("tr", {}, el("td", {}, el("span", { class: "chave" }, el("i", { style: { background: m.cor } }), m.nome)),
           ...colunas.map(([, k, c]) => el("td", { class: `num${m[k] === melhorDe(k) ? " melhor" : ""}` }, fmt(m[k], c))),
           el("td", { class: "num" }, `${fmt(m.ms_por_foto, 0)} (T4)`))),
-        el("tr", { class: "usado" }, el("td", {}, linhaLocal.nome), ...colunas.map(([, k, c]) => el("td", { class: "num" }, fmt(linhaLocal[k], c))),
-          el("td", { class: "num" }, `${fmt(linhaLocal.ms_por_foto, 0)} (CPU)`))));
+        el("tr", { class: "usado" }, el("td", {}, "RF-DETR Medium · treinado neste notebook (o usado aqui)"), ...colunas.map(([, k, c]) => el("td", { class: "num" }, fmt(local[k], c))),
+          el("td", { class: "num" }, `${fmt(av.treino_local.ms_por_foto_cpu, 0)} (CPU)`))));
     const classes = av.classes;
-    const grafico = graficoColunas({
-      titulo: "Acerto por peça (AP50), nas 27 fotos de teste",
-      nota: "O para-raio e as saias quase sempre; o terminal inferior, pequeno e às vezes escondido pela estrutura, é o ponto fraco dos três.",
-      grupos: classes, series: modelos, valor: (s, classe) => s.por_classe[classe].AP50 });
     const tabelaClasses = el("table", { class: "tabela" },
-      el("thead", {}, el("tr", {}, el("th", {}, "Peça"), ...modelos.map((m) => el("th", {}, m.nome)), el("th", {}, "RF-DETR (este notebook)"))),
+      el("thead", {}, el("tr", {}, el("th", {}, "Peça (AP50)"), ...modelos.map((m) => el("th", {}, m.nome)), el("th", {}, "RF-DETR (este notebook)"))),
       el("tbody", {}, ...classes.map((c) => el("tr", {}, el("td", {}, c),
         ...modelos.map((m) => el("td", { class: "num" }, fmt(m.por_classe[c].AP50, 3))),
         el("td", { class: "num" }, fmt(local.por_classe[c].AP50, 3))))));
+
     const figura = (grupo, arquivo, legenda) => el("button", { type: "button", class: "figura", onclick: () => ampliar(`/api/figuras/${grupo}/${arquivo}`, legenda) },
       el("img", { src: `/api/figuras/${grupo}/${arquivo}`, alt: legenda, loading: "lazy" }), el("span", {}, legenda));
     const nomesFiguras = { "metricas.png": "Métricas dos três detectores", "curvas.png": "Curvas de treino (Colab)", "pecas_perdidas.png": "Peças perdidas por tipo e tamanho",
@@ -471,20 +539,37 @@ async function desenharAvaliacao() {
 
     aba.replaceChildren(
       el("div", { class: "cartao" },
-        el("h2", {}, "O modelo usado aqui, nas 27 fotos de teste"),
-        el("p", { class: "nota" }, `Fotos que ficaram fora do treino, com ${totalPecas} peças rotuladas à mão para conferir.`),
-        el("div", { class: "destaques" },
-          el("div", { class: "destaque" }, el("b", { class: "num" }, `${local.acertos} de ${totalPecas}`), el("span", {}, "peças achadas")),
-          el("div", { class: "destaque" }, el("b", { class: "num" }, pct(local.precisao)), el("span", {}, "precisão: das caixas marcadas, quantas estavam certas")),
-          el("div", { class: "destaque" }, el("b", { class: "num" }, pct(local.revocacao)), el("span", {}, "revocação: das peças que existiam, quantas ele achou")),
-          el("div", { class: "destaque" }, el("b", { class: "num" }, fmt(local.mAP50, 3)), el("span", {}, "mAP50: acerto médio, caixa certa quando cobre ao menos metade da peça")),
-          el("div", { class: "destaque" }, el("b", { class: "num" }, `${fmt(local.erro_Tmax_mediano_C, 1)} °C`), el("span", {}, `erro da temperatura máxima por peça (mediana; 90% até ${fmt(local.erro_Tmax_p90_C, 2)} °C), contra as caixas rotuladas`)))),
+        el("h2", {}, "Os três detectores que treinamos"),
+        el("p", { class: "nota" }, `Treinados com as mesmas ${av.fotos.treino} fotos, no ${av.comparacao.onde}, e medidos nas mesmas ${av.fotos.teste} fotos de teste, que nenhum deles viu no treino.`),
+        el("div", { class: "modelos" }, ...modelos.map(cartaoModelo)),
+        el("p", { class: "aviso" }, `Entre o maior e o menor acerto médio há ${fmt(diferenca, 1)} ponto${diferenca >= 2 ? "s" : ""} percentua${diferenca >= 2 ? "is" : "l"}: na prática, um empate técnico. `
+          + `O ${melhor.nome} ficou com o maior e tem licença Apache 2.0, livre para um produto comercial (o YOLO é AGPL).`)),
       el("div", { class: "cartao" },
-        el("h2", {}, "Comparação de detectores"),
-        el("p", { class: "nota" }, `Os três treinados com as mesmas fotos e a mesma divisão, no ${av.comparacao.onde}. Diferença de mAP50 abaixo de 0,02: empate técnico. Em negrito, o melhor de cada coluna.`),
-        el("div", { class: "rolar" }, tabela),
-        el("div", { class: "graficos" }, grafico),
-        el("div", { class: "rolar" }, tabelaClasses)),
+        el("h2", {}, `O modelo deste aplicativo, nas ${av.fotos.teste} fotos de teste`),
+        el("p", { class: "nota" }, `${melhor.nome} treinado de novo neste notebook (${fmt(av.treino_local.duracao_min, 0)} min na RTX 3050), com as mesmas fotos. As ${totalPecas} peças das fotos de teste foram marcadas à mão para conferir.`),
+        el("div", { class: "resumo" },
+          el("div", { class: "resumo-pecas" },
+            el("p", { class: "heroi" }, String(local.acertos), el("span", {}, ` de ${totalPecas}`)),
+            el("p", { class: "heroi-rotulo" }, "peças achadas"),
+            casasDasPecas(local.acertos, totalPecas),
+            el("div", { class: "legenda" },
+              el("span", { class: "chave" }, el("i", { class: "casa-chave cheia" }), `achada (${local.acertos})`),
+              el("span", { class: "chave" }, el("i", { class: "casa-chave" }), `perdida (${local.perdidos})`))),
+          el("div", { class: "resumo-indicadores" },
+            indicador("Precisão", local.precisao, "Das caixas que o modelo marcou, quantas estavam certas.", "var(--serie-1)"),
+            indicador("Revocação", local.revocacao, "Das peças que existiam na foto, quantas ele achou.", "var(--serie-1)"),
+            indicador("Acerto médio (mAP50)", local.mAP50, "Conta como certa a caixa que cobre ao menos metade da peça.", "var(--serie-1)")))),
+      el("div", { class: "cartao" },
+        el("h2", {}, "Acerto por tipo de peça"),
+        graficoColunas({
+          titulo: `AP50 de cada detector, nas ${av.fotos.teste} fotos de teste`,
+          nota: "O para-raio e as saias quase sempre; o terminal inferior, pequeno e às vezes escondido pela estrutura, é o ponto fraco dos três.",
+          grupos: classes, series: modelos, valor: (s, classe) => s.por_classe[classe].AP50 }),
+        el("details", { class: "detalhes" },
+          el("summary", {}, "Ver todos os números"),
+          el("p", { class: "nota" }, "Em negrito, o melhor de cada coluna entre os três do Colab."),
+          el("div", { class: "rolar" }, tabela),
+          el("div", { class: "rolar" }, tabelaClasses))),
       el("div", { class: "cartao" },
         el("h2", {}, "Figuras do teste"),
         el("p", { class: "nota" }, "Verde: peça achada; vermelho: peça perdida; amarelo: caixa a mais. Clique para ampliar."),

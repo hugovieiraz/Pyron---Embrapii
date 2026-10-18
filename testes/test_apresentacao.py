@@ -85,7 +85,8 @@ def test_rotas_da_avaliacao_e_das_figuras(monkeypatch) -> None:
     assert c.post("/api/analisar", files={"arquivo": ("vazio.jpg", b"", "image/jpeg")}).status_code == 422
     assert "Pyron" in c.get("/").text
     for arquivo in ("app.js", "estilo.css", "tokens.css", "rotulos.js"):  # a página não funciona sem eles
-        assert c.get(f"/e/{arquivo}").status_code == 200
+        r = c.get(f"/e/{arquivo}")
+        assert r.status_code == 200 and r.headers["cache-control"] == "no-cache"  # a janela confere a versão depois de atualizar
 
 
 def test_nome_exibido_das_saias(tmp_path) -> None:

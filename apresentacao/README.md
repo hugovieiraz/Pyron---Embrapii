@@ -8,11 +8,13 @@ quatro telas, sem alertas, severidade, laudos ou monitoramento:
   e os terminais; em cada para-raio, o **ponto mais quente** aparece marcado na imagem,
   com o valor e a peça onde ele está, e a máxima de cada peça. Passando o mouse sobre a imagem, a
   temperatura daquele ponto. Foto sem dados radiométricos (print, foto de tela): só a identificação.
-- **Modelo.** Como funciona (foto → identificação → temperatura → ponto mais quente), a ficha do
-  RF-DETR Medium, os números do treino e as curvas de perda e de acerto na validação.
-- **Avaliação.** O modelo usado nas 27 fotos de teste (159 de 177 peças, precisão 88,8%, revocação
-  89,8%, erro da temperatura máxima 0,0 °C na mediana), a comparação dos três detectores treinados no
-  Colab (Faster R-CNN, YOLO26s, RF-DETR), o acerto por peça e as figuras do teste.
+- **Modelo.** Como funciona em quatro etapas, ilustradas com uma foto de teste de verdade (foto →
+  identificação → matriz de temperatura → ponto mais quente), a ficha do RF-DETR Medium e o treino
+  (163 fotos, 1.183 peças marcadas, a divisão em treino, validação e teste).
+- **Avaliação.** Os três detectores treinados no Colab (Faster R-CNN, YOLO26s, RF-DETR), cada um com
+  acerto médio, precisão e revocação em destaque; o modelo deste aplicativo nas 27 fotos de teste
+  (159 de 177 peças achadas, uma casinha por peça); o acerto por tipo de peça; as figuras do teste.
+  A tabela completa fica em "Ver todos os números".
 - **Câmera do celular.** Identificação em tempo real: **Ligar** mostra um QR code; o celular (na
   mesma rede Wi-Fi) abre a câmera apontada para a tela da câmera térmica e marca para-raio, saias e
   terminais com a temperatura máxima estimada pela barra de cores. O computador espelha o vídeo com

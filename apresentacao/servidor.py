@@ -49,6 +49,16 @@ NOME_FOTO = re.compile(r"^[A-Za-z0-9_.-]{1,80}\.jpe?g$", re.IGNORECASE)
 app = FastAPI(title="Pyron · Apresentação", docs_url=None, redoc_url=None, openapi_url=None)
 app.mount("/e", StaticFiles(directory=ESTATICO), name="estatico")
 
+
+@app.middleware("http")
+async def sem_cache_velho(request, chamar_proximo):
+    # a janela do Edge guarda os arquivos da tela; "no-cache" faz conferir a versão (304 quando não mudou),
+    # para uma atualização do aplicativo não abrir com o app.js ou o estilo antigos
+    resposta = await chamar_proximo(request)
+    if request.url.path.startswith("/e/"):
+        resposta.headers["Cache-Control"] = "no-cache"
+    return resposta
+
 detector = Detector(MODELO)  # sem a pasta do modelo, abre do mesmo jeito e a tela mostra o que falta
 _carga = {"erro": None, "iniciada": False}
 _trava_carga = threading.Lock()

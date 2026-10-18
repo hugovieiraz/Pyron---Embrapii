@@ -113,20 +113,76 @@ main { max-width: var(--conteudo-max); margin: 0 auto; padding: var(--e-6); }
 @media (max-width: 1000px) { .etapas { grid-template-columns: 1fr 1fr; } }
 .etapa { position: relative; display: grid; gap: var(--e-2); align-content: start; padding: var(--e-4); border-radius: var(--r-m); background: var(--superficie-2); }
 .etapa b { font-size: var(--t-3); line-height: var(--a-3); }
+.etapa-cabeca { display: flex; align-items: center; gap: var(--e-3); }
 .etapa .passo { width: var(--e-8); height: var(--e-8); display: grid; place-items: center; border-radius: 50%; background: var(--acao); color: var(--acao-texto);
   font-weight: var(--p-forte); }
 .etapa + .etapa::before { content: "→"; position: absolute; left: calc(var(--apr-seta) * -1); top: var(--e-6); width: var(--apr-seta);
   text-align: center; color: var(--texto-3); font-size: var(--t-4); }
-.fatos { display: grid; grid-template-columns: repeat(auto-fit, minmax(var(--apr-coluna-min), 1fr)); gap: var(--e-4); }
-.fato { display: grid; gap: var(--e-1); }
+.etapa-figura { position: relative; display: grid; place-items: center; height: var(--apr-etapa-img); border-radius: var(--r-m); background: var(--palco); overflow: hidden; }
+.etapa-quadro { position: relative; height: var(--apr-etapa-img); min-height: 0; }
+.etapa-quadro > img, .etapa-quadro > canvas { display: block; height: 100%; width: auto; }
+.matriz-etapa { image-rendering: pixelated; }
+.caixa-etapa { position: absolute; border: 2px solid; border-radius: var(--r-p); box-shadow: 0 0 0 1px var(--contorno-imagem); }
+.etapa-rotulo { transform: translateY(-50%); }
+.lupa-matriz { position: absolute; border: 1px solid var(--branco); box-shadow: 0 0 0 1px var(--contorno-imagem); }
+.numeros { position: absolute; bottom: var(--e-2); display: grid; grid-template-columns: repeat(3, auto); gap: 0 var(--e-2); padding: var(--e-1) var(--e-2);
+  border-radius: var(--r-p); background: var(--rotulo-imagem); color: var(--palco-texto-2); font-size: var(--t-1); line-height: var(--a-1); }
+.numeros .centro { color: var(--branco); font-weight: var(--p-forte); }
+.texto-medida { max-width: var(--medida); }
+.fatos { display: grid; grid-template-columns: repeat(auto-fit, minmax(var(--apr-coluna-min), 1fr)); gap: var(--e-4) var(--e-6); }
+.fato { display: grid; gap: var(--e-1); align-content: start; }
 .fato span { color: var(--texto-3); font-size: var(--t-1); line-height: var(--a-1); }
+.fato b { font-size: var(--t-3); line-height: var(--a-3); }
+.pecas-chaves { display: flex; flex-wrap: wrap; gap: var(--e-2); }
+.pecas-chaves .etiqueta { font-size: var(--t-2); line-height: var(--a-3); padding: 0 var(--e-3); color: var(--texto); }
 .lista { margin-inline: 0; margin-bottom: 0; padding-left: var(--e-6); display: grid; gap: var(--e-1); }
 
 /* números de destaque */
 .destaques { display: grid; grid-template-columns: repeat(auto-fit, minmax(var(--apr-destaque-min), 1fr)); gap: var(--e-4); }
 .destaque { display: grid; gap: var(--e-1); padding: var(--e-4); border-radius: var(--r-m); background: var(--superficie-2); }
-.destaque b { font-size: var(--t-5); line-height: var(--a-5); font-weight: var(--p-forte); }
-.destaque span { color: var(--texto-2); font-size: var(--t-1); line-height: var(--a-1); }
+.destaque b { font-size: var(--apr-grande); line-height: var(--apr-grande-linha); font-weight: var(--p-forte); }
+.destaque span { color: var(--texto-2); }
+
+/* medidor de 0 a 100%, com o número sempre escrito ao lado */
+.medidor { height: var(--apr-medidor); border-radius: var(--apr-medidor); background: var(--superficie-3); overflow: hidden; }
+.medidor i { display: block; height: 100%; border-radius: var(--apr-medidor); }
+.indicador { display: grid; gap: var(--e-2); }
+.indicador-cabeca { display: flex; justify-content: space-between; align-items: baseline; gap: var(--e-3); }
+.indicador-cabeca span { color: var(--texto-2); font-weight: var(--p-medio); }
+.indicador-cabeca b { font-size: var(--t-4); line-height: var(--a-4); }
+
+/* faixa (parte do todo): treino, validação e teste */
+.faixa { display: flex; gap: 2px; }
+.faixa-parte { flex: 1 1 0; min-width: 0; display: grid; gap: var(--e-1); align-content: start; }
+.faixa-parte i { height: var(--apr-faixa); border-radius: var(--e-1); }
+.faixa-parte b { margin-top: var(--e-2); font-size: var(--t-5); line-height: var(--a-5); }
+.faixa-parte span { color: var(--texto-2); }
+
+/* ---------------------------------------------------------------- avaliação */
+.modelos { display: grid; grid-template-columns: repeat(auto-fit, minmax(var(--apr-coluna-min), 1fr)); gap: var(--e-4); }
+.modelo { display: grid; gap: var(--e-3); align-content: start; padding: var(--e-5); border: 1px solid var(--borda); border-top: var(--apr-borda-serie) solid;
+  border-radius: var(--r-m); background: var(--superficie); }
+.modelo.escolhido { box-shadow: 0 0 0 2px var(--acao-suave-2), var(--sombra-2); }
+.modelo-cabeca { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e-2); }
+.modelo-cabeca h3 { font-size: var(--t-4); line-height: var(--a-4); }
+.modelo-familia { min-height: calc(var(--a-2) * 2); color: var(--texto-2); }
+.modelo-numero { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--e-2); }
+.modelo-numero b { font-size: var(--apr-grande); line-height: var(--apr-grande-linha); font-weight: var(--p-forte); }
+.modelo-numero span { color: var(--texto-2); }
+.modelo-rodape { padding-top: var(--e-3); border-top: 1px solid var(--borda); color: var(--texto-2); }
+.resumo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--e-10); align-items: center; }
+@media (max-width: 1000px) { .resumo { grid-template-columns: 1fr; } }
+.resumo-pecas { display: grid; gap: var(--e-3); justify-items: start; }
+.resumo-indicadores { display: grid; gap: var(--e-6); }
+.heroi { font-size: var(--apr-heroi); line-height: var(--apr-heroi-linha); font-weight: var(--p-forte); }
+.heroi span { font-size: var(--apr-grande); color: var(--texto-2); font-weight: var(--p-medio); }
+.heroi-rotulo { margin-top: calc(var(--e-2) * -1); font-size: var(--t-4); line-height: var(--a-4); color: var(--texto-2); }
+.casas { display: grid; grid-template-columns: repeat(var(--apr-casas-linha), var(--apr-casa)); gap: var(--e-1); margin-top: var(--e-2); }
+.casas i, .chave i.casa-chave { width: var(--apr-casa); height: var(--apr-casa); border-radius: var(--apr-casa-raio); box-shadow: inset 0 0 0 2px var(--borda-forte); }
+.casas i.cheia, .chave i.casa-chave.cheia { background: var(--serie-1); box-shadow: none; }
+.detalhes summary { width: fit-content; cursor: pointer; color: var(--acao); font-weight: var(--p-forte); }
+.detalhes[open] summary { margin-bottom: var(--e-3); }
+.detalhes > * + * { margin-top: var(--e-3); }
 
 /* ---------------------------------------------------------------- gráficos (marcas finas, grade recessiva) */
 .graficos { display: grid; grid-template-columns: repeat(auto-fit, minmax(var(--apr-grafico-min), 1fr)); gap: var(--e-6); }
@@ -134,11 +190,7 @@ main { max-width: var(--conteudo-max); margin: 0 auto; padding: var(--e-6); }
 .grafico svg { width: 100%; height: var(--apr-grafico-alto); overflow: visible; }
 .grafico .grade { stroke: var(--grafico-grade); stroke-width: 1; }
 .grafico .eixo { fill: var(--texto-3); font-size: var(--t-1); font-family: var(--fonte); }
-.grafico .valor { fill: var(--texto); font-size: var(--t-1); font-weight: var(--p-forte); font-family: var(--fonte); }
-.grafico .linha { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-.grafico .ponto { stroke: var(--superficie); stroke-width: 2; }
 .grafico .alvo { fill: transparent; cursor: crosshair; }
-.grafico .mira-grafico { stroke: var(--texto-3); stroke-width: 1; }
 .legenda { display: flex; flex-wrap: wrap; gap: var(--e-4); }
 .dica { position: fixed; z-index: var(--z-aviso); max-width: var(--apr-dica); padding: var(--e-2) var(--e-3); border-radius: var(--r-m); background: var(--palco); color: var(--palco-texto);
   font-size: var(--t-1); line-height: var(--a-1); pointer-events: none; box-shadow: var(--sombra-2); }

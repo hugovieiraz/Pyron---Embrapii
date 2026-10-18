@@ -244,7 +244,7 @@
   --apr-miniatura: 112px;      /* foto de teste na galeria */
   --apr-visor-max: 540px;      /* altura máxima do termograma (cabe na janela de 1480 × 920 sem rolar) */
   --apr-painel: 380px;         /* coluna dos resultados ao lado do termograma */
-  --apr-grafico-alto: 220px;   /* gráficos de linha e de colunas */
+  --apr-grafico-alto: 260px;   /* gráfico de colunas (acerto por peça) */
   --apr-barra: 24px;           /* espessura máxima de barra nos gráficos */
   --apr-mira: 22px;            /* marcador do ponto mais quente */
   --apr-seta: 28px;            /* seta entre as etapas do "como funciona" */
@@ -255,4 +255,15 @@
   --apr-dica: 260px;           /* largura máxima da dica dos gráficos */
   --apr-mira-braco: 6px;       /* quanto os braços da mira passam do círculo */
   --apr-coluna-celular: 340px; /* coluna do QR code e do link, ao lado do vídeo do celular */
+  --apr-heroi: 64px;           /* número principal da avaliação (peças achadas), lido de longe no projetor */
+  --apr-heroi-linha: 68px;
+  --apr-grande: 40px;          /* número de cada detector e dos destaques do treino */
+  --apr-grande-linha: 46px;
+  --apr-medidor: 8px;          /* espessura da trilha dos medidores de 0 a 100% */
+  --apr-casa: 14px;            /* casinha de cada peça rotulada (achada ou perdida) */
+  --apr-casa-raio: 3px;
+  --apr-casas-linha: 30;       /* casinhas por linha */
+  --apr-faixa: 28px;           /* espessura da faixa que divide as fotos em treino, validação e teste */
+  --apr-borda-serie: 4px;      /* faixa de cor no alto do cartão de cada detector */
+  --apr-etapa-img: 260px;      /* imagem de cada etapa do "como funciona" */
 }
