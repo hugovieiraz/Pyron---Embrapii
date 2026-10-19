@@ -81,7 +81,9 @@ def test_rotas_da_avaliacao_e_das_figuras(monkeypatch) -> None:
     assert c.get(f"/api/figuras/comparacao/{av['figuras']['comparacao'][0]}").status_code == 200
     assert c.get("/api/figuras/comparacao/..%2F..%2Favaliacao.json").status_code == 404
     assert c.get("/api/figuras/outro/metricas.png").status_code == 404
-    assert len(c.get("/api/exemplos").json()) == 27
+    galeria = [e["nome"] for e in c.get("/api/exemplos").json()]
+    assert len(galeria) == 27 and len(set(galeria)) == 27
+    assert galeria[:5] == ["FLIR2620.jpg", "FLIR2618.jpg", "FLIR2614.jpg", "FLIR2812.jpg", "FLIR2612.jpg"]
     assert c.post("/api/exemplos/nao_existe.jpg/analisar").status_code == 404
     assert c.post("/api/analisar", files={"arquivo": ("vazio.jpg", b"", "image/jpeg")}).status_code == 422
     pagina = c.get("/").text

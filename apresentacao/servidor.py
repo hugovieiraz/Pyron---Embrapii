@@ -130,9 +130,15 @@ def estado() -> dict:
     }
 
 
+# Ordem da galeria na apresentação: estas primeiro, nesta ordem; as outras fotos de teste vêm depois, como estavam.
+PRIMEIRAS = ["FLIR2620.jpg", "FLIR2618.jpg", "FLIR2614.jpg", "FLIR2812.jpg", "FLIR2612.jpg"]
+
+
 @app.get("/api/exemplos")
 def exemplos() -> list[dict]:
-    return [{"nome": n, "disponivel": (ACERVO / n).exists()} for n in _avaliacao()["fotos_teste"]]
+    fotos = _avaliacao()["fotos_teste"]
+    ordem = [n for n in PRIMEIRAS if n in fotos] + [n for n in fotos if n not in PRIMEIRAS]
+    return [{"nome": n, "disponivel": (ACERVO / n).exists()} for n in ordem]
 
 
 def _foto_do_acervo(nome: str) -> Path:
