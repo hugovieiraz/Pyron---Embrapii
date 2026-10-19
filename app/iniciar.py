@@ -48,7 +48,7 @@ def abrir_janela(url: str, pasta_perfil: Path) -> None:
                     str(edge),
                     f"--app={url}",
                     f"--user-data-dir={pasta_perfil}",
-                    "--window-size=1480,920",
+                    "--start-maximized",  # tamanho fixo maior que a tela deixava o pé da página fora dela
                     "--no-first-run",
                     "--no-default-browser-check",
                     "--disable-features=Translate",

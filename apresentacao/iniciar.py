@@ -38,7 +38,9 @@ def abrir_janela(url: str) -> None:
     for edge in EDGE:
         if edge.exists():
             subprocess.Popen(
-                [str(edge), f"--app={url}", f"--user-data-dir={AQUI / '.janela'}", "--window-size=1480,920",
+                # maximizada: ocupa a área útil da tela que estiver em uso. Um tamanho fixo maior que a tela (1480 × 920
+                # numa tela de 1536 × 816) deixa o pé da página fora da tela, sem barra para rolar até lá.
+                [str(edge), f"--app={url}", f"--user-data-dir={AQUI / '.janela'}", "--start-maximized",
                  "--no-first-run", "--no-default-browser-check", "--disable-features=Translate",
                  "--disable-component-update"],  # sem os ~500 MB de componentes que o Edge baixa sozinho
                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
