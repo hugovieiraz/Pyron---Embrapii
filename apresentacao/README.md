@@ -7,10 +7,11 @@ quatro telas, sem alertas, severidade, laudos ou monitoramento:
   (o JPEG original da FLIR, ou arrastar a foto para a janela). O modelo marca o para-raio, as saias
   e os terminais; em cada para-raio, o **ponto mais quente** aparece marcado na imagem,
   com o valor e a peça onde ele está, e a máxima de cada peça. Passando o mouse sobre a imagem, a
-  temperatura daquele ponto. Foto sem dados radiométricos (print, foto de tela): só a identificação.
+  temperatura daquele ponto. Clicando numa peça no painel (o para-raio, as saias, um terminal), a imagem
+  destaca onde o modelo a achou. Foto sem dados radiométricos (print, foto de tela): só a identificação.
 - **Modelo.** Como funciona em quatro etapas, ilustradas com uma foto de teste de verdade (foto →
-  identificação → matriz de temperatura → ponto mais quente), a ficha do RF-DETR Medium e o treino
-  (163 fotos, 1.183 peças marcadas, a divisão em treino, validação e teste).
+  identificação → matriz de temperatura → ponto mais quente), o treino (163 fotos, 1.183 peças
+  marcadas, a divisão em treino, validação e teste) e a rotulagem no CVAT (`estatico/cvat/`).
 - **Avaliação.** Os três detectores treinados no Colab (Faster R-CNN, YOLO26s, RF-DETR), cada um com
   acerto médio, precisão e recall em destaque; o modelo deste aplicativo nas 27 fotos de teste
   (159 de 177 peças achadas, uma casinha por peça); o acerto por tipo de peça; as figuras do teste.

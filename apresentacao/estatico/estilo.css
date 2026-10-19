@@ -92,10 +92,18 @@ main { max-width: var(--conteudo-max); margin: 0 auto; padding: var(--e-6); }
 .quente { display: grid; gap: var(--e-1); }
 .quente b { font-size: var(--t-6); line-height: var(--a-6); font-weight: var(--p-forte); white-space: nowrap; }
 .quente span { color: var(--texto-2); }
-.partes { width: 100%; border-collapse: collapse; }
-.partes td { padding: var(--e-1) 0; border-top: 1px solid var(--borda); }
-.partes td:last-child { text-align: right; }
-.partes tr.maior td { font-weight: var(--p-forte); }
+.pecas-lista { display: grid; gap: var(--e-1); }
+.pecas-lista .nota { margin-bottom: var(--e-1); }
+.peca-botao { display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); width: 100%; min-height: var(--alvo-sm);
+  padding: 0 var(--e-3); border: 1px solid var(--borda); border-radius: var(--r-p); background: var(--superficie); color: var(--texto);
+  font: inherit; text-align: left; cursor: pointer; transition: background var(--dur-rapida) var(--ease-padrao), border-color var(--dur-rapida) var(--ease-padrao); }
+.peca-botao:hover { background: var(--superficie-2); border-color: var(--borda-forte); }
+.peca-botao[aria-pressed="true"] { background: var(--acao-suave); border-color: var(--acao); box-shadow: inset 0 0 0 1px var(--acao); }
+.peca-botao.maior { font-weight: var(--p-forte); }
+/* peça clicada: a caixa dela forte, as outras quase somem */
+.caixa, .rotulo { transition: opacity var(--dur-rapida) var(--ease-padrao); }
+.caixa.foco { border-width: 3px; box-shadow: 0 0 0 1px var(--contorno-imagem), 0 0 0 9999px var(--veu-foco); }
+.caixa.apagada, .rotulo.apagada { opacity: .25; }
 .chave { display: inline-flex; align-items: center; gap: var(--e-2); }
 .aviso { padding: var(--e-3) var(--e-4); border-radius: var(--r-m); background: var(--realce-suave); color: var(--texto); }
 .rodape { display: grid; gap: var(--e-1); }
@@ -133,6 +141,10 @@ main { max-width: var(--conteudo-max); margin: 0 auto; padding: var(--e-6); }
 .fato { display: grid; gap: var(--e-1); align-content: start; }
 .fato span { color: var(--texto-3); font-size: var(--t-1); line-height: var(--a-1); }
 .fato b { font-size: var(--t-3); line-height: var(--a-3); }
+.cvat-cabeca { display: flex; align-items: center; gap: var(--e-3); }
+.cvat-logo { height: var(--apr-logo-cvat); width: auto; }
+.cvat-figura { display: block; width: 100%; cursor: zoom-in; }
+.figura.cvat-figura img { height: auto; object-fit: contain; }
 .pecas-chaves { display: flex; flex-wrap: wrap; gap: var(--e-2); }
 .pecas-chaves .etiqueta { font-size: var(--t-2); line-height: var(--a-3); padding: 0 var(--e-3); color: var(--texto); }
 .lista { margin-inline: 0; margin-bottom: 0; padding-left: var(--e-6); display: grid; gap: var(--e-1); }

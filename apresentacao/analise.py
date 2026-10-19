@@ -103,6 +103,10 @@ def analisar(dados: bytes, nome: str, detector) -> dict:
     for n, p in enumerate(sorted((p for p in pecas if p["classe"] == "para_raio"), key=lambda p: p["caixa"][0]), start=1):
         p["nome"] = f"Para-raio {n}"
         item = {"numero": n, "caixa": p["caixa"], "confianca": p["confianca"]}
+        # as peças deste para-raio (caixa quase toda dentro da dele), com a caixa para a tela destacar a peça clicada
+        item["partes"] = [{"nome": q["nome"], "classe": q["classe"], "caixa": q["caixa"], "confianca": q["confianca"],
+                           **({"tmax": q["tmax"], "ponto": q["ponto"]} if temp is not None else {})}
+                          for q in pecas if q["classe"] in PARTES and _contida(q["caixa"], p["caixa"]) > 0.6]
         if temp is not None:
             item["tmax"], item["ponto"] = p["tmax"], p["ponto"]
             # a peça onde o ponto caiu: entre as partes deste para-raio (caixa quase toda dentro da dele),
@@ -110,8 +114,6 @@ def analisar(dados: bytes, nome: str, detector) -> dict:
             partes = [q for q in pecas if q["classe"] in PARTES and _contida(q["caixa"], p["caixa"]) > 0.6 and _dentro(p["ponto"], q["caixa"])]
             menor = min(partes, key=lambda q: (q["caixa"][2] - q["caixa"][0]) * (q["caixa"][3] - q["caixa"][1]), default=None)
             item["onde"] = menor["nome"] if menor else "corpo do para-raio"
-            item["partes"] = [{"nome": q["nome"], "tmax": q["tmax"]} for q in pecas
-                              if q["classe"] in PARTES and _contida(q["caixa"], p["caixa"]) > 0.6]
         para_raios.append(item)
     t3 = time.perf_counter()
     buf = io.BytesIO()

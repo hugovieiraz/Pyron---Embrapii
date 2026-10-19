@@ -19,6 +19,7 @@ const T = {
   pontoQuente: "ponto mais quente",
   onde: (parte) => (/^Saias/.test(parte) ? `nas ${parte}` : `no ${parte}`),
   maxPorParte: "Máxima em cada peça",
+  cliquePeca: "Clique numa peça para ver onde o modelo a achou:",
   pecas: "Peças",
   pontoMaisQuente: "Ponto mais quente",
   camera: (i) => [i.camera, i.sensor ? `sensor ${i.sensor}` : "", i.emissividade ? `emissividade ${String(i.emissividade).replace(".", ",")}` : ""].filter(Boolean).join(" · "),
@@ -191,9 +192,19 @@ function erroAnalise(e) {
 
 let atual = null;
 const exibir = { pecas: true, quente: true };
+let foco = null; // peça clicada no painel: a imagem destaca só ela
+const chaveCaixa = (caixa) => caixa.join(",");
+
+/** Clicou numa peça do painel: destaca a caixa dela na imagem (clicar de novo tira o destaque). */
+function focar(peca) {
+  foco = foco && chaveCaixa(foco.caixa) === chaveCaixa(peca.caixa) ? null : peca;
+  document.querySelectorAll(".peca-botao").forEach((b) => b.setAttribute("aria-pressed", String(!!foco && b.dataset.caixa === chaveCaixa(foco.caixa))));
+  desenharCamada();
+}
 
 function mostrarAnalise(r) {
   atual = r;
+  foco = null;
   const img = el("img", { src: r.imagem, alt: `Termograma ${r.arquivo}` });
   const camada = el("div", { class: "camada" });
   const leitura = el("div", { class: "leitura num", hidden: "" });
@@ -235,12 +246,17 @@ function desenharCamada() {
   const H = camada.clientHeight;
   const p = (v) => `${v * 100}%`;
   const filhos = [];
-  if (exibir.pecas) {
-    const rotulos = atual.pecas.map((d) => el("span", { class: "rotulo" }, el("i", { style: { background: COR_PECA[d.classe] } }), d.nome));
-    filhos.push(...atual.pecas.map((d) => el("div", { class: `caixa ${d.classe}`, style: { left: p(d.caixa[0]), top: p(d.caixa[1]), width: p(d.caixa[2] - d.caixa[0]), height: p(d.caixa[3] - d.caixa[1]) } })), ...rotulos);
+  const emFoco = (d) => !!foco && chaveCaixa(d.caixa) === chaveCaixa(foco.caixa);
+  const visiveis = exibir.pecas ? atual.pecas : atual.pecas.filter(emFoco);
+  if (visiveis.length) {
+    const estado = (d) => (!foco ? "" : emFoco(d) ? " foco" : " apagada");
+    // com foco e ponto quente, o nome da peça vai junto da temperatura (uma etiqueta só, sem uma cobrir a outra)
+    const comPonto = !!(foco && foco.ponto);
+    const rotulos = visiveis.map((d) => el("span", { class: `rotulo${estado(d)}`, hidden: comPonto && emFoco(d) ? "" : null }, el("i", { style: { background: COR_PECA[d.classe] } }), d.nome));
+    filhos.push(...visiveis.map((d) => el("div", { class: `caixa ${d.classe}${estado(d)}`, style: { left: p(d.caixa[0]), top: p(d.caixa[1]), width: p(d.caixa[2] - d.caixa[0]), height: p(d.caixa[3] - d.caixa[1]) } })), ...rotulos);
     camada.replaceChildren(...filhos);
-    const chaves = chavesDasDeteccoes(atual.pecas);
-    const itens = atual.pecas.map((d, i) => ({ chave: chaves[i], largura: rotulos[i].offsetWidth, altura: rotulos[i].offsetHeight,
+    const chaves = chavesDasDeteccoes(visiveis);
+    const itens = visiveis.map((d, i) => ({ chave: chaves[i], largura: rotulos[i].offsetWidth, altura: rotulos[i].offsetHeight,
       caixa: { x: d.caixa[0] * W, y: d.caixa[1] * H, w: (d.caixa[2] - d.caixa[0]) * W, h: (d.caixa[3] - d.caixa[1]) * H } }));
     const margem = 4;
     posicionarRotulos(itens, { x0: margem, y0: margem, x1: W - margem, y1: H - margem }, new Map(), margem)
@@ -248,10 +264,11 @@ function desenharCamada() {
   } else {
     camada.replaceChildren();
   }
-  if (exibir.quente) {
-    for (const pr of atual.para_raios.filter((x) => x.ponto)) {
+  if (exibir.quente || (foco && foco.ponto)) {
+    const pontos = foco ? (foco.ponto ? [foco] : []) : atual.para_raios.filter((x) => x.ponto);
+    for (const pr of pontos) {
       const mira = el("div", { class: "mira", style: { left: p(pr.ponto[0]), top: p(pr.ponto[1]) } });
-      const texto = el("span", { class: "mira-rotulo num" }, `${fmt(pr.tmax)} °C`);
+      const texto = el("span", { class: "mira-rotulo" }, foco ? `${foco.nome} · ` : null, el("span", { class: "num" }, `${fmt(pr.tmax)} °C`));
       camada.append(mira, texto);
       // à direita do marcador; à esquerda quando não cabe
       const x = pr.ponto[0] * W;
@@ -273,8 +290,13 @@ function painelResultado(r) {
   if (!r.radiometrica) blocos.push(el("p", { class: "aviso" }, T.semTemperatura));
   if (!r.para_raios.length) blocos.push(el("p", { class: "nota" }, T.nenhumParaRaio));
   for (const pr of r.para_raios) {
-    const linhas = (pr.partes || []).slice().sort((a, b) => b.tmax - a.tmax).map((q, i) =>
-      el("tr", { class: i === 0 && q.tmax === pr.tmax ? "maior" : null }, el("td", {}, q.nome), el("td", { class: "num" }, `${fmt(q.tmax)} °C`)));
+    // o para-raio inteiro e cada peça dele: clicar mostra na imagem onde o modelo achou a peça
+    const inteiro = { nome: T.paraRaio(pr.numero), classe: "para_raio", caixa: pr.caixa, confianca: pr.confianca, tmax: pr.tmax, ponto: pr.ponto };
+    const partes = (pr.partes || []).slice().sort((a, b) => (r.radiometrica ? b.tmax - a.tmax : a.caixa[1] - b.caixa[1]));
+    const botao = (q, maior) => el("button", { type: "button", class: `peca-botao${maior ? " maior" : ""}`, "aria-pressed": "false", "data-caixa": chaveCaixa(q.caixa), onclick: () => focar(q) },
+      el("span", { class: "chave" }, el("i", { style: { background: COR_PECA[q.classe] } }), q.nome),
+      el("span", { class: "num" }, q.tmax != null ? `${fmt(q.tmax)} °C` : T.confianca(Math.round(q.confianca * 100))));
+    const linhas = [botao(inteiro, false), ...partes.map((q, i) => botao(q, i === 0 && q.tmax != null && q.tmax === pr.tmax))];
     blocos.push(el("article", { class: "para-raio" },
       el("div", { class: "para-raio-cabeca" },
         el("span", { class: "chave" }, el("i", { style: { background: COR_PECA.para_raio, width: "var(--e-3)", height: "var(--e-3)", borderRadius: "50%" } }), el("b", {}, T.paraRaio(pr.numero))),
@@ -282,7 +304,7 @@ function painelResultado(r) {
       pr.tmax != null
         ? el("div", { class: "quente" }, el("b", { class: "num" }, `${fmt(pr.tmax)} °C`), el("span", {}, `${T.pontoQuente} ${T.onde(pr.onde)}`))
         : null,
-      linhas.length ? el("table", { class: "partes", "aria-label": T.maxPorParte }, el("tbody", {}, ...linhas)) : null));
+      el("div", { class: "pecas-lista", role: "group", "aria-label": T.maxPorParte }, el("p", { class: "nota" }, T.cliquePeca), ...linhas)));
   }
   const rodape = el("div", { class: "rodape" });
   if (r.info && (r.info.camera || r.info.sensor)) rodape.append(el("p", { class: "nota" }, T.camera(r.info)));
@@ -378,7 +400,6 @@ async function desenharModelo() {
     const figuras = [1, 2, 3, 4].map(() => el("div", { class: "etapa-figura esqueleto" }));
     const etapa = (n, titulo, texto) => el("div", { class: "etapa" },
       el("div", { class: "etapa-cabeca" }, el("span", { class: "passo" }, n), el("b", {}, titulo)), figuras[n - 1], el("p", {}, texto));
-    const fato = (rotulo, valor) => el("div", { class: "fato" }, el("span", {}, rotulo), el("b", {}, valor));
     const destaque = (numero, texto) => el("div", { class: "destaque" }, el("b", {}, numero), el("span", {}, texto));
     const exemplo = el("p", { class: "nota" });
     const f = av.fotos;
@@ -387,33 +408,30 @@ async function desenharModelo() {
         el("h2", {}, "Como funciona"),
         el("div", { class: "etapas" },
           etapa(1, "Foto da câmera", "O JPEG da FLIR traz a imagem colorida e, gravada junto, a temperatura de cada ponto do sensor."),
-          etapa(2, "Identificação", `O RF-DETR olha a imagem colorida (reduzida para ${est.modelo.entrada.join(" × ")}) e marca o para-raio, as saias e os terminais.`),
+          etapa(2, "Identificação", `O modelo olha a imagem colorida (reduzida para ${est.modelo.entrada.join(" × ")}) e marca o para-raio, as saias e os terminais.`),
           etapa(3, "Temperatura", "Cada ponto do sensor é um número em °C (160 × 120 = 19.200 medidas na FLIR C5). As caixas são levadas para essa matriz."),
           etapa(4, "Ponto mais quente", "Dentro da caixa de cada para-raio, o ponto de maior temperatura e a peça onde ele está.")),
         exemplo),
       el("div", { class: "cartao" },
-        el("h2", {}, est.modelo.nome),
-        el("p", { class: "texto-medida" }, "Detector de objetos do tipo transformer (DETR) com base DINOv2, licença Apache 2.0: recebe a imagem inteira e devolve, de uma vez, as caixas e o tipo de cada peça, sem etapas de proposta de regiões."),
-        el("div", { class: "fato" }, el("span", {}, "Peças que reconhece"),
-          el("div", { class: "pecas-chaves" }, ...Object.entries(COR_PECA).map(([classe, cor]) => el("span", { class: "etiqueta" }, el("i", { style: { background: cor } }), nomeDaClasse(classe))))),
-        el("div", { class: "fatos" },
-          fato("Entrada", `imagem colorida ${est.modelo.entrada.join(" × ")} pixels`),
-          fato("Confiança mínima", pct(est.modelo.limiar, 0)),
-          fato("Onde roda agora", est.pronto ? est.motor : T.carregandoModelo),
-          fato("Tempo por foto", `~70 ms na placa de vídeo · ${fmt(tl.ms_por_foto_cpu, 0)} ms no processador`),
-          fato("Formato", "ONNX (o mesmo arquivo no processador ou na placa)"))),
-      el("div", { class: "cartao" },
         el("h2", {}, "Treino"),
         el("div", { class: "destaques" },
-          destaque((f.treino + f.validacao + f.teste).toLocaleString("pt-BR"), "fotos térmicas de para-raios, rotuladas no CVAT"),
-          destaque(tl.dados.caixas.toLocaleString("pt-BR"), "peças marcadas à mão, uma caixa por peça"),
-          destaque(`${fmt(tl.duracao_min, 0)} min`, "de treino na placa de vídeo deste notebook (RTX 3050)"),
+          destaque((f.treino + f.validacao + f.teste).toLocaleString("pt-BR"), "fotos térmicas de para-raios, rotuladas à mão"),
+          destaque(tl.dados.caixas.toLocaleString("pt-BR"), "peças marcadas, uma caixa por peça"),
+          destaque(String(Object.keys(COR_PECA).length), "tipos de peça que o modelo aprendeu a reconhecer"),
           destaque(String(av.comparacao.modelos.length), "detectores treinados e comparados (aba Avaliação)")),
+        el("div", { class: "fato" }, el("span", {}, "Peças que reconhece"),
+          el("div", { class: "pecas-chaves" }, ...Object.entries(COR_PECA).map(([classe, cor]) => el("span", { class: "etiqueta" }, el("i", { style: { background: cor } }), nomeDaClasse(classe))))),
         el("h3", {}, "Como as fotos foram divididas"),
         faixa([
           { n: f.treino, nome: "treino: o modelo aprende com elas", cor: "var(--serie-1)" },
           { n: f.validacao, nome: "validação: escolhe a melhor rodada", cor: "var(--serie-2)" },
           { n: f.teste, nome: "teste: nunca vistas, medem o resultado", cor: "var(--serie-3)" }])),
+      el("div", { class: "cartao" },
+        el("div", { class: "cvat-cabeca" }, el("h2", {}, "Rotulagem no"), el("img", { class: "cvat-logo", src: "/e/cvat/logo.png", alt: "CVAT" })),
+        el("p", { class: "texto-medida" }, `As fotos foram rotuladas no CVAT (Computer Vision Annotation Tool): em cada foto, uma caixa desenhada à mão em volta de cada peça, com o tipo dela. Uma tarefa para cada grupo (treino, validação e teste), exportadas no formato COCO para o treino.`),
+        el("button", { type: "button", class: "figura cvat-figura", onclick: () => ampliar("/e/cvat/tarefas.png", "As três tarefas de rotulagem no CVAT: treino, validação e teste") },
+          el("img", { src: "/e/cvat/tarefas.png", alt: "As três tarefas de rotulagem no CVAT: treino, validação e teste" }),
+          el("span", {}, "As três tarefas no CVAT: treino, validação e teste. Clique para ampliar."))),
       el("div", { class: "cartao" },
         el("h2", {}, "Limitações"),
         el("ul", { class: "lista" }, ...est.modelo.limitacoes.map((t) => el("li", {}, t)))));
@@ -546,7 +564,7 @@ async function desenharAvaliacao() {
           + `O ${melhor.nome} ficou com o maior e tem licença Apache 2.0, livre para um produto comercial (o YOLO é AGPL).`)),
       el("div", { class: "cartao" },
         el("h2", {}, `O modelo deste aplicativo, nas ${av.fotos.teste} fotos de teste`),
-        el("p", { class: "nota" }, `${melhor.nome} treinado de novo neste notebook (${fmt(av.treino_local.duracao_min, 0)} min na RTX 3050), com as mesmas fotos. As ${totalPecas} peças das fotos de teste foram marcadas à mão para conferir.`),
+        el("p", { class: "nota" }, `${melhor.nome} treinado de novo neste notebook, com as mesmas fotos. As ${totalPecas} peças das fotos de teste foram marcadas à mão para conferir.`),
         el("div", { class: "resumo" },
           el("div", { class: "resumo-pecas" },
             el("p", { class: "heroi" }, String(local.acertos), el("span", {}, ` de ${totalPecas}`)),
