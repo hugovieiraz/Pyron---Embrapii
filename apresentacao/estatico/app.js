@@ -219,6 +219,7 @@ function mostrarAnalise(r) {
   const camada = el("div", { class: "camada" });
   const leitura = el("div", { class: "leitura num", hidden: "" });
   const quadro = el("div", { class: "quadro" }, img, camada, leitura);
+  quadro.style.setProperty("--proporcao", r.largura / r.altura); // a imagem cresce até a altura da tela sem distorcer
   const controle = (chave, texto) => el("label", {}, el("input", { type: "checkbox", checked: exibir[chave] ? "" : null,
     onchange: (ev) => { exibir[chave] = ev.target.checked; desenharCamada(); } }), texto);
   const legenda = el("div", { class: "legenda" }, ...Object.entries(COR_PECA).map(([classe, cor]) =>
@@ -317,6 +318,12 @@ function painelResultado(r) {
       el("div", { class: "pecas-lista", role: "group", "aria-label": T.maxPorParte }, el("p", { class: "nota" }, T.cliquePeca), ...linhas)));
   }
   const item = (rotulo, valor) => (valor == null || valor === "" ? null : el("div", { class: "parametro" }, el("span", {}, rotulo), el("b", {}, valor)));
+  const total = r.ms.leitura + r.ms.deteccao + r.ms.temperatura;
+  blocos.push(el("section", { class: "bloco-tecnico" }, el("h4", {}, "Tempo de processamento"),
+    el("div", { class: "parametros" },
+      item("Leitura", `${r.ms.leitura} ms`), item("Detecção", `${r.ms.deteccao} ms`),
+      item("Ponto mais quente", `${r.ms.temperatura} ms`), item("Total", `${total} ms`)),
+    el("p", { class: "nota" }, `Execução: ${r.motor}`)));
   const i = r.info || {};
   if (i.camera || i.sensor) {
     blocos.push(el("section", { class: "bloco-tecnico" }, el("h4", {}, "Parâmetros da câmera"),
@@ -329,12 +336,6 @@ function painelResultado(r) {
         item("Umidade", i.umidade != null ? `${i.umidade}%` : null),
         item("Faixa", i.faixa_c ? `${i.faixa_c[0]} a ${i.faixa_c[1]} °C` : null))));
   }
-  const total = r.ms.leitura + r.ms.deteccao + r.ms.temperatura;
-  blocos.push(el("section", { class: "bloco-tecnico" }, el("h4", {}, "Tempo de processamento"),
-    el("div", { class: "parametros" },
-      item("Leitura", `${r.ms.leitura} ms`), item("Detecção", `${r.ms.deteccao} ms`),
-      item("Ponto mais quente", `${r.ms.temperatura} ms`), item("Total", `${total} ms`)),
-    el("p", { class: "nota" }, `Execução: ${r.motor}`)));
   return el("aside", { class: "resultado" }, ...blocos);
 }
 

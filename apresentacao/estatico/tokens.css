@@ -245,6 +245,7 @@
   --apr-miniatura: 112px;      /* foto de teste na galeria */
   --apr-visor-max: 540px;      /* altura máxima do termograma (cabe na janela de 1480 × 920 sem rolar) */
   --apr-topo: 72px;            /* altura do topo fixo da apresentação (a imagem da análise fica logo abaixo) */
+  --apr-folga-visor: 176px;    /* altura da tela fora da imagem da análise: topo, margens e a linha de controles */
   --apr-painel: 460px;         /* coluna dos resultados ao lado do termograma (temperaturas e parâmetros legíveis no projetor) */
   --apr-grafico-alto: 260px;   /* gráfico de colunas (acerto por peça) */
   --apr-barra: 24px;           /* espessura máxima de barra nos gráficos */
