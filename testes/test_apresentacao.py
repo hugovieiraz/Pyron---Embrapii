@@ -147,3 +147,23 @@ def test_camera_do_celular_identifica_e_estima_a_temperatura(monkeypatch) -> Non
     estado = c.get("/api/celular").json()
     assert estado["ligado"] is False and estado["modelo"]["captura"] is False
     assert c.get("/api/celular/qr.png").status_code == 404  # desligado: sem link
+
+
+def test_servidor_so_desliga_quando_a_janela_fecha() -> None:
+    from apresentacao.iniciar import deve_desligar
+
+    class _Edge:
+        def __init__(self, vivo):
+            self.vivo = vivo
+
+        def poll(self):
+            return None if self.vivo else 0
+
+    # janela escondida (PowerPoint na frente): o sinal atrasa 10 min, mas o Edge está vivo → fica
+    assert not deve_desligar(1000.0 + 600, 1000.0, 1000.0, {"proc": _Edge(True), "aberta_em": 1000.0})
+    # o Edge da janela rodou e terminou → a janela fechou
+    assert deve_desligar(1100.0, 1000.0, 1090.0, {"proc": _Edge(False), "aberta_em": 1000.0})
+    # o Edge terminou logo depois de abrir: entregou a janela a outro Edge; vale o sinal (5 min)
+    entregou = {"proc": _Edge(False), "aberta_em": 1000.0, "terminou_em": 1002.0}
+    assert not deve_desligar(1200.0, 1000.0, 1150.0, entregou)
+    assert deve_desligar(1500.0, 1000.0, 1150.0, entregou)

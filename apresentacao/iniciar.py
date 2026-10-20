@@ -22,7 +22,12 @@ EDGE = [
     Path(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)")) / "Microsoft/Edge/Application/msedge.exe",
     Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Microsoft/Edge/Application/msedge.exe",
 ]
-SEM_SINAL_S = 45  # a janela manda um sinal a cada 10 s; sem sinal por isso, ela fechou
+# A janela manda um sinal a cada 10 s. Escondida (minimizada, coberta pelo PowerPoint em tela cheia, tela
+# bloqueada), o Edge segura os relógios da página e o sinal chega no máximo uma vez por minuto: por isso o
+# servidor vigia o processo da janela e só usa o sinal quando não tem esse processo para olhar.
+SEM_SINAL_S = 300
+SEM_SINAL_PRESO_S = 3 * 3600  # com o processo da janela vivo: 3 h sem sinal nenhum
+ENTREGOU_S = 10  # o Edge que termina antes disso só entregou a janela a outro Edge aberto
 SEM_JANELA_S = 600  # ninguém abriu a janela
 
 
@@ -34,10 +39,11 @@ def porta_livre(inicio: int = 8770) -> int:
     raise RuntimeError("Nenhuma porta livre entre 8770 e 8789.")
 
 
-def abrir_janela(url: str) -> None:
+def abrir_janela(url: str) -> subprocess.Popen | None:
+    """Abre a janela; devolve o processo do Edge (None se abriu no navegador padrão)."""
     for edge in EDGE:
         if edge.exists():
-            subprocess.Popen(
+            return subprocess.Popen(
                 # maximizada: ocupa a área útil da tela que estiver em uso. Um tamanho fixo maior que a tela (1480 × 920
                 # numa tela de 1536 × 816) deixa o pé da página fora da tela, sem barra para rolar até lá.
                 [str(edge), f"--app={url}", f"--user-data-dir={AQUI / '.janela'}", "--start-maximized",
@@ -45,18 +51,29 @@ def abrir_janela(url: str) -> None:
                  "--disable-component-update"],  # sem os ~500 MB de componentes que o Edge baixa sozinho
                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
-            return
     webbrowser.open(url)
+    return None
 
 
-def vigiar(servidor, sinais: dict, inicio: float) -> None:
+def deve_desligar(agora: float, inicio: float, ultimo_sinal: float, janela: dict) -> bool:
+    """A janela fechou? Sem confundir janela escondida (sinal lento) com janela fechada."""
+    sem_sinal = agora - (ultimo_sinal or inicio)
+    proc = janela.get("proc")
+    if proc is not None and proc.poll() is None:
+        # a janela está aberta, mesmo escondida; só um Edge preso em segundo plano passa tanto tempo calado
+        return sem_sinal > SEM_SINAL_PRESO_S
+    if proc is not None and janela.setdefault("terminou_em", agora) - janela["aberta_em"] > ENTREGOU_S:
+        return True  # o Edge desta janela rodou e terminou: a janela foi fechada
+    # sem processo para olhar (navegador padrão, ou o Edge entregou a janela a outro já aberto): fica o sinal
+    if ultimo_sinal == 0.0:
+        return agora - inicio > SEM_JANELA_S
+    return sem_sinal > SEM_SINAL_S
+
+
+def vigiar(servidor, sinais: dict, inicio: float, janela: dict) -> None:
     while not servidor.should_exit:
         time.sleep(2)
-        agora = time.time()
-        if sinais["ultimo"] == 0.0:
-            servidor.should_exit = agora - inicio > SEM_JANELA_S
-        elif agora - sinais["ultimo"] > SEM_SINAL_S:
-            servidor.should_exit = True
+        servidor.should_exit = deve_desligar(time.time(), inicio, sinais["ultimo"], janela)
 
 
 def main() -> None:
@@ -77,13 +94,15 @@ def main() -> None:
     print("Pyron · Apresentação em", url)
     config = uvicorn.Config(srv.app, host="127.0.0.1", port=porta, log_level="warning", log_config=None)
     servidor = uvicorn.Server(config)
-    threading.Thread(target=vigiar, args=(servidor, srv.sinais, time.time()), daemon=True).start()
+    janela: dict = {"proc": None, "fechou_em": 0.0}
+    threading.Thread(target=vigiar, args=(servidor, srv.sinais, time.time(), janela), daemon=True).start()
 
     def abrir_quando_pronto() -> None:
         for _ in range(150):
             if servidor.started:
                 if not sem_janela:
-                    abrir_janela(url)
+                    janela["aberta_em"] = time.time()
+                    janela["proc"] = abrir_janela(url)
                 return
             time.sleep(0.1)
 

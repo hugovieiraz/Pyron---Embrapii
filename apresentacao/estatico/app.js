@@ -26,6 +26,7 @@ const T = {
   tempos: (ms, motor) => `Leitura ${ms.leitura} ms · identificação ${ms.deteccao} ms (${motor}) · ponto mais quente ${ms.temperatura} ms`,
   erroAnalise: "Não consegui analisar esta foto",
   soltar: "Solte a foto da câmera para analisar",
+  semServidor: "O aplicativo parou de responder. Feche esta janela e abra o Pyron Apresentação de novo.",
 };
 
 const $ = (s, raiz = document) => raiz.querySelector(s);
@@ -56,7 +57,12 @@ const COR_PECA = { para_raio: "var(--serie-1)", aletas_isoladoras: "var(--serie-
 const COR_MODELO = ["var(--serie-1)", "var(--serie-4)", "var(--serie-2)", "var(--serie-3)"];
 
 async function api(caminho, opcoes) {
-  const r = await fetch(caminho, opcoes);
+  let r;
+  try {
+    r = await fetch(caminho, opcoes);
+  } catch {
+    throw new Error(T.semServidor); // o fetch só falha assim quando o servidor do aplicativo não responde
+  }
   const corpo = await r.json().catch(() => null);
   if (!r.ok) throw new Error((corpo && corpo.detail) || `erro ${r.status}`);
   return corpo;
@@ -847,6 +853,7 @@ function desenharAchadosCelular(esp) {
 const avisarServidor = () => fetch("/api/sinal", { method: "POST" }).catch(() => {});
 avisarServidor();
 setInterval(avisarServidor, 10000);
+document.addEventListener("visibilitychange", avisarServidor); // ao voltar a aparecer, avisa na hora
 
 vazioAnalise();
 montarGaleria();
