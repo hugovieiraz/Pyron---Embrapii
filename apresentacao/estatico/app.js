@@ -211,6 +211,9 @@ async function executarAnalise(previa, tarefa, aindaAtual) {
 
 $("#arquivo").addEventListener("change", (ev) => { analisarArquivos([...ev.target.files]); ev.target.value = ""; });
 let arrastando = 0;
+// As imagens da própria tela (miniaturas da galeria, o termograma) não se arrastam: soltas na janela, viravam um
+// "envio" de miniatura.jpg sem dados radiométricos. Só arquivos que vêm de fora do aplicativo contam.
+document.addEventListener("dragstart", (ev) => { if (ev.target instanceof HTMLImageElement) ev.preventDefault(); });
 document.addEventListener("dragenter", (ev) => { if (ev.dataTransfer.types.includes("Files")) { arrastando++; $("#soltar").hidden = false; } });
 document.addEventListener("dragleave", () => { if (--arrastando <= 0) { arrastando = 0; $("#soltar").hidden = true; } });
 document.addEventListener("dragover", (ev) => ev.preventDefault());

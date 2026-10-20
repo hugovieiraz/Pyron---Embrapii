@@ -302,3 +302,6 @@ main { max-width: var(--conteudo-max); margin: 0 auto; padding: var(--e-6); }
 .quadro.revelar .mira { animation: surgir var(--dur-lenta) var(--ease-entrada) backwards; animation-delay: calc(var(--dur-lenta) + var(--escalonar) * 2); }
 @keyframes surgir { from { opacity: 0; transform: scale(.96); } }
 @keyframes aparecer { from { opacity: 0; } }
+
+/* imagens da tela não se arrastam (ver o dragstart em app.js) */
+img { -webkit-user-drag: none; user-select: none; }
