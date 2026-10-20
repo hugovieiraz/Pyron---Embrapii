@@ -397,7 +397,7 @@ const indicador = (nome, valor, explica, cor) => el("div", { class: "indicador" 
   medidor(valor, cor),
   explica ? el("p", { class: "nota" }, explica) : null);
 
-/** Uma casinha por peça rotulada à mão: cheia, o modelo achou; vazia, perdeu. */
+/** Uma casinha por instância do teste: cheia, detectada; vazia, não detectada. */
 const casasDasPecas = (achadas, total) => el("div", { class: "casas", role: "img", "aria-label": `${achadas} de ${total} instâncias detectadas` },
   ...Array.from({ length: total }, (_, i) => el("i", { class: i < achadas ? "cheia" : null })));
 
@@ -487,7 +487,6 @@ async function desenharModelo() {
         el("h2", {}, "Conjunto de dados"),
         el("div", { class: "destaques" },
           destaque((f.treino + f.validacao + f.teste).toLocaleString("pt-BR"), "imagens térmicas de para-raios"),
-          destaque(tl.dados.caixas.toLocaleString("pt-BR"), "instâncias anotadas"),
           destaque(String(Object.keys(COR_PECA).length), "classes")),
         el("div", { class: "fato" }, el("span", {}, "Classes"),
           el("div", { class: "pecas-chaves" }, ...Object.entries(COR_PECA).map(([classe, cor]) => el("span", { class: "etiqueta" }, el("i", { style: { background: cor } }), nomeDaClasse(classe))))),
@@ -503,7 +502,7 @@ async function desenharModelo() {
         el("p", { class: "aviso" }, `Diferença de ${fmt(diferenca, 1)} p.p. de mAP50 entre os três. ${emExecucao.nome} em execução: maior mAP50 e licença Apache 2.0.`)),
       el("div", { class: "cartao" },
         el("h2", {}, `Modelo em execução · conjunto de teste`),
-        el("p", { class: "nota" }, `${emExecucao.nome}, ${f.teste} imagens, ${totalInstancias} instâncias anotadas.`),
+        el("p", { class: "nota" }, `${emExecucao.nome}, ${f.teste} imagens, ${totalInstancias} instâncias.`),
         el("div", { class: "resumo" },
           el("div", { class: "resumo-pecas" },
             el("p", { class: "heroi" }, String(local.acertos), el("span", {}, ` / ${totalInstancias}`)),

@@ -11,7 +11,7 @@ abas, sem alertas, severidade, laudos ou monitoramento:
   parâmetros da câmera (emissividade, distância, temperaturas refletida e atmosférica, umidade, faixa)
   e o tempo de cada etapa. Imagem sem dados radiométricos: só a detecção.
 - **Avaliação do modelo.** Pipeline em quatro etapas ilustrado com uma imagem de teste, conjunto de
-  dados (163 imagens, 1.183 instâncias, 4 classes, divisão treino/validação/teste), os três modelos
+  dados (163 imagens, 4 classes, divisão treino/validação/teste), os três modelos
   treinados (Faster R-CNN, YOLO26s, RF-DETR, este em execução), o modelo em execução no conjunto de
   teste (159/177 instâncias), AP50 por classe, tabela completa e as figuras do teste.
 - **Câmera do celular.** Identificação em tempo real: **Ligar** mostra um QR code; o celular (na
