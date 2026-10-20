@@ -664,7 +664,7 @@ const C = {
     "Deixe o celular e o computador no mesmo Wi-Fi.",
     "Ligue a conexão aqui e leia o QR code com a câmera do celular.",
     "O celular avisa que a conexão não é particular (o certificado é do próprio Pyron): toque em Avançado › Continuar.",
-    "Permita a câmera e aponte para uma imagem térmica, na tela do computador por exemplo, com a barra de cores no quadro.",
+    "Permita a câmera e aponte para uma imagem térmica, na tela do computador por exemplo.",
   ],
   ligar: "Ligar conexão com o celular",
   desligar: "Desligar",
@@ -680,9 +680,7 @@ const C = {
   ritmo: (q, a, ms) => [q != null ? `vídeo ${fmt(q, 0)} quadros/s` : "", a != null ? `${fmt(a, 1)} análises/s` : "", ms != null ? `detector ${ms} ms` : ""].filter(Boolean).join(" · "),
   nenhuma: "Nenhuma instância confirmada no último quadro.",
   semTermograma: "Nenhuma imagem térmica no quadro.",
-  escalaLida: (min, max) => `Barra de cores lida: ${min} a ${max} °C. Temperaturas estimadas pelas cores.`,
-  escalaLendo: "Barra de cores achada: lendo os números da escala…",
-  nota: "A imagem do celular não traz os dados do sensor: a temperatura é estimada pelas cores da barra (erro típico de 0,5 °C), não medida.",
+  nota: "Modo de identificação: detecção das instâncias em tempo real. A temperatura é medida na aba Análise, com o JPEG radiométrico.",
   rede: "O Windows pode perguntar se o Pyron pode usar a rede: permita em redes privadas. A conexão fica só na sua rede, com um código no link, e desliga quando você desligar aqui ou fechar o aplicativo.",
 };
 const CABECALHO_CELULAR = 16;
@@ -848,7 +846,6 @@ function moverCaixas(esp) {
   if (d) camada.style.transform = `translate3d(${(d.x * esp.largura).toFixed(1)}px, ${(d.y * esp.altura).toFixed(1)}px, 0)`;
 }
 
-const temperaturaPeca = (d) => (d.tmax != null ? `${d.tmax_acima ? "≥ " : ""}${fmt(d.tmax)} °C` : null);
 
 function desenharResultadoCelular(esp) {
   const quadro = $("#celular-espelho .celular-quadro");
@@ -857,7 +854,7 @@ function desenharResultadoCelular(esp) {
   const pct = (v) => `${v * 100}%`;
   const caixaEm = (b) => ({ left: pct(b[0]), top: pct(b[1]), width: pct(b[2] - b[0]), height: pct(b[3] - b[1]) });
   const rotulos = r.deteccoes.map((d) => el("span", { class: "rotulo" }, el("i", { style: { background: COR_PECA[d.classe] } }),
-    temperaturaPeca(d) ? `${d.nome} · ${temperaturaPeca(d)}` : d.nome));
+    d.nome));
   const barra = r.escala && r.escala.barra;
   $(".celular-caixas", quadro).replaceChildren(
     ...(r.area ? [el("div", { class: "celular-area", style: caixaEm(r.area) })] : []),
@@ -883,9 +880,8 @@ function desenharAchadosCelular(esp) {
   const pecas = [...r.deteccoes].sort((a, b) => a.caixa[1] - b.caixa[1]);
   const itens = pecas.length
     ? pecas.map((d) => el("span", { class: "etiqueta" }, el("i", { style: { background: COR_PECA[d.classe] } }),
-      [d.nome, `${Math.round(d.confianca * 100)}%`, temperaturaPeca(d)].filter(Boolean).join(" · ")))
+      `${d.nome} · ${Math.round(d.confianca * 100)}%`))
     : [el("span", { class: "nota" }, r.area ? C.nenhuma : C.semTermograma)];
-  if (r.escala) itens.push(el("span", { class: "nota" }, r.escala.estado === "lida" ? C.escalaLida(fmt(r.escala.min), fmt(r.escala.max)) : C.escalaLendo));
   lista.replaceChildren(...itens);
 }
 

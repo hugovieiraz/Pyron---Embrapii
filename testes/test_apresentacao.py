@@ -118,12 +118,11 @@ def test_sem_a_pasta_do_modelo_o_aplicativo_abre_e_avisa(tmp_path) -> None:
         det.carregar()
 
 
-def test_camera_do_celular_identifica_e_estima_a_temperatura(monkeypatch) -> None:
+def test_camera_do_celular_so_identifica(monkeypatch) -> None:
     from fastapi.testclient import TestClient
 
+    from app import celular
     from apresentacao import servidor
-    from nucleo import barra
-    from testes.test_barra import _OCRFalso, _caixa
     from testes.test_celular import _termograma_na_sala
 
     class _Detector(_DetectorFalso):
@@ -133,15 +132,9 @@ def test_camera_do_celular_identifica_e_estima_a_temperatura(monkeypatch) -> Non
     monkeypatch.setattr(servidor, "detector", _Detector([
         {"classe": "aletas_isoladoras", "nome": "Saias", "confianca": 0.9, "caixa": [0.4, 0.4, 0.6, 0.6]}]))
     monkeypatch.setattr(servidor, "iniciar_carga", lambda: None)
-    ocr = _OCRFalso([(_caixa(0, 0, 30, 15), "50.0", 0.9)], [(_caixa(0, 0, 30, 15), "10.0", 0.9)])
-    monkeypatch.setattr(servidor, "leitor_escala", barra.LeitorAoVivo(lambda: ocr))
-    from app import celular
-
     quadro = celular.ler_imagem(_termograma_na_sala())
-    servidor._celular_detectar(quadro)  # a primeira leitura dos números ainda não vale
     pecas, info = servidor._celular_detectar(quadro)
-    assert info["escala"]["estado"] == "lida" and (info["escala"]["min"], info["escala"]["max"]) == (10.0, 50.0)
-    assert pecas[0]["nome"] == "Saias" and 10.0 <= pecas[0]["tmax"] <= 50.0
+    assert pecas[0]["nome"] == "Saias" and "tmax" not in pecas[0] and info["escala"] is None  # só identificação
     assert pecas[0]["caixa"][1] > 400  # em pixels do quadro, não do recorte do termograma (que começa em y = 400)
 
     c = TestClient(servidor.app)

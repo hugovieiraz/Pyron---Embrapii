@@ -20,7 +20,6 @@ import os
 import re
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -33,9 +32,9 @@ from apresentacao import analise
 from apresentacao.detector import Detector
 
 # O modo celular é o mesmo do Pyron completo: a página do celular, a transmissão por WebSocket, o rastro
-# da câmera e a leitura da barra de cores (app/celular.py, nucleo/enquadrar.py, nucleo/barra.py).
+# da câmera e o recorte da tela térmica no quadro (app/celular.py, nucleo/enquadrar.py). Só identificação.
 from app import celular  # noqa: E402
-from nucleo import barra, enquadrar  # noqa: E402
+from nucleo import enquadrar  # noqa: E402
 
 AQUI = Path(__file__).resolve().parent
 RAIZ = AQUI.parent
@@ -201,42 +200,23 @@ def figura(grupo: str, arquivo: str) -> FileResponse:
 
 # ---------------------------------------------------------------- câmera do celular
 
-leitor_escala = barra.LeitorAoVivo()
-_fio_escala = ThreadPoolExecutor(max_workers=1, thread_name_prefix="escala")
-
-
 def _celular_detectar(rgb: np.ndarray) -> tuple[list[dict], dict]:
-    """Peças no quadro do celular: só dentro da área do termograma, com a máxima pela barra de cores.
+    """Instâncias no quadro do celular, só dentro da área do termograma. Só identificação, sem temperatura.
 
     O modelo foi treinado só com termogramas: no quadro inteiro (a sala, a mesa) ele vê para-raios em
-    qualquer coisa. A barra é lida em paralelo com o detector, noutro fio.
+    qualquer coisa. A temperatura pela barra de cores ficou fora da apresentação: o OCR dos números (60 a
+    500 ms no processador) segurava os quadros e derrubava a taxa de análises.
     """
     area = enquadrar.achar_termograma(rgb)
     if area is None:
         return [], {"area": None}
     recorte = np.ascontiguousarray(rgb[area.y0:area.y1, area.x0:area.x1])
     h, w = recorte.shape[:2]
-    img_lab = barra.lab(recorte)
-    leitura = _fio_escala.submit(leitor_escala.ler, recorte, img_lab)
     pecas = []
     for d in detector.detectar(recorte):
         x0, y0, x1, y1 = d["caixa"]
-        pecas.append({**d, "caixa": [x0 * w, y0 * h, x1 * w, y1 * h]})
-    escala, achada, estado_escala = leitura.result()
-    for p in pecas:
-        if escala is not None:
-            t, acima = barra.maxima(img_lab, escala, p["caixa"])
-            if t is not None:
-                p["tmax"], p["tmax_acima"] = round(t, 1), acima
-        x0, y0, x1, y1 = p["caixa"]
-        p["caixa"] = [x0 + area.x0, y0 + area.y0, x1 + area.x0, y1 + area.y0]
-    info_escala = None
-    if achada is not None:
-        bx0, by0, bx1, by1 = achada.caixa()
-        info_escala = {"estado": estado_escala, "barra": [bx0 + area.x0, by0 + area.y0, bx1 + area.x0, by1 + area.y0]}
-        if escala is not None:
-            info_escala.update(min=round(escala.t_min, 1), max=round(escala.t_max, 1))
-    return pecas, {"area": area.caixa(), "escala": info_escala}
+        pecas.append({**d, "caixa": [x0 * w + area.x0, y0 * h + area.y0, x1 * w + area.x0, y1 * h + area.y0]})
+    return pecas, {"area": area.caixa(), "escala": None}
 
 
 def _celular_capturar(_dados: bytes, _nome: str) -> dict:
@@ -265,7 +245,6 @@ def celular_ligar() -> dict:
     """Abre o servidor do celular na rede local (HTTPS, só as rotas do celular, com código no link)."""
     try:
         _celular_modelo()
-        leitor_escala.reiniciar()
         celular_modo.ligar()
     except ValueError as erro:
         raise HTTPException(409, str(erro)) from erro
