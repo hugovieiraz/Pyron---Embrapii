@@ -244,7 +244,8 @@
 :root {
   --apr-miniatura: 112px;      /* foto de teste na galeria */
   --apr-visor-max: 540px;      /* altura máxima do termograma (cabe na janela de 1480 × 920 sem rolar) */
-  --apr-painel: 380px;         /* coluna dos resultados ao lado do termograma */
+  --apr-topo: 72px;            /* altura do topo fixo da apresentação (a imagem da análise fica logo abaixo) */
+  --apr-painel: 460px;         /* coluna dos resultados ao lado do termograma (temperaturas e parâmetros legíveis no projetor) */
   --apr-grafico-alto: 260px;   /* gráfico de colunas (acerto por peça) */
   --apr-barra: 24px;           /* espessura máxima de barra nos gráficos */
   --apr-mira: 22px;            /* marcador do ponto mais quente */
@@ -266,6 +267,5 @@
   --apr-casas-linha: 30;       /* casinhas por linha */
   --apr-faixa: 28px;           /* espessura da faixa que divide as fotos em treino, validação e teste */
   --apr-borda-serie: 4px;      /* faixa de cor no alto do cartão de cada detector */
-  --apr-logo-cvat: 18px;       /* logotipo do CVAT ao lado do título (do tamanho da letra do título) */
   --apr-etapa-img: 260px;      /* imagem de cada etapa do "como funciona" */
 }

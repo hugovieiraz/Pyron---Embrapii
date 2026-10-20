@@ -12,27 +12,27 @@
 <header class="topo">
   <div class="marca">
     <img src="/e/marca/icone-64.png" alt="">
-    <div><b>Pyron</b><span>Identificação de para-raios por termografia</span></div>
+    <b>Pyron</b>
   </div>
   <nav class="abas" role="tablist" aria-label="Seções">
     <button type="button" role="tab" id="tab-analise" aria-controls="aba-analise" aria-selected="true">Análise</button>
-    <button type="button" role="tab" id="tab-modelo" aria-controls="aba-modelo" aria-selected="false">Modelo</button>
-    <button type="button" role="tab" id="tab-avaliacao" aria-controls="aba-avaliacao" aria-selected="false">Avaliação</button>
+    <button type="button" role="tab" id="tab-modelo" aria-controls="aba-modelo" aria-selected="false">Avaliação do modelo</button>
     <button type="button" role="tab" id="tab-celular" aria-controls="aba-celular" aria-selected="false">Câmera do celular</button>
+    <span class="abas-marcador" aria-hidden="true"></span>
   </nav>
-  <span class="motor" id="motor" role="status"><i></i><span>Carregando o modelo…</span></span>
+  <span class="topo-frase">Identificação de para-raios por termografia</span>
 </header>
 
 <main>
   <section class="aba" id="aba-analise" role="tabpanel" aria-labelledby="tab-analise">
     <div class="galeria-cabeca">
       <div>
-        <h2>Fotos de teste</h2>
-        <p class="nota" id="galeria-nota">Fotos que o modelo nunca viu no treino. Clique numa para analisar.</p>
+        <h2>Imagens de teste</h2>
+        <p class="nota" id="galeria-nota">Imagens do conjunto de teste, fora do treino.</p>
       </div>
       <label class="btn">
         <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0-5 5m5-5 5 5M5 20h14"/></svg>
-        Enviar foto
+        Enviar imagem
         <input type="file" id="arquivo" accept="image/jpeg" multiple hidden>
       </label>
     </div>
@@ -41,11 +41,10 @@
   </section>
 
   <section class="aba" id="aba-modelo" role="tabpanel" aria-labelledby="tab-modelo" hidden></section>
-  <section class="aba" id="aba-avaliacao" role="tabpanel" aria-labelledby="tab-avaliacao" hidden></section>
   <section class="aba" id="aba-celular" role="tabpanel" aria-labelledby="tab-celular" hidden></section>
 </main>
 
-<div class="soltar" id="soltar" hidden><p>Solte a foto da câmera para analisar</p></div>
+<div class="soltar" id="soltar" hidden><p>Solte a imagem para analisar</p></div>
 <div class="dica" id="dica" role="tooltip" hidden></div>
 <dialog class="lupa" id="lupa"><button type="button" class="btn btn-fantasma lupa-fechar" id="lupa-fechar">Fechar</button><img alt=""><p class="nota"></p></dialog>
 

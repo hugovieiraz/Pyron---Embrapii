@@ -1,21 +1,19 @@
 # Pyron · Apresentação
 
-Aplicativo separado e enxuto, para apresentar a identificação de para-raios por termografia. Só
-quatro telas, sem alertas, severidade, laudos ou monitoramento:
+Aplicativo separado e enxuto, para apresentar a identificação de para-raios por termografia. Três
+abas, sem alertas, severidade, laudos ou monitoramento:
 
-- **Análise.** Galeria com as 27 fotos de teste (nunca vistas no treino) e envio de fotos da câmera
-  (o JPEG original da FLIR, ou arrastar a foto para a janela). O modelo marca o para-raio, as saias
-  e os terminais; em cada para-raio, o **ponto mais quente** aparece marcado na imagem,
-  com o valor e a peça onde ele está, e a máxima de cada peça. Passando o mouse sobre a imagem, a
-  temperatura daquele ponto. Clicando numa peça no painel (o para-raio, as saias, um terminal), a imagem
-  destaca onde o modelo a achou. Foto sem dados radiométricos (print, foto de tela): só a identificação.
-- **Modelo.** Como funciona em quatro etapas, ilustradas com uma foto de teste de verdade (foto →
-  identificação → matriz de temperatura → ponto mais quente), o treino (163 fotos, 1.183 peças
-  marcadas, a divisão em treino, validação e teste) e a rotulagem no CVAT (`estatico/cvat/`).
-- **Avaliação.** Os três detectores treinados no Colab (Faster R-CNN, YOLO26s, RF-DETR), cada um com
-  acerto médio, precisão e recall em destaque; o modelo deste aplicativo nas 27 fotos de teste
-  (159 de 177 peças achadas, uma casinha por peça); o acerto por tipo de peça; as figuras do teste.
-  A tabela completa fica em "Ver todos os números".
+- **Análise.** Galeria com as 27 imagens de teste (fora do treino) e envio de imagens da câmera
+  (o JPEG radiométrico da FLIR, ou arrastar para a janela). O modelo detecta o para-raio, as saias e
+  os terminais; em cada para-raio, o **ponto mais quente** aparece marcado na imagem, com o valor e a
+  classe onde ele está, e a máxima de cada instância. Passando o mouse, a temperatura do ponto.
+  Clicando numa instância no painel, a imagem destaca a caixa dela. O painel mostra também os
+  parâmetros da câmera (emissividade, distância, temperaturas refletida e atmosférica, umidade, faixa)
+  e o tempo de cada etapa. Imagem sem dados radiométricos: só a detecção.
+- **Avaliação do modelo.** Pipeline em quatro etapas ilustrado com uma imagem de teste, conjunto de
+  dados (163 imagens, 1.183 instâncias, 4 classes, divisão treino/validação/teste), os três modelos
+  treinados (Faster R-CNN, YOLO26s, RF-DETR, este em execução), o modelo em execução no conjunto de
+  teste (159/177 instâncias), AP50 por classe, tabela completa e as figuras do teste.
 - **Câmera do celular.** Identificação em tempo real: **Ligar** mostra um QR code; o celular (na
   mesma rede Wi-Fi) abre a câmera apontada para a tela da câmera térmica e marca para-raio, saias e
   terminais com a temperatura máxima estimada pela barra de cores. O computador espelha o vídeo com
@@ -34,7 +32,7 @@ Dois cliques no atalho **Pyron Apresentação** da área de trabalho. Ou, na pas
 ```
 
 A janela abre sozinha (Edge em modo aplicativo) e o servidor desliga quando ela fecha. Teclas
-**1** a **4** trocam de aba. Para criar o atalho de novo: `.venv/Scripts/python.exe -m apresentacao.atalho`.
+**1** a **3** trocam de aba. Para criar o atalho de novo: `.venv/Scripts/python.exe -m apresentacao.atalho`.
 Diagnóstico: `-m apresentacao --sem-janela` sobe só o servidor; o endereço e erros vão para
 `apresentacao/registro.log`.
 

@@ -55,7 +55,14 @@ def abrir(dados: bytes) -> tuple[np.ndarray, np.ndarray | None, dict]:
         return rgb, None, info
     info["camera"] = termo.parametros.modelo or info["camera"]
     info["sensor"] = f"{termo.bruto.shape[1]} × {termo.bruto.shape[0]}"
-    info["emissividade"] = round(termo.parametros.emissividade, 2)
+    pc = termo.parametros
+    info["emissividade"] = round(pc.emissividade, 2)
+    # parâmetros que a câmera usou na conversão para °C (mostrados no painel da análise)
+    info["distancia_m"] = round(pc.distancia_m, 1)
+    info["temp_refletida_c"] = round(pc.temp_refletida_c, 1)
+    info["temp_atmosfera_c"] = round(pc.temp_atmosfera_c, 1)
+    info["umidade"] = round(pc.umidade_relativa * 100)
+    info["faixa_c"] = [round(pc.faixa_camera_min_c), round(pc.faixa_camera_max_c)]
     return rgb, orientar(termo.temperatura_c, orientacao).astype(np.float32), info
 
 

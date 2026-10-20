@@ -4,28 +4,24 @@
 
 const T = {
   carregandoModelo: "Carregando o modelo…",
-  motor: (m) => `Modelo pronto · ${m}`,
-  erroModelo: (e) => `O modelo não carregou: ${e}`,
-  semAcervo: "As fotos de teste não estão neste computador. Envie uma foto da câmera FLIR.",
-  vazioTitulo: "Escolha uma foto",
-  vazioTexto: "Clique numa foto de teste acima ou envie uma foto da câmera FLIR (o JPEG original, com os dados de temperatura).",
+  semAcervo: "As imagens de teste não estão neste computador. Envie uma imagem da câmera FLIR.",
+  vazioTitulo: "Selecione uma imagem",
+  vazioTexto: "Selecione uma imagem de teste ou envie um JPEG radiométrico da câmera FLIR.",
   analisando: "Analisando…",
-  naoVista: "Foto de teste · não vista no treino",
-  enviada: "Foto enviada",
-  semTemperatura: "Esta foto não tem os dados de temperatura da câmera (print ou foto de tela): só a identificação das peças.",
-  nenhumParaRaio: "Nenhum para-raio identificado nesta foto.",
+  naoVista: "Imagem de teste",
+  enviada: "Imagem enviada",
+  semTemperatura: "Imagem sem dados radiométricos: apenas detecção, sem temperatura.",
+  nenhumParaRaio: "Nenhum para-raio detectado nesta imagem.",
   paraRaio: (n) => `Para-raio ${n}`,
   confianca: (p) => `confiança ${p}%`,
   pontoQuente: "ponto mais quente",
   onde: (parte) => (/^Saias/.test(parte) ? `nas ${parte}` : `no ${parte}`),
-  maxPorParte: "Máxima em cada peça",
-  cliquePeca: "Clique numa peça para ver onde o modelo a achou:",
-  pecas: "Peças",
+  maxPorParte: "Máxima por instância",
+  cliquePeca: "Instâncias detectadas (clique para destacar):",
+  pecas: "Instâncias",
   pontoMaisQuente: "Ponto mais quente",
-  camera: (i) => [i.camera, i.sensor ? `sensor ${i.sensor}` : "", i.emissividade ? `emissividade ${String(i.emissividade).replace(".", ",")}` : ""].filter(Boolean).join(" · "),
-  tempos: (ms, motor) => `Leitura ${ms.leitura} ms · identificação ${ms.deteccao} ms (${motor}) · ponto mais quente ${ms.temperatura} ms`,
-  erroAnalise: "Não consegui analisar esta foto",
-  soltar: "Solte a foto da câmera para analisar",
+  erroAnalise: "Falha na análise desta imagem",
+  soltar: "Solte a imagem para analisar",
   semServidor: "O aplicativo parou de responder. Feche esta janela e abra o Pyron Apresentação de novo.",
 };
 
@@ -70,22 +66,32 @@ async function api(caminho, opcoes) {
 
 // ------------------------------------------------------------------ abas
 
-const ABAS = ["analise", "modelo", "avaliacao", "celular"];
+const ABAS = ["analise", "modelo", "celular"];
 const carregadas = new Set();
 function mostrarAba(nome) {
   for (const a of ABAS) {
     $(`#tab-${a}`).setAttribute("aria-selected", String(a === nome));
     $(`#aba-${a}`).hidden = a !== nome;
   }
+  posicionarMarcador();
   if (nome === "modelo" && !carregadas.has(nome)) { carregadas.add(nome); desenharModelo(); }
-  if (nome === "avaliacao" && !carregadas.has(nome)) { carregadas.add(nome); desenharAvaliacao(); }
   if (nome === "celular") carregarCelular();
   else pararCelular();
 }
+/** O marcador branco desliza até a aba ativa (posição e largura da aba). */
+function posicionarMarcador() {
+  const ativa = $(".abas [aria-selected='true']");
+  const marcador = $(".abas-marcador");
+  if (!ativa || !marcador) return;
+  marcador.style.width = `${ativa.offsetWidth}px`;
+  marcador.style.transform = `translateX(${ativa.offsetLeft}px)`;
+}
+window.addEventListener("resize", posicionarMarcador);
+document.fonts?.ready.then(posicionarMarcador);
 ABAS.forEach((a) => $(`#tab-${a}`).addEventListener("click", () => mostrarAba(a)));
 document.addEventListener("keydown", (ev) => {
   if (ev.target.closest("input, textarea") || ev.ctrlKey || ev.altKey) return;
-  const i = ["1", "2", "3", "4"].indexOf(ev.key);
+  const i = ["1", "2", "3"].indexOf(ev.key);
   if (i >= 0) mostrarAba(ABAS[i]);
 });
 
@@ -96,9 +102,7 @@ async function acompanharModelo() {
   for (let i = 0; i < 120; i++) {
     try {
       estadoModelo = await api("/api/estado");
-      const m = $("#motor");
-      if (estadoModelo.erro) { m.className = "motor erro"; m.lastElementChild.textContent = T.erroModelo(estadoModelo.erro); return; }
-      if (estadoModelo.pronto) { m.className = "motor pronto"; m.lastElementChild.textContent = T.motor(estadoModelo.motor); return; }
+      if (estadoModelo.erro || estadoModelo.pronto) return;
     } catch { /* o servidor ainda está subindo */ }
     await new Promise((ok) => setTimeout(ok, 500));
   }
@@ -113,7 +117,7 @@ async function montarGaleria() {
   try {
     const exemplos = (await api("/api/exemplos")).filter((e) => e.disponivel);
     if (!exemplos.length) { g.replaceChildren(); $("#galeria-nota").textContent = T.semAcervo; return; }
-    $("#galeria-nota").textContent = `${exemplos.length} fotos que o modelo nunca viu no treino. Clique numa para analisar.`;
+    $("#galeria-nota").textContent = `${exemplos.length} imagens do conjunto de teste, fora do treino.`;
     g.replaceChildren(...exemplos.map((e) => el("button", { type: "button", class: "foto", "aria-pressed": "false", "data-nome": e.nome, onclick: (ev) => analisarExemplo(e.nome, ev.currentTarget) },
       el("img", { src: `/api/exemplos/${encodeURIComponent(e.nome)}/miniatura.jpg`, alt: e.nome, loading: "lazy" }),
       el("span", {}, e.nome.replace(/\.jpe?g$/i, "")))));
@@ -308,14 +312,29 @@ function painelResultado(r) {
         el("span", { class: "chave" }, el("i", { style: { background: COR_PECA.para_raio, width: "var(--e-3)", height: "var(--e-3)", borderRadius: "50%" } }), el("b", {}, T.paraRaio(pr.numero))),
         el("span", { class: "nota" }, T.confianca(Math.round(pr.confianca * 100)))),
       pr.tmax != null
-        ? el("div", { class: "quente" }, el("b", { class: "num" }, `${fmt(pr.tmax)} °C`), el("span", {}, `${T.pontoQuente} ${T.onde(pr.onde)}`))
+        ? el("div", { class: "quente" }, el("b", {}, `${fmt(pr.tmax)} °C`), el("span", {}, `${T.pontoQuente} ${T.onde(pr.onde)}`))
         : null,
       el("div", { class: "pecas-lista", role: "group", "aria-label": T.maxPorParte }, el("p", { class: "nota" }, T.cliquePeca), ...linhas)));
   }
-  const rodape = el("div", { class: "rodape" });
-  if (r.info && (r.info.camera || r.info.sensor)) rodape.append(el("p", { class: "nota" }, T.camera(r.info)));
-  rodape.append(el("p", { class: "nota num" }, T.tempos(r.ms, r.motor)));
-  blocos.push(rodape);
+  const item = (rotulo, valor) => (valor == null || valor === "" ? null : el("div", { class: "parametro" }, el("span", {}, rotulo), el("b", {}, valor)));
+  const i = r.info || {};
+  if (i.camera || i.sensor) {
+    blocos.push(el("section", { class: "bloco-tecnico" }, el("h4", {}, "Parâmetros da câmera"),
+      el("div", { class: "parametros" },
+        item("Câmera", i.camera), item("Sensor", i.sensor && `${i.sensor} px`),
+        item("Emissividade", i.emissividade != null ? fmt(i.emissividade, 2) : null),
+        item("Distância", i.distancia_m != null ? `${fmt(i.distancia_m, 1)} m` : null),
+        item("T. refletida", i.temp_refletida_c != null ? `${fmt(i.temp_refletida_c)} °C` : null),
+        item("T. atmosférica", i.temp_atmosfera_c != null ? `${fmt(i.temp_atmosfera_c)} °C` : null),
+        item("Umidade", i.umidade != null ? `${i.umidade}%` : null),
+        item("Faixa", i.faixa_c ? `${i.faixa_c[0]} a ${i.faixa_c[1]} °C` : null))));
+  }
+  const total = r.ms.leitura + r.ms.deteccao + r.ms.temperatura;
+  blocos.push(el("section", { class: "bloco-tecnico" }, el("h4", {}, "Tempo de processamento"),
+    el("div", { class: "parametros" },
+      item("Leitura", `${r.ms.leitura} ms`), item("Detecção", `${r.ms.deteccao} ms`),
+      item("Ponto mais quente", `${r.ms.temperatura} ms`), item("Total", `${total} ms`)),
+    el("p", { class: "nota" }, `Execução: ${r.motor}`)));
   return el("aside", { class: "resultado" }, ...blocos);
 }
 
@@ -379,7 +398,7 @@ const indicador = (nome, valor, explica, cor) => el("div", { class: "indicador" 
   explica ? el("p", { class: "nota" }, explica) : null);
 
 /** Uma casinha por peça rotulada à mão: cheia, o modelo achou; vazia, perdeu. */
-const casasDasPecas = (achadas, total) => el("div", { class: "casas", role: "img", "aria-label": `${achadas} de ${total} peças achadas` },
+const casasDasPecas = (achadas, total) => el("div", { class: "casas", role: "img", "aria-label": `${achadas} de ${total} instâncias detectadas` },
   ...Array.from({ length: total }, (_, i) => el("i", { class: i < achadas ? "cheia" : null })));
 
 /** Faixa dividida em partes proporcionais (parte do todo), com o número e o nome embaixo de cada parte. */
@@ -403,44 +422,116 @@ async function desenharModelo() {
   try {
     const [est, av] = [estadoModelo || (await api("/api/estado")), await dadosAvaliacao()];
     const tl = av.treino_local;
+    const local = tl.teste;
+    const f = av.fotos;
+    const totalInstancias = local.acertos + local.perdidos;
+    const modelos = av.comparacao.modelos.map((m, i) => ({ ...m, cor: COR_MODELO[i] }));
+    const emExecucao = modelos.reduce((a, b) => (b.mAP50 > a.mAP50 ? b : a));
+    const diferenca = (emExecucao.mAP50 - Math.min(...modelos.map((m) => m.mAP50))) * 100;
+
+    // ---- pipeline
     const figuras = [1, 2, 3, 4].map(() => el("div", { class: "etapa-figura esqueleto" }));
     const etapa = (n, titulo, texto) => el("div", { class: "etapa" },
       el("div", { class: "etapa-cabeca" }, el("span", { class: "passo" }, n), el("b", {}, titulo)), figuras[n - 1], el("p", {}, texto));
-    const destaque = (numero, texto) => el("div", { class: "destaque" }, el("b", {}, numero), el("span", {}, texto));
     const exemplo = el("p", { class: "nota" });
-    const f = av.fotos;
+    const destaque = (numero, texto) => el("div", { class: "destaque" }, el("b", {}, numero), el("span", {}, texto));
+
+    // ---- modelos treinados
+    const cartaoModelo = (m) => el("article", { class: `modelo${m === emExecucao ? " escolhido" : ""}`, style: { borderTopColor: m.cor } },
+      el("div", { class: "modelo-cabeca" }, el("h3", {}, m.nome), m === emExecucao ? el("span", { class: "selo selo-ativo" }, el("i"), "em execução") : null),
+      el("p", { class: "modelo-familia" }, FAMILIA[m.nome] || ""),
+      el("div", { class: "modelo-numero" }, el("b", {}, pct(m.mAP50)), el("span", {}, "mAP50")),
+      medidor(m.mAP50, m.cor),
+      indicador("Precisão", m.precisao, null, m.cor),
+      indicador("Recall", m.revocacao, null, m.cor),
+      el("p", { class: "modelo-rodape" }, `${m.acertos}/${m.acertos + m.perdidos} instâncias · ${fmt(m.ms_por_foto, 0)} ms por imagem`));
+
+    // ---- tabelas completas
+    const colunas = [["mAP50", "mAP50", 3], ["mAP50-95", "mAP50-95", 3], ["Precisão", "precisao", 3], ["Recall", "revocacao", 3], ["F1", "F1", 3],
+      ["VP", "acertos", 0], ["FP", "falsos", 0], ["FN", "perdidos", 0]];
+    const melhorDe = (chave) => (["falsos", "perdidos"].includes(chave) ? Math.min : Math.max)(...modelos.map((m) => m[chave]));
+    const tabela = el("table", { class: "tabela" },
+      el("thead", {}, el("tr", {}, el("th", {}, "Modelo"), ...colunas.map(([t]) => el("th", {}, t)), el("th", {}, "ms por imagem"))),
+      el("tbody", {},
+        ...modelos.map((m) => el("tr", {}, el("td", {}, el("span", { class: "chave" }, el("i", { style: { background: m.cor } }), m.nome)),
+          ...colunas.map(([, k, c]) => el("td", { class: `num${m[k] === melhorDe(k) ? " melhor" : ""}` }, fmt(m[k], c))),
+          el("td", { class: "num" }, `${fmt(m.ms_por_foto, 0)} (T4)`))),
+        el("tr", { class: "usado" }, el("td", {}, `${emExecucao.nome} · versão em execução`), ...colunas.map(([, k, c]) => el("td", { class: "num" }, fmt(local[k], c))),
+          el("td", { class: "num" }, `${fmt(tl.ms_por_foto_cpu, 0)} (CPU)`))));
+    const classes = av.classes;
+    const tabelaClasses = el("table", { class: "tabela" },
+      el("thead", {}, el("tr", {}, el("th", {}, "Classe (AP50)"), ...modelos.map((m) => el("th", {}, m.nome)), el("th", {}, "Em execução"))),
+      el("tbody", {}, ...classes.map((c) => el("tr", {}, el("td", {}, c),
+        ...modelos.map((m) => el("td", { class: "num" }, fmt(m.por_classe[c].AP50, 3))),
+        el("td", { class: "num" }, fmt(local.por_classe[c].AP50, 3))))));
+
+    // ---- figuras
+    const figura = (grupo, arquivo, legenda) => el("button", { type: "button", class: "figura", onclick: () => ampliar(`/api/figuras/${grupo}/${arquivo}`, legenda) },
+      el("img", { src: `/api/figuras/${grupo}/${arquivo}`, alt: legenda, loading: "lazy" }), el("span", {}, legenda));
+    const nomesFiguras = { "metricas.png": "Métricas por modelo", "curvas.png": "Curvas de treino", "pecas_perdidas.png": "Falsos negativos por classe e tamanho",
+      "piores_fotos.png": "Imagens com mais erros" };
+    const faixaDe = (arquivo) => arquivo.match(/\d+_a_\d+/)?.[0].replace("_a_", "–") || "";
+    const figurasComparacao = av.figuras.comparacao.map((a) => figura("comparacao", a, nomesFiguras[a] || `Teste, imagens ${faixaDe(a)} · três modelos`));
+    const figurasLocal = av.figuras.treino_local.map((a) => figura("treino_local", a, `Teste, imagens ${faixaDe(a)} · modelo em execução`));
+
     aba.replaceChildren(
       el("div", { class: "cartao" },
-        el("h2", {}, "Como funciona"),
+        el("h2", {}, "Pipeline"),
         el("div", { class: "etapas" },
-          etapa(1, "Foto da câmera", "O JPEG da FLIR traz a imagem colorida e, gravada junto, a temperatura de cada ponto do sensor."),
-          etapa(2, "Identificação", `O modelo olha a imagem colorida (reduzida para ${est.modelo.entrada.join(" × ")}) e marca o para-raio, as saias e os terminais.`),
-          etapa(3, "Temperatura", "Cada ponto do sensor é um número em °C (160 × 120 = 19.200 medidas na FLIR C5). As caixas são levadas para essa matriz."),
-          etapa(4, "Ponto mais quente", "Dentro da caixa de cada para-raio, o ponto de maior temperatura e a peça onde ele está.")),
+          etapa(1, "Aquisição", "O JPEG radiométrico da FLIR contém a imagem em paleta e a temperatura de cada pixel do sensor."),
+          etapa(2, "Detecção", `A imagem em paleta, redimensionada para ${est.modelo.entrada.join(" × ")}, passa pelo detector, que devolve a caixa e a classe de cada instância.`),
+          etapa(3, "Matriz térmica", "160 × 120 = 19.200 leituras em °C (FLIR C5). As caixas são projetadas sobre essa matriz."),
+          etapa(4, "Ponto mais quente", "Máximo da matriz dentro da caixa de cada para-raio e a classe onde ele está.")),
         exemplo),
       el("div", { class: "cartao" },
-        el("h2", {}, "Treino"),
+        el("h2", {}, "Conjunto de dados"),
         el("div", { class: "destaques" },
-          destaque((f.treino + f.validacao + f.teste).toLocaleString("pt-BR"), "fotos térmicas de para-raios, rotuladas à mão"),
-          destaque(tl.dados.caixas.toLocaleString("pt-BR"), "peças marcadas, uma caixa por peça"),
-          destaque(String(Object.keys(COR_PECA).length), "tipos de peça que o modelo aprendeu a reconhecer"),
-          destaque(String(av.comparacao.modelos.length), "detectores treinados e comparados (aba Avaliação)")),
-        el("div", { class: "fato" }, el("span", {}, "Peças que reconhece"),
+          destaque((f.treino + f.validacao + f.teste).toLocaleString("pt-BR"), "imagens térmicas de para-raios"),
+          destaque(tl.dados.caixas.toLocaleString("pt-BR"), "instâncias anotadas"),
+          destaque(String(Object.keys(COR_PECA).length), "classes")),
+        el("div", { class: "fato" }, el("span", {}, "Classes"),
           el("div", { class: "pecas-chaves" }, ...Object.entries(COR_PECA).map(([classe, cor]) => el("span", { class: "etiqueta" }, el("i", { style: { background: cor } }), nomeDaClasse(classe))))),
-        el("h3", {}, "Como as fotos foram divididas"),
+        el("h3", {}, "Divisão"),
         faixa([
-          { n: f.treino, nome: "treino: o modelo aprende com elas", cor: "var(--serie-1)" },
-          { n: f.validacao, nome: "validação: escolhe a melhor rodada", cor: "var(--serie-2)" },
-          { n: f.teste, nome: "teste: nunca vistas, medem o resultado", cor: "var(--serie-3)" }])),
+          { n: f.treino, nome: "treino", cor: "var(--serie-1)" },
+          { n: f.validacao, nome: "validação", cor: "var(--serie-2)" },
+          { n: f.teste, nome: "teste (fora do treino)", cor: "var(--serie-3)" }])),
       el("div", { class: "cartao" },
-        el("div", { class: "cvat-cabeca" }, el("h2", {}, "Rotulagem no"), el("img", { class: "cvat-logo", src: "/e/cvat/logo.png", alt: "CVAT" })),
-        el("p", { class: "texto-medida" }, `As fotos foram rotuladas no CVAT (Computer Vision Annotation Tool): em cada foto, uma caixa desenhada à mão em volta de cada peça, com o tipo dela. Uma tarefa para cada grupo (treino, validação e teste), exportadas no formato COCO para o treino.`),
-        el("button", { type: "button", class: "figura cvat-figura", onclick: () => ampliar("/e/cvat/tarefas.png", "As três tarefas de rotulagem no CVAT: treino, validação e teste") },
-          el("img", { src: "/e/cvat/tarefas.png", alt: "As três tarefas de rotulagem no CVAT: treino, validação e teste" }),
-          el("span", {}, "As três tarefas no CVAT: treino, validação e teste. Clique para ampliar."))),
+        el("h2", {}, "Modelos treinados"),
+        el("p", { class: "nota" }, `Mesma divisão de dados para os três. Métricas no conjunto de teste (${f.teste} imagens, ${totalInstancias} instâncias). Treino em ${av.comparacao.onde}.`),
+        el("div", { class: "modelos" }, ...modelos.map(cartaoModelo)),
+        el("p", { class: "aviso" }, `Diferença de ${fmt(diferenca, 1)} p.p. de mAP50 entre os três. ${emExecucao.nome} em execução: maior mAP50 e licença Apache 2.0.`)),
       el("div", { class: "cartao" },
-        el("h2", {}, "Limitações"),
-        el("ul", { class: "lista" }, ...est.modelo.limitacoes.map((t) => el("li", {}, t)))));
+        el("h2", {}, `Modelo em execução · conjunto de teste`),
+        el("p", { class: "nota" }, `${emExecucao.nome}, ${f.teste} imagens, ${totalInstancias} instâncias anotadas.`),
+        el("div", { class: "resumo" },
+          el("div", { class: "resumo-pecas" },
+            el("p", { class: "heroi" }, String(local.acertos), el("span", {}, ` / ${totalInstancias}`)),
+            el("p", { class: "heroi-rotulo" }, "instâncias detectadas"),
+            casasDasPecas(local.acertos, totalInstancias),
+            el("div", { class: "legenda" },
+              el("span", { class: "chave" }, el("i", { class: "casa-chave cheia" }), `detectada (${local.acertos})`),
+              el("span", { class: "chave" }, el("i", { class: "casa-chave" }), `não detectada (${local.perdidos})`))),
+          el("div", { class: "resumo-indicadores" },
+            indicador("Precisão", local.precisao, "VP / (VP + FP)", "var(--serie-1)"),
+            indicador("Recall", local.revocacao, "VP / (VP + FN)", "var(--serie-1)"),
+            indicador("mAP50", local.mAP50, "Precisão média com IoU ≥ 0,5", "var(--serie-1)")))),
+      el("div", { class: "cartao" },
+        el("h2", {}, "Desempenho por classe"),
+        graficoColunas({
+          titulo: `AP50 por classe e modelo, conjunto de teste`,
+          nota: "O terminal inferior, pequeno e parcialmente encoberto pela estrutura, é a classe mais difícil para os três modelos.",
+          grupos: classes, series: modelos, valor: (s, classe) => s.por_classe[classe].AP50 }),
+        el("details", { class: "detalhes" },
+          el("summary", {}, "Tabela completa"),
+          el("p", { class: "nota" }, "Em negrito, o melhor valor de cada coluna. VP: verdadeiros positivos; FP: falsos positivos; FN: falsos negativos."),
+          el("div", { class: "rolar" }, tabela),
+          el("div", { class: "rolar" }, tabelaClasses))),
+      el("div", { class: "cartao" },
+        el("h2", {}, "Resultados no conjunto de teste"),
+        el("p", { class: "nota" }, "Verde: verdadeiro positivo; vermelho: falso negativo; amarelo: falso positivo."),
+        el("div", { class: "figuras" }, ...figurasLocal, ...figurasComparacao)),
+      el("p", { class: "nota" }, "Imagens: Infrared Power Equipment Dataset (ScienceDB 10185, doi 10.57760/sciencedb.10185), licença CC BY-NC-SA 4.0, uso não comercial."));
     ilustrarEtapas(figuras, exemplo);
   } catch (e) {
     aba.replaceChildren(el("div", { class: "erro-caixa", role: "alert" }, e.message));
@@ -472,7 +563,7 @@ async function ilustrarEtapas(figuras, legenda) {
     }
     figuras[3].replaceChildren(quadroEtapa(r.imagem, quente));
     figuras.forEach((fig) => fig.classList.remove("esqueleto"));
-    legenda.textContent = `Exemplo: ${nome.replace(/\.jpe?g$/i, "")}, uma das ${avaliacao.fotos.teste} fotos de teste${pr ? `. Ponto mais quente: ${fmt(pr.tmax)} °C ${T.onde(pr.onde)}` : ""}.`;
+    legenda.textContent = `Imagem de exemplo: ${nome.replace(/\.jpe?g$/i, "")} (conjunto de teste)${pr ? `. Ponto mais quente: ${fmt(pr.tmax)} °C ${T.onde(pr.onde)}` : ""}.`;
   } catch {
     figuras.forEach((fig) => fig.remove());
   }
@@ -516,94 +607,6 @@ const FAMILIA = {
   "RF-DETR Medium": "Transformer (DETR) com base DINOv2, da Roboflow. Licença Apache 2.0.",
 };
 
-async function desenharAvaliacao() {
-  const aba = $("#aba-avaliacao");
-  aba.replaceChildren(el("div", { class: "cartao esqueleto", style: { height: "var(--apr-visor-max)" } }));
-  try {
-    const av = await dadosAvaliacao();
-    const local = av.treino_local.teste;
-    const totalPecas = local.acertos + local.perdidos;
-    const modelos = av.comparacao.modelos.map((m, i) => ({ ...m, cor: COR_MODELO[i] }));
-    const melhor = modelos.reduce((a, b) => (b.mAP50 > a.mAP50 ? b : a));
-    const diferenca = (melhor.mAP50 - Math.min(...modelos.map((m) => m.mAP50))) * 100;
-
-    const cartaoModelo = (m) => el("article", { class: `modelo${m === melhor ? " escolhido" : ""}`, style: { borderTopColor: m.cor } },
-      el("div", { class: "modelo-cabeca" }, el("h3", {}, m.nome), m === melhor ? el("span", { class: "selo" }, "o escolhido") : null),
-      el("p", { class: "modelo-familia" }, FAMILIA[m.nome] || ""),
-      el("div", { class: "modelo-numero" }, el("b", {}, pct(m.mAP50)), el("span", {}, "acerto médio (mAP50)")),
-      medidor(m.mAP50, m.cor),
-      indicador("Precisão", m.precisao, null, m.cor),
-      indicador("Recall", m.revocacao, null, m.cor),
-      el("p", { class: "modelo-rodape" }, `${m.acertos} de ${m.acertos + m.perdidos} peças achadas · ${fmt(m.ms_por_foto, 0)} ms por foto`));
-
-    const colunas = [["mAP50", "mAP50", 3], ["mAP50-95", "mAP50-95", 3], ["Precisão", "precisao", 3], ["Recall", "revocacao", 3], ["F1", "F1", 3],
-      ["Acertos", "acertos", 0], ["Falsos", "falsos", 0], ["Perdidos", "perdidos", 0]];
-    const melhorDe = (chave) => (["falsos", "perdidos"].includes(chave) ? Math.min : Math.max)(...modelos.map((m) => m[chave]));
-    const tabela = el("table", { class: "tabela" },
-      el("thead", {}, el("tr", {}, el("th", {}, "Modelo"), ...colunas.map(([t]) => el("th", {}, t)), el("th", {}, "ms por foto"))),
-      el("tbody", {},
-        ...modelos.map((m) => el("tr", {}, el("td", {}, el("span", { class: "chave" }, el("i", { style: { background: m.cor } }), m.nome)),
-          ...colunas.map(([, k, c]) => el("td", { class: `num${m[k] === melhorDe(k) ? " melhor" : ""}` }, fmt(m[k], c))),
-          el("td", { class: "num" }, `${fmt(m.ms_por_foto, 0)} (T4)`))),
-        el("tr", { class: "usado" }, el("td", {}, "RF-DETR Medium · treinado neste notebook (o usado aqui)"), ...colunas.map(([, k, c]) => el("td", { class: "num" }, fmt(local[k], c))),
-          el("td", { class: "num" }, `${fmt(av.treino_local.ms_por_foto_cpu, 0)} (CPU)`))));
-    const classes = av.classes;
-    const tabelaClasses = el("table", { class: "tabela" },
-      el("thead", {}, el("tr", {}, el("th", {}, "Peça (AP50)"), ...modelos.map((m) => el("th", {}, m.nome)), el("th", {}, "RF-DETR (este notebook)"))),
-      el("tbody", {}, ...classes.map((c) => el("tr", {}, el("td", {}, c),
-        ...modelos.map((m) => el("td", { class: "num" }, fmt(m.por_classe[c].AP50, 3))),
-        el("td", { class: "num" }, fmt(local.por_classe[c].AP50, 3))))));
-
-    const figura = (grupo, arquivo, legenda) => el("button", { type: "button", class: "figura", onclick: () => ampliar(`/api/figuras/${grupo}/${arquivo}`, legenda) },
-      el("img", { src: `/api/figuras/${grupo}/${arquivo}`, alt: legenda, loading: "lazy" }), el("span", {}, legenda));
-    const nomesFiguras = { "metricas.png": "Métricas dos três detectores", "curvas.png": "Curvas de treino (Colab)", "pecas_perdidas.png": "Peças perdidas por tipo e tamanho",
-      "piores_fotos.png": "As fotos com mais erros" };
-    const figurasComparacao = av.figuras.comparacao.map((f) => figura("comparacao", f, nomesFiguras[f] || `Teste, fotos ${f.match(/\d+_a_\d+/)?.[0].replace("_a_", " a ") || ""} (3 detectores)`));
-    const figurasLocal = av.figuras.treino_local.map((f) => figura("treino_local", f, `Teste, fotos ${f.match(/\d+_a_\d+/)?.[0].replace("_a_", " a ") || ""} (RF-DETR deste notebook)`));
-
-    aba.replaceChildren(
-      el("div", { class: "cartao" },
-        el("h2", {}, "Os três detectores que treinamos"),
-        el("p", { class: "nota" }, `Treinados com as mesmas ${av.fotos.treino} fotos, no ${av.comparacao.onde}, e medidos nas mesmas ${av.fotos.teste} fotos de teste, que nenhum deles viu no treino.`),
-        el("div", { class: "modelos" }, ...modelos.map(cartaoModelo)),
-        el("p", { class: "aviso" }, `Entre o maior e o menor acerto médio há ${fmt(diferenca, 1)} ponto${diferenca >= 2 ? "s" : ""} percentua${diferenca >= 2 ? "is" : "l"}: na prática, um empate técnico. `
-          + `O ${melhor.nome} ficou com o maior e tem licença Apache 2.0, livre para um produto comercial (o YOLO é AGPL).`)),
-      el("div", { class: "cartao" },
-        el("h2", {}, `O modelo deste aplicativo, nas ${av.fotos.teste} fotos de teste`),
-        el("p", { class: "nota" }, `${melhor.nome} treinado de novo neste notebook, com as mesmas fotos. As ${totalPecas} peças das fotos de teste foram marcadas à mão para conferir.`),
-        el("div", { class: "resumo" },
-          el("div", { class: "resumo-pecas" },
-            el("p", { class: "heroi" }, String(local.acertos), el("span", {}, ` de ${totalPecas}`)),
-            el("p", { class: "heroi-rotulo" }, "peças achadas"),
-            casasDasPecas(local.acertos, totalPecas),
-            el("div", { class: "legenda" },
-              el("span", { class: "chave" }, el("i", { class: "casa-chave cheia" }), `achada (${local.acertos})`),
-              el("span", { class: "chave" }, el("i", { class: "casa-chave" }), `perdida (${local.perdidos})`))),
-          el("div", { class: "resumo-indicadores" },
-            indicador("Precisão", local.precisao, "Das caixas que o modelo marcou, quantas estavam certas.", "var(--serie-1)"),
-            indicador("Recall", local.revocacao, "Das peças que existiam na foto, quantas ele achou.", "var(--serie-1)"),
-            indicador("Acerto médio (mAP50)", local.mAP50, "Conta como certa a caixa que cobre ao menos metade da peça.", "var(--serie-1)")))),
-      el("div", { class: "cartao" },
-        el("h2", {}, "Acerto por tipo de peça"),
-        graficoColunas({
-          titulo: `AP50 de cada detector, nas ${av.fotos.teste} fotos de teste`,
-          nota: "O para-raio e as saias quase sempre; o terminal inferior, pequeno e às vezes escondido pela estrutura, é o ponto fraco dos três.",
-          grupos: classes, series: modelos, valor: (s, classe) => s.por_classe[classe].AP50 }),
-        el("details", { class: "detalhes" },
-          el("summary", {}, "Ver todos os números"),
-          el("p", { class: "nota" }, "Em negrito, o melhor de cada coluna entre os três do Colab."),
-          el("div", { class: "rolar" }, tabela),
-          el("div", { class: "rolar" }, tabelaClasses))),
-      el("div", { class: "cartao" },
-        el("h2", {}, "Figuras do teste"),
-        el("p", { class: "nota" }, "Verde: peça achada; vermelho: peça perdida; amarelo: caixa a mais. Clique para ampliar."),
-        el("div", { class: "figuras" }, ...figurasLocal, ...figurasComparacao)),
-      el("p", { class: "nota" }, "Fotos: Infrared Power Equipment Dataset (ScienceDB 10185, doi 10.57760/sciencedb.10185), licença CC BY-NC-SA 4.0, uso não comercial."));
-  } catch (e) {
-    aba.replaceChildren(el("div", { class: "erro-caixa", role: "alert" }, e.message));
-  }
-}
-
 function ampliar(src, legenda) {
   const d = $("#lupa");
   $("img", d).src = src;
@@ -637,11 +640,11 @@ const C = {
   esperandoTitulo: "Esperando o celular",
   esperandoTexto: "Abra o link no celular e ligue a câmera. O vídeo aparece aqui.",
   ritmo: (q, a, ms) => [q != null ? `vídeo ${fmt(q, 0)} quadros/s` : "", a != null ? `${fmt(a, 1)} análises/s` : "", ms != null ? `detector ${ms} ms` : ""].filter(Boolean).join(" · "),
-  nenhuma: "Nenhuma peça confirmada no último quadro.",
+  nenhuma: "Nenhuma instância confirmada no último quadro.",
   semTermograma: "Nenhuma imagem térmica no quadro.",
   escalaLida: (min, max) => `Barra de cores lida: ${min} a ${max} °C. Temperaturas estimadas pelas cores.`,
   escalaLendo: "Barra de cores achada: lendo os números da escala…",
-  nota: "A foto do celular não traz os dados do sensor: a temperatura é estimada pelas cores da barra (erro típico de 0,5 °C), não medida.",
+  nota: "A imagem do celular não traz os dados do sensor: a temperatura é estimada pelas cores da barra (erro típico de 0,5 °C), não medida.",
   rede: "O Windows pode perguntar se o Pyron pode usar a rede: permita em redes privadas. A conexão fica só na sua rede, com um código no link, e desliga quando você desligar aqui ou fechar o aplicativo.",
 };
 const CABECALHO_CELULAR = 16;
@@ -672,7 +675,7 @@ function desenharCelular(c) {
     const botao = el("button", { type: "button", class: "btn", onclick: (ev) => ligarCelular(ev.currentTarget) }, C.ligar);
     aba.replaceChildren(el("div", { class: "cartao celular-ligar" },
       el("h2", {}, "Câmera do celular"),
-      el("p", {}, "Aponte a câmera do celular para uma imagem térmica e o modelo identifica o para-raio e as peças ao vivo, sem instalar nada no celular."),
+      el("p", {}, "Aponte a câmera do celular para uma imagem térmica e o modelo detecta o para-raio e suas partes em tempo real, sem instalar nada no celular."),
       el("ol", { class: "lista" }, ...C.passos.map((p) => el("li", {}, p))),
       el("div", {}, botao),
       el("p", { class: "nota" }, C.nota),
