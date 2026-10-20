@@ -269,3 +269,36 @@ main { max-width: var(--conteudo-max); margin: 0 auto; padding: var(--e-6); }
 .selo-ativo i::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--sucesso);
   animation: em-execucao calc(var(--dur-lenta) * 5) var(--ease-saida) infinite; }
 @keyframes em-execucao { from { transform: scale(1); opacity: .7; } to { transform: scale(2.6); opacity: 0; } }
+
+/* seletor de vista da análise: térmica ou a foto visível da câmera */
+.controles-termica { display: flex; flex-wrap: wrap; gap: var(--e-4); align-items: center; justify-content: center; transition: opacity var(--dur-rapida) var(--ease-padrao); }
+.controles-termica.desligado { opacity: .35; pointer-events: none; }
+.vista { display: inline-flex; padding: 2px; border-radius: var(--r-m); background: var(--superficie-3); }
+.vista-opcao { min-height: var(--alvo-sm); padding: 0 var(--e-4); border: 0; border-radius: var(--r-p); background: transparent; color: var(--texto-2);
+  font: inherit; font-weight: var(--p-medio); cursor: pointer; transition: background var(--dur-rapida) var(--ease-padrao), color var(--dur-rapida) var(--ease-padrao); }
+.vista-opcao:hover { color: var(--texto); }
+.vista-opcao[aria-checked="true"] { background: var(--superficie); color: var(--acao); box-shadow: var(--sombra-1); }
+
+/* análise em andamento: imagem desfocada, varredura e as etapas acendendo */
+.quadro.processando img { filter: blur(3px) saturate(.8); transform: scale(1.02); }
+.varredura { position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(to bottom, transparent 42%, var(--brilho) 50%, transparent 58%); background-size: 100% 220%;
+  animation: varrer calc(var(--dur-lenta) * 3) linear infinite; }
+@keyframes varrer { from { background-position: 0 120%; } to { background-position: 0 -20%; } }
+.etapas-analise { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--e-3); }
+.etapas-analise li { display: flex; align-items: center; gap: var(--e-3); color: var(--texto-apagado); font-size: var(--t-3); line-height: var(--a-3);
+  transition: color var(--dur-rapida) var(--ease-padrao); }
+.etapas-analise li i { flex: none; width: var(--e-4); height: var(--e-4); border-radius: 50%; border: 2px solid var(--borda-forte); }
+.etapas-analise li.ativo { color: var(--texto); font-weight: var(--p-medio); }
+.etapas-analise li.ativo i { border-color: var(--acao); border-top-color: transparent; animation: girar calc(var(--dur-lenta) * 2) linear infinite; }
+.etapas-analise li.feito { color: var(--texto-2); }
+.etapas-analise li.feito i { border-color: var(--sucesso); background: var(--sucesso); box-shadow: inset 0 0 0 3px var(--superficie); }
+.etapa-ms { margin-left: auto; color: var(--texto-3); font-size: var(--t-2); }
+@keyframes girar { to { transform: rotate(360deg); } }
+/* resultado chegando: caixas, rótulos e o ponto mais quente surgem em sequência */
+.quadro.revelar .caixa { animation: surgir var(--dur-lenta) var(--ease-entrada) backwards; animation-delay: calc(var(--i, 0) * var(--escalonar) * 3); }
+/* os rótulos já usam transform para a posição: só aparecem */
+.quadro.revelar .rotulo, .quadro.revelar .mira-rotulo { animation: aparecer var(--dur-lenta) var(--ease-entrada) backwards; animation-delay: calc(var(--dur-lenta) + var(--escalonar) * 2); }
+.quadro.revelar .mira { animation: surgir var(--dur-lenta) var(--ease-entrada) backwards; animation-delay: calc(var(--dur-lenta) + var(--escalonar) * 2); }
+@keyframes surgir { from { opacity: 0; transform: scale(.96); } }
+@keyframes aparecer { from { opacity: 0; } }

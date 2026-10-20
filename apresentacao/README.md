@@ -9,11 +9,13 @@ abas, sem alertas, severidade, laudos ou monitoramento:
   classe onde ele está, e a máxima de cada instância. Passando o mouse, a temperatura do ponto.
   Clicando numa instância no painel, a imagem destaca a caixa dela. O painel mostra também os
   parâmetros da câmera (emissividade, distância, temperaturas refletida e atmosférica, umidade, faixa)
-  e o tempo de cada etapa. Imagem sem dados radiométricos: só a detecção.
+  e o tempo de cada etapa. O seletor Térmica | Visível troca para a foto comum que a FLIR grava junto
+  (sem as caixas: o ângulo de visão é outro). Ao escolher uma imagem, as etapas da análise acendem uma
+  a uma (meio segundo cada) com o tempo real de cada uma. Imagem sem dados radiométricos: só a detecção.
 - **Avaliação do modelo.** Pipeline em quatro etapas ilustrado com uma imagem de teste, conjunto de
   dados (163 imagens, 4 classes, divisão treino/validação/teste), os três modelos
   treinados (Faster R-CNN, YOLO26s, RF-DETR, este em execução), o modelo em execução no conjunto de
-  teste (159/177 instâncias), AP50 por classe, tabela completa e as figuras do teste.
+  teste (159/177 instâncias), AP50 por classe e tabela completa.
 - **Câmera do celular.** Identificação em tempo real: **Ligar** mostra um QR code; o celular (na
   mesma rede Wi-Fi) abre a câmera apontada para a tela da câmera térmica e marca para-raio, saias e
   terminais com a temperatura máxima estimada pela barra de cores. O computador espelha o vídeo com

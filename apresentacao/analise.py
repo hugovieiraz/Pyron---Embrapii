@@ -95,6 +95,22 @@ def _contida(peca: list[float], caixa: list[float]) -> float:
     return ix * iy / area if area > 0 else 0.0
 
 
+def foto_visivel(dados: bytes) -> str | None:
+    """A foto comum que a FLIR grava junto (câmera visível ao lado do sensor), no mesmo sentido da térmica."""
+    bruto = flir.foto_visivel(dados)
+    if bruto is None:
+        return None
+    try:
+        img = Image.open(io.BytesIO(bruto))
+        img.load()
+    except OSError:
+        return None
+    orientacao = int(Image.open(io.BytesIO(dados)).getexif().get(274, 1) or 1)
+    buf = io.BytesIO()
+    Image.fromarray(orientar(np.asarray(img.convert("RGB")), orientacao)).save(buf, format="JPEG", quality=90)
+    return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
+
+
 def analisar(dados: bytes, nome: str, detector) -> dict:
     t0 = time.perf_counter()
     rgb, temp, info = abrir(dados)
@@ -137,6 +153,9 @@ def analisar(dados: bytes, nome: str, detector) -> dict:
         "motor": detector.motor,
         "ms": {"leitura": round((t1 - t0) * 1000), "deteccao": round((t2 - t1) * 1000), "temperatura": round((t3 - t2) * 1000)},
     }
+    visivel = foto_visivel(dados)
+    if visivel is not None:
+        resultado["visivel"] = visivel
     if temp is not None:
         resultado["matriz"] = {"largura": int(temp.shape[1]), "altura": int(temp.shape[0]),
                                "valores": np.round(temp, 1).ravel().tolist(),

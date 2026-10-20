@@ -8,6 +8,7 @@ const T = {
   vazioTitulo: "Selecione uma imagem",
   vazioTexto: "Selecione uma imagem de teste ou envie um JPEG radiométrico da câmera FLIR.",
   analisando: "Analisando…",
+  processando: "Processando",
   naoVista: "Imagem de teste",
   enviada: "Imagem enviada",
   semTemperatura: "Imagem sem dados radiométricos: apenas detecção, sem temperatura.",
@@ -20,6 +21,9 @@ const T = {
   cliquePeca: "Instâncias detectadas (clique para destacar):",
   pecas: "Instâncias",
   pontoMaisQuente: "Ponto mais quente",
+  vista: "Imagem exibida",
+  termica: "Térmica",
+  visivel: "Visível",
   erroAnalise: "Falha na análise desta imagem",
   soltar: "Solte a imagem para analisar",
   semServidor: "O aplicativo parou de responder. Feche esta janela e abra o Pyron Apresentação de novo.",
@@ -31,7 +35,7 @@ const el = (tag, props = {}, ...filhos) => {
   for (const [k, v] of Object.entries(props)) {
     if (v == null) continue;
     if (k === "class") n.className = v;
-    else if (k === "style") Object.assign(n.style, v);
+    else if (k === "style") for (const [s, x] of Object.entries(v)) { if (s.startsWith("--")) n.style.setProperty(s, x); else n.style[s] = x; }
     else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
     else n.setAttribute(k, v);
   }
@@ -134,13 +138,8 @@ function marcar(botao) {
 async function analisarExemplo(nome, botao) {
   marcar(botao);
   selecionado = nome;
-  carregandoAnalise();
-  try {
-    const r = await api(`/api/exemplos/${encodeURIComponent(nome)}/analisar`, { method: "POST" });
-    if (selecionado === nome) mostrarAnalise(r);
-  } catch (e) {
-    if (selecionado === nome) erroAnalise(e);
-  }
+  await executarAnalise(`/api/exemplos/${encodeURIComponent(nome)}/miniatura.jpg`,
+    () => api(`/api/exemplos/${encodeURIComponent(nome)}/analisar`, { method: "POST" }), () => selecionado === nome);
 }
 
 async function analisarArquivos(arquivos) {
@@ -154,19 +153,60 @@ async function analisarArquivos(arquivos) {
       marcar(botao);
       selecionado = botao;
       if (resultado) return mostrarAnalise(resultado);
-      carregandoAnalise();
-      try {
+      resultado = await executarAnalise(url, () => {
         const corpo = new FormData();
         corpo.append("arquivo", arquivo);
-        resultado = await api("/api/analisar", { method: "POST", body: corpo });
-        if (selecionado === botao) mostrarAnalise(resultado);
-      } catch (e) {
-        if (selecionado === botao) erroAnalise(e);
-      }
+        return api("/api/analisar", { method: "POST", body: corpo });
+      }, () => selecionado === botao);
     };
     botao.addEventListener("click", abrir);
     await abrir();
   }
+}
+
+// ------------------------------------------------------------------ análise em andamento (animação)
+
+const ETAPAS_ANALISE = ["Leitura do arquivo radiométrico", "Detecção das instâncias", "Ponto mais quente"];
+const PASSO_MS = 500; // cada etapa acende por meio segundo; a análise de verdade corre ao mesmo tempo
+const esperar = (ms) => new Promise((ok) => setTimeout(ok, ms));
+
+/** A imagem desfocada com a varredura e as etapas ao lado, acendendo uma a uma. */
+function carregandoAnalise(previa) {
+  const img = el("img", { src: previa, alt: "" });
+  const quadro = el("div", { class: "quadro processando" }, img, el("div", { class: "varredura" }));
+  img.addEventListener("load", () => quadro.style.setProperty("--proporcao", img.naturalWidth / img.naturalHeight));
+  const itens = ETAPAS_ANALISE.map((texto) => el("li", {}, el("i"), el("span", {}, texto), el("span", { class: "num etapa-ms" })));
+  $("#analise").replaceChildren(el("div", { class: "analise", "aria-busy": "true" },
+    el("div", { class: "visor" }, quadro),
+    el("aside", { class: "resultado" }, el("section", { class: "bloco-tecnico" }, el("h4", {}, T.processando), el("ol", { class: "etapas-analise" }, ...itens)))));
+  return itens;
+}
+
+/** Roda a análise com a animação das etapas; devolve o resultado (ou null se outra imagem foi escolhida). */
+async function executarAnalise(previa, tarefa, aindaAtual) {
+  const itens = carregandoAnalise(previa);
+  const reduzido = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const acender = (i) => itens.forEach((li, k) => { li.className = k < i ? "feito" : k === i ? "ativo" : ""; });
+  const pedido = tarefa();
+  pedido.catch(() => {});
+  for (let i = 0; i < itens.length; i++) {
+    acender(i);
+    await esperar(reduzido ? 0 : PASSO_MS);
+    if (!aindaAtual()) return null;
+  }
+  let r;
+  try {
+    r = await pedido;
+  } catch (e) {
+    if (aindaAtual()) erroAnalise(e);
+    return null;
+  }
+  if (!aindaAtual()) return r;
+  [r.ms.leitura, r.ms.deteccao, r.ms.temperatura].forEach((ms, k) => { $(".etapa-ms", itens[k]).textContent = `${ms} ms`; });
+  acender(itens.length);
+  await esperar(reduzido ? 0 : PASSO_MS / 2);
+  if (aindaAtual()) mostrarAnalise(r, true);
+  return r;
 }
 
 $("#arquivo").addEventListener("change", (ev) => { analisarArquivos([...ev.target.files]); ev.target.value = ""; });
@@ -190,12 +230,6 @@ function vazioAnalise() {
     el("h3", {}, T.vazioTitulo), el("p", {}, T.vazioTexto)));
 }
 
-function carregandoAnalise() {
-  $("#analise").replaceChildren(el("div", { class: "analise", "aria-busy": "true" },
-    el("div", { class: "esqueleto", style: { height: "var(--apr-visor-max)" } }),
-    el("div", { class: "resultado" }, ...[1, 2, 3].map(() => el("div", { class: "esqueleto", style: { height: "var(--e-24)" } })))));
-}
-
 function erroAnalise(e) {
   $("#analise").replaceChildren(el("div", { class: "erro-caixa", role: "alert" }, el("b", {}, T.erroAnalise), el("p", {}, e.message)));
 }
@@ -212,23 +246,39 @@ function focar(peca) {
   desenharCamada();
 }
 
-function mostrarAnalise(r) {
+function mostrarAnalise(r, revelar = false) {
   atual = r;
   foco = null;
   const img = el("img", { src: r.imagem, alt: `Termograma ${r.arquivo}` });
   const camada = el("div", { class: "camada" });
   const leitura = el("div", { class: "leitura num", hidden: "" });
-  const quadro = el("div", { class: "quadro" }, img, camada, leitura);
+  // revelar: as caixas surgem uma a uma, só na primeira vez (o destaque de uma instância não repete a entrada)
+  const quadro = el("div", { class: `quadro${revelar ? " revelar" : ""}` }, img, camada, leitura);
+  if (revelar) setTimeout(() => quadro.classList.remove("revelar"), PASSO_MS * 3);
   quadro.style.setProperty("--proporcao", r.largura / r.altura); // a imagem cresce até a altura da tela sem distorcer
   const controle = (chave, texto) => el("label", {}, el("input", { type: "checkbox", checked: exibir[chave] ? "" : null,
     onchange: (ev) => { exibir[chave] = ev.target.checked; desenharCamada(); } }), texto);
   const legenda = el("div", { class: "legenda" }, ...Object.entries(COR_PECA).map(([classe, cor]) =>
     el("span", { class: "chave nota" }, el("i", { style: { background: cor } }), nomeDaClasse(classe))));
-  const visor = el("div", { class: "visor" }, quadro, el("div", { class: "controles" }, controle("pecas", T.pecas), controle("quente", T.pontoMaisQuente), legenda));
+  // térmica ou a foto comum que a FLIR grava junto (ângulo de visão diferente: as caixas só valem na térmica)
+  let vista = "termica";
+  const sobreTermica = el("div", { class: "controles-termica" }, controle("pecas", T.pecas), controle("quente", T.pontoMaisQuente), legenda);
+  const opcao = (valor, texto) => el("button", { type: "button", class: "vista-opcao", role: "radio", "aria-checked": String(valor === vista), "data-vista": valor,
+    onclick: () => {
+      vista = valor;
+      img.src = valor === "visivel" ? r.visivel : r.imagem;
+      img.alt = valor === "visivel" ? `Imagem visível ${r.arquivo}` : `Termograma ${r.arquivo}`;
+      camada.hidden = valor === "visivel";
+      sobreTermica.classList.toggle("desligado", valor === "visivel");
+      seletor.querySelectorAll(".vista-opcao").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.vista === vista)));
+    } }, texto);
+  const seletor = el("div", { class: "vista", role: "radiogroup", "aria-label": T.vista }, opcao("termica", T.termica), opcao("visivel", T.visivel));
+  const visor = el("div", { class: "visor" }, quadro, el("div", { class: "controles" }, r.visivel ? seletor : null, sobreTermica));
   $("#analise").replaceChildren(el("div", { class: "analise" }, visor, painelResultado(r)));
 
   if (r.matriz) {
     quadro.addEventListener("mousemove", (ev) => {
+      if (vista === "visivel") { leitura.hidden = true; return; }
       const caixa = img.getBoundingClientRect();
       const fx = (ev.clientX - caixa.left) / caixa.width;
       const fy = (ev.clientY - caixa.top) / caixa.height;
@@ -264,7 +314,7 @@ function desenharCamada() {
     // com foco e ponto quente, o nome da peça vai junto da temperatura (uma etiqueta só, sem uma cobrir a outra)
     const comPonto = !!(foco && foco.ponto);
     const rotulos = visiveis.map((d) => el("span", { class: `rotulo${estado(d)}`, hidden: comPonto && emFoco(d) ? "" : null }, el("i", { style: { background: COR_PECA[d.classe] } }), d.nome));
-    filhos.push(...visiveis.map((d) => el("div", { class: `caixa ${d.classe}${estado(d)}`, style: { left: p(d.caixa[0]), top: p(d.caixa[1]), width: p(d.caixa[2] - d.caixa[0]), height: p(d.caixa[3] - d.caixa[1]) } })), ...rotulos);
+    filhos.push(...visiveis.map((d, n) => el("div", { class: `caixa ${d.classe}${estado(d)}`, style: { "--i": n, left: p(d.caixa[0]), top: p(d.caixa[1]), width: p(d.caixa[2] - d.caixa[0]), height: p(d.caixa[3] - d.caixa[1]) } })), ...rotulos);
     camada.replaceChildren(...filhos);
     const chaves = chavesDasDeteccoes(visiveis);
     const itens = visiveis.map((d, i) => ({ chave: chaves[i], largura: rotulos[i].offsetWidth, altura: rotulos[i].offsetHeight,
@@ -432,9 +482,8 @@ async function desenharModelo() {
 
     // ---- pipeline
     const figuras = [1, 2, 3, 4].map(() => el("div", { class: "etapa-figura esqueleto" }));
-    const etapa = (n, titulo, texto) => el("div", { class: "etapa" },
-      el("div", { class: "etapa-cabeca" }, el("span", { class: "passo" }, n), el("b", {}, titulo)), figuras[n - 1], el("p", {}, texto));
-    const exemplo = el("p", { class: "nota" });
+    const etapa = (n, titulo) => el("div", { class: "etapa" },
+      el("div", { class: "etapa-cabeca" }, el("span", { class: "passo" }, n), el("b", {}, titulo)), figuras[n - 1]);
     const destaque = (numero, texto) => el("div", { class: "destaque" }, el("b", {}, numero), el("span", {}, texto));
 
     // ---- modelos treinados
@@ -466,24 +515,15 @@ async function desenharModelo() {
         ...modelos.map((m) => el("td", { class: "num" }, fmt(m.por_classe[c].AP50, 3))),
         el("td", { class: "num" }, fmt(local.por_classe[c].AP50, 3))))));
 
-    // ---- figuras
-    const figura = (grupo, arquivo, legenda) => el("button", { type: "button", class: "figura", onclick: () => ampliar(`/api/figuras/${grupo}/${arquivo}`, legenda) },
-      el("img", { src: `/api/figuras/${grupo}/${arquivo}`, alt: legenda, loading: "lazy" }), el("span", {}, legenda));
-    const nomesFiguras = { "metricas.png": "Métricas por modelo", "curvas.png": "Curvas de treino", "pecas_perdidas.png": "Falsos negativos por classe e tamanho",
-      "piores_fotos.png": "Imagens com mais erros" };
-    const faixaDe = (arquivo) => arquivo.match(/\d+_a_\d+/)?.[0].replace("_a_", "–") || "";
-    const figurasComparacao = av.figuras.comparacao.map((a) => figura("comparacao", a, nomesFiguras[a] || `Teste, imagens ${faixaDe(a)} · três modelos`));
-    const figurasLocal = av.figuras.treino_local.map((a) => figura("treino_local", a, `Teste, imagens ${faixaDe(a)} · modelo em execução`));
-
     aba.replaceChildren(
       el("div", { class: "cartao" },
         el("h2", {}, "Pipeline"),
         el("div", { class: "etapas" },
-          etapa(1, "Aquisição", "O JPEG radiométrico da FLIR contém a imagem em paleta e a temperatura de cada pixel do sensor."),
-          etapa(2, "Detecção", `A imagem em paleta, redimensionada para ${est.modelo.entrada.join(" × ")}, passa pelo detector, que devolve a caixa e a classe de cada instância.`),
-          etapa(3, "Matriz térmica", "160 × 120 = 19.200 leituras em °C (FLIR C5). As caixas são projetadas sobre essa matriz."),
-          etapa(4, "Ponto mais quente", "Máximo da matriz dentro da caixa de cada para-raio e a classe onde ele está.")),
-        exemplo),
+          etapa(1, "Aquisição"),
+          etapa(2, "Detecção"),
+          etapa(3, "Matriz térmica"),
+          etapa(4, "Ponto mais quente")),
+      ),
       el("div", { class: "cartao" },
         el("h2", {}, "Conjunto de dados"),
         el("div", { class: "destaques" },
@@ -527,12 +567,8 @@ async function desenharModelo() {
           el("p", { class: "nota" }, "Em negrito, o melhor valor de cada coluna. VP: verdadeiros positivos; FP: falsos positivos; FN: falsos negativos."),
           el("div", { class: "rolar" }, tabela),
           el("div", { class: "rolar" }, tabelaClasses))),
-      el("div", { class: "cartao" },
-        el("h2", {}, "Resultados no conjunto de teste"),
-        el("p", { class: "nota" }, "Verde: verdadeiro positivo; vermelho: falso negativo; amarelo: falso positivo."),
-        el("div", { class: "figuras" }, ...figurasLocal, ...figurasComparacao)),
       el("p", { class: "nota" }, "Imagens: Infrared Power Equipment Dataset (ScienceDB 10185, doi 10.57760/sciencedb.10185), licença CC BY-NC-SA 4.0, uso não comercial."));
-    ilustrarEtapas(figuras, exemplo);
+    ilustrarEtapas(figuras);
   } catch (e) {
     aba.replaceChildren(el("div", { class: "erro-caixa", role: "alert" }, e.message));
   }
@@ -544,7 +580,7 @@ const caixaEtapa = (caixa, cor) => el("div", { class: "caixa-etapa", style: {
   left: porcento(caixa[0]), top: porcento(caixa[1]), width: porcento(caixa[2] - caixa[0]), height: porcento(caixa[3] - caixa[1]), borderColor: cor } });
 
 /** As quatro etapas com uma foto de teste de verdade. Sem o acervo ou sem o modelo, ficam só os textos. */
-async function ilustrarEtapas(figuras, legenda) {
+async function ilustrarEtapas(figuras) {
   try {
     const exemplos = (await api("/api/exemplos")).filter((e) => e.disponivel);
     if (!exemplos.length) throw new Error(T.semAcervo);
@@ -563,7 +599,6 @@ async function ilustrarEtapas(figuras, legenda) {
     }
     figuras[3].replaceChildren(quadroEtapa(r.imagem, quente));
     figuras.forEach((fig) => fig.classList.remove("esqueleto"));
-    legenda.textContent = `Imagem de exemplo: ${nome.replace(/\.jpe?g$/i, "")} (conjunto de teste)${pr ? `. Ponto mais quente: ${fmt(pr.tmax)} °C ${T.onde(pr.onde)}` : ""}.`;
   } catch {
     figuras.forEach((fig) => fig.remove());
   }

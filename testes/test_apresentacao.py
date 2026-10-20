@@ -65,6 +65,7 @@ def test_foto_da_flir_da_o_ponto_mais_quente_e_a_peca_onde_ele_cai(monkeypatch) 
     assert {p["nome"] for p in pr["partes"]} == {"Terminal Superior", "Aletas Isoladoras"}
     m = r["matriz"]
     assert len(m["valores"]) == m["largura"] * m["altura"] and m["max"] == 99.0
+    assert r["visivel"].startswith("data:image/jpeg;base64,")  # a foto comum que a C5 grava junto
 
 
 def test_rotas_da_avaliacao_e_das_figuras(monkeypatch) -> None:
