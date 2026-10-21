@@ -667,6 +667,7 @@ const C = {
     "Permita a câmera e aponte para uma imagem térmica, na tela do computador por exemplo.",
   ],
   ligar: "Ligar conexão com o celular",
+  telaCheia: "Tela cheia",
   desligar: "Desligar",
   copiar: "Copiar",
   abra: "Abra no celular",
@@ -728,7 +729,10 @@ function desenharCelular(c) {
       el("span", { class: "linha-estado", id: "celular-status" }),
       el("button", { type: "button", class: "btn btn-fantasma", onclick: (ev) => desligarCelular(ev.currentTarget) }, C.desligar)),
     el("div", { class: "cartao" },
-      el("div", { class: "cartao-cabeca" }, el("h2", {}, C.espelho), el("span", { class: "nota num", id: "celular-ritmo" })),
+      el("div", { class: "cartao-cabeca" }, el("h2", {}, C.espelho),
+        el("div", { class: "celular-cabeca-direita" }, el("span", { class: "nota num", id: "celular-ritmo" }),
+          el("button", { type: "button", class: "btn btn-fantasma", onclick: telaCheiaCelular },
+            icone("M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"), C.telaCheia))),
       el("div", { id: "celular-espelho" }, el("div", { class: "vazio" }, el("h3", {}, C.esperandoTitulo), el("p", {}, C.esperandoTexto))),
       el("div", { class: "celular-achados", id: "celular-achados" }),
       el("p", { class: "nota" }, C.nota))));
@@ -812,6 +816,14 @@ async function mostrarQuadros(esp) {
   }
 }
 
+/** O vídeo do celular na tela inteira (Esc volta); as caixas se reposicionam no próximo quadro. */
+function telaCheiaCelular() {
+  const espelho = $("#celular-espelho");
+  if (!espelho) return;
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  else espelho.requestFullscreen().catch(() => {});
+}
+
 function desenharQuadro(esp, imagem) {
   const espelho = $("#celular-espelho");
   if (!espelho) return imagem.close();
@@ -822,7 +834,11 @@ function desenharQuadro(esp, imagem) {
   }
   const tela = $("canvas", quadro);
   const mudou = tela.width !== imagem.width || tela.height !== imagem.height;
-  if (mudou) { tela.width = imagem.width; tela.height = imagem.height; }
+  if (mudou) {
+    tela.width = imagem.width;
+    tela.height = imagem.height;
+    quadro.style.setProperty("--proporcao", imagem.width / imagem.height); // cresce até a altura livre da tela sem distorcer
+  }
   tela.getContext("2d").drawImage(imagem, 0, 0);
   imagem.close();
   if (mudou || esp.largura !== tela.clientWidth) desenharResultadoCelular(esp);

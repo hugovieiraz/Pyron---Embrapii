@@ -244,8 +244,14 @@ main { max-width: var(--conteudo-max); margin: 0 auto; padding: var(--e-6); }
 .linha-estado i { width: var(--ponto); height: var(--ponto); border-radius: 50%; background: var(--texto-3); }
 .linha-estado.ok i { background: var(--sucesso); }
 .cartao-cabeca { display: flex; align-items: baseline; justify-content: space-between; gap: var(--e-4); flex-wrap: wrap; }
-.celular-quadro { position: relative; width: fit-content; max-width: 100%; margin-inline: auto; border-radius: var(--r-m); overflow: hidden; background: var(--palco); }
-.celular-quadro canvas { display: block; max-width: 100%; max-height: var(--apr-visor-max); }
+/* largura pela altura livre da tela × proporção do quadro do celular (em pé, a altura é que limita) */
+.celular-quadro { position: relative; width: min(100%, calc((100vh - var(--apr-folga-celular)) * var(--proporcao, .5625))); margin-inline: auto;
+  border-radius: var(--r-m); overflow: hidden; background: var(--palco); }
+.celular-quadro canvas { display: block; width: 100%; height: auto; }
+.celular-cabeca-direita { display: flex; align-items: center; gap: var(--e-4); }
+/* tela cheia: só o vídeo, o maior possível, no fundo escuro */
+#celular-espelho:fullscreen { display: grid; place-items: center; background: var(--palco); }
+#celular-espelho:fullscreen .celular-quadro { width: min(100vw, calc(100vh * var(--proporcao, .5625))); border-radius: 0; }
 .celular-caixas { position: absolute; inset: 0; will-change: transform; transition: opacity var(--dur-rapida) var(--ease-padrao); }
 .celular-caixas.sumido { opacity: 0; }
 .celular-caixas .caixa { position: absolute; }
@@ -305,3 +311,4 @@ main { max-width: var(--conteudo-max); margin: 0 auto; padding: var(--e-6); }
 
 /* imagens da tela não se arrastam (ver o dragstart em app.js) */
 img { -webkit-user-drag: none; user-select: none; }
+#celular-espelho:fullscreen .rotulo { font-size: var(--t-2); line-height: var(--a-3); }
