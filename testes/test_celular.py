@@ -293,3 +293,12 @@ def test_certificado_proprio_carrega_e_e_reaproveitado(tmp_path) -> None:
     celular.certificado(tmp_path, "10.0.0.7")
     assert (tmp_path / "endereco.txt").read_text(encoding="utf-8") == "10.0.0.7"
     shutil.rmtree(tmp_path, ignore_errors=True)
+
+
+def test_sem_openssl_reaproveita_o_certificado_que_ja_existe(tmp_path, monkeypatch) -> None:
+    cert, chave = celular.certificado(tmp_path, "192.168.0.4")
+    monkeypatch.setattr(celular, "_openssl", lambda: None)
+    # outro computador, outro endereço e sem OpenSSL: segue com o certificado que veio no pacote
+    assert celular.certificado(tmp_path, "10.0.0.7") == (cert, chave)
+    with pytest.raises(RuntimeError, match="OpenSSL"):
+        celular.certificado(tmp_path / "vazio", "10.0.0.7")

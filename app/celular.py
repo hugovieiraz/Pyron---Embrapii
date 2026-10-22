@@ -123,6 +123,10 @@ def certificado(pasta: Path, ip: str) -> tuple[Path, Path]:
     if cert.exists() and chave.exists() and marca.exists() and marca.read_text(encoding="utf-8").strip() == ip:
         return cert, chave
     openssl = _openssl()
+    if not openssl and cert.exists() and chave.exists():
+        # sem OpenSSL (outro computador, com o pacote portátil): o certificado que veio junto serve. Ele não é do
+        # endereço desta rede, mas o celular já avisa de qualquer jeito (certificado próprio) e segue igual.
+        return cert, chave
     if not openssl:
         raise RuntimeError("Para ligar o celular falta o OpenSSL, que gera o certificado da conexão segura. "
                            "Instale o Git para Windows (ele traz o OpenSSL) e tente de novo.")

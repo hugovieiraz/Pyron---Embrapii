@@ -161,3 +161,8 @@ def test_servidor_so_desliga_quando_a_janela_fecha() -> None:
     entregou = {"proc": _Edge(False), "aberta_em": 1000.0, "terminou_em": 1002.0}
     assert not deve_desligar(1200.0, 1000.0, 1150.0, entregou)
     assert deve_desligar(1500.0, 1000.0, 1150.0, entregou)
+    # a página avisou que fechou (Edge segue vivo em segundo plano): desliga em poucos segundos
+    vivo = {"proc": _Edge(True), "aberta_em": 1000.0}
+    assert deve_desligar(1110.0, 1000.0, 1100.0, vivo, fechou=1101.0)
+    assert not deve_desligar(1102.0, 1000.0, 1100.0, vivo, fechou=1101.0)  # ainda dentro da espera
+    assert not deve_desligar(1110.0, 1000.0, 1103.0, vivo, fechou=1101.0)  # recarregou: a página nova mandou sinal

@@ -29,6 +29,10 @@ SEM_SINAL_S = 300
 SEM_SINAL_PRESO_S = 3 * 3600  # com o processo da janela vivo: 3 h sem sinal nenhum
 ENTREGOU_S = 10  # o Edge que termina antes disso só entregou a janela a outro Edge aberto
 SEM_JANELA_S = 600  # ninguém abriu a janela
+# A página avisa quando fecha. O Edge com perfil novo continua rodando em segundo plano depois da janela fechada
+# (o processo não termina): o aviso é o que desliga o servidor na hora. Recarregar também avisa, mas a página nova
+# manda sinal logo em seguida; por isso espera este tanto antes de desligar.
+FECHOU_S = 4
 
 
 def porta_livre(inicio: int = 8770) -> int:
@@ -55,8 +59,10 @@ def abrir_janela(url: str) -> subprocess.Popen | None:
     return None
 
 
-def deve_desligar(agora: float, inicio: float, ultimo_sinal: float, janela: dict) -> bool:
+def deve_desligar(agora: float, inicio: float, ultimo_sinal: float, janela: dict, fechou: float = 0.0) -> bool:
     """A janela fechou? Sem confundir janela escondida (sinal lento) com janela fechada."""
+    if fechou > ultimo_sinal and agora - fechou > FECHOU_S:
+        return True  # a página avisou que fechou e nenhuma outra (recarregada) mandou sinal depois
     sem_sinal = agora - (ultimo_sinal or inicio)
     proc = janela.get("proc")
     if proc is not None and proc.poll() is None:
@@ -73,7 +79,7 @@ def deve_desligar(agora: float, inicio: float, ultimo_sinal: float, janela: dict
 def vigiar(servidor, sinais: dict, inicio: float, janela: dict) -> None:
     while not servidor.should_exit:
         time.sleep(2)
-        servidor.should_exit = deve_desligar(time.time(), inicio, sinais["ultimo"], janela)
+        servidor.should_exit = deve_desligar(time.time(), inicio, sinais["ultimo"], janela, sinais.get("fechou", 0.0))
 
 
 def main() -> None:

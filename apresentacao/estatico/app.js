@@ -907,6 +907,7 @@ const avisarServidor = () => fetch("/api/sinal", { method: "POST" }).catch(() =>
 avisarServidor();
 setInterval(avisarServidor, 10000);
 document.addEventListener("visibilitychange", avisarServidor); // ao voltar a aparecer, avisa na hora
+addEventListener("pagehide", () => navigator.sendBeacon("/api/fechou")); // janela fechando: o servidor desliga
 
 vazioAnalise();
 montarGaleria();

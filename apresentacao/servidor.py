@@ -61,7 +61,7 @@ async def sem_cache_velho(request, chamar_proximo):
 detector = Detector(MODELO)  # sem a pasta do modelo, abre do mesmo jeito e a tela mostra o que falta
 _carga = {"erro": None, "iniciada": False}
 _trava_carga = threading.Lock()
-sinais = {"ultimo": 0.0}  # último sinal da janela (o lançador desliga o servidor quando ela fecha)
+sinais = {"ultimo": 0.0, "fechou": 0.0}  # último sinal da janela (o lançador desliga o servidor quando ela fecha)
 _miniaturas: dict[str, bytes] = {}
 
 
@@ -110,6 +110,13 @@ def pagina() -> HTMLResponse:
 @app.post("/api/sinal")
 def sinal() -> dict:
     sinais["ultimo"] = time.time()
+    return {"ok": True}
+
+
+@app.post("/api/fechou")
+def fechou() -> dict:
+    """A página foi fechada (ou recarregada: aí a nova manda sinal logo em seguida e nada desliga)."""
+    sinais["fechou"] = time.time()
     return {"ok": True}
 
 
