@@ -1,0 +1,201 @@
+PYRON APRESENTAÇÃO
+Nota técnica: detecção de para-raios e leitura de temperatura em termogramas FLIR
+
+Este texto descreve o processamento feito pelo aplicativo, da leitura do arquivo da câmera até o
+ponto mais quente de cada para-raio. As contas da seção 4 usam os valores reais de uma das imagens
+de teste (FLIR2620.jpg) e podem ser refeitas à mão.
+
+
+1. VISÃO GERAL
+
+A entrada é o JPEG radiométrico gravado pela câmera FLIR C5. O processamento tem quatro etapas:
+
+  1) Leitura do arquivo: a imagem em paleta (640 x 480 pixels), a matriz de valores brutos do
+     sensor térmico (160 x 120) e os parâmetros de medição e de calibração gravados pela câmera.
+  2) Detecção: um detector de objetos treinado localiza, na imagem em paleta, o para-raio e três
+     partes dele (saias, terminal superior e terminal inferior), cada uma com uma caixa retangular.
+  3) Temperatura: cada valor bruto da matriz é convertido em temperatura (°C) pelo modelo
+     radiométrico da FLIR, com as correções de emissividade, radiação refletida e atmosfera.
+  4) Ponto mais quente: as caixas são projetadas sobre a matriz de temperatura e, dentro da caixa
+     de cada para-raio, procura-se o valor máximo e a parte onde ele está.
+
+A temperatura vem somente dos dados do sensor. A imagem colorida serve apenas para localizar as
+peças; as cores e a escala exibidas pela câmera não entram na conta.
+
+
+2. CONTEÚDO DO ARQUIVO DA CÂMERA
+
+O JPEG da FLIR é uma imagem comum com dados extras nos segmentos APP1 identificados por "FLIR".
+Esses segmentos, unidos na ordem do índice de cada um, formam um bloco no formato FFF, que tem um
+diretório de registros. O aplicativo usa três deles:
+
+  Registro 0x01 (dados brutos): matriz de 160 x 120 valores de 16 bits, gravada como PNG com os
+                                bytes de cada valor em ordem invertida.
+  Registro 0x20 (dados da câmera): parâmetros em posições fixas do registro (floats de 32 bits).
+  Registro 0x0E (foto visível): JPEG de 640 x 480 da câmera comum ao lado do sensor térmico.
+
+Parâmetros lidos do registro 0x20 (posição em hexadecimal):
+
+  0x020  emissividade (e)                  0x058  R1 (constante de Planck da calibração)
+  0x024  distância do objeto (d, m)        0x05C  B
+  0x028  temperatura refletida (K)         0x060  F
+  0x02C  temperatura atmosférica (K)       0x308  O (inteiro de 32 bits)
+  0x030  temperatura da janela (K)         0x30C  R2
+  0x034  transmissão da janela             0x070 a 0x080  alfa1, alfa2, beta1, beta2, X
+  0x03C  umidade relativa                  0x090 / 0x094  faixa de medição (máx. / mín., K)
+  0x1B4  campo de visão horizontal (graus)
+
+Resolução: o sensor térmico tem 160 x 120 pontos de medição. A imagem de 640 x 480 que aparece na
+tela é a térmica ampliada 4 vezes em cada direção, com os contornos da câmera comum desenhados por
+cima (recurso MSX da FLIR). Cada valor de temperatura corresponde, portanto, a um bloco de 4 x 4
+pixels da imagem. Com o campo de visão gravado nos arquivos (53,6 graus na horizontal), cada ponto
+do sensor cobre cerca de 5,85 mrad, ou seja, aproximadamente 5,8 cm a 10 m de distância.
+
+
+3. CONVERSÃO DO VALOR BRUTO EM TEMPERATURA
+
+O valor bruto S de cada ponto é proporcional à radiação que chega ao detector. A calibração de
+fábrica relaciona a radiação de um corpo negro à temperatura pela forma de Planck:
+
+    R(T) = R1 / ( R2 * ( exp(B / T) - F ) ) - O                  (T em kelvin)
+
+    T = B / ln( R1 / ( R2 * (R + O) ) + F )                       (inversa)
+
+A radiação que chega à câmera não vem só do objeto. Com emissividade e < 1, parte é radiação do
+ambiente refletida pela superfície; e o ar entre o objeto e a câmera absorve uma parcela e emite a
+sua própria. O modelo usado é o da FLIR (o mesmo implementado no pacote Thermimage, para R): divide
+o caminho em duas metades de atmosfera, com transmissão tau1 e tau2, e uma janela (aqui ausente:
+transmissão 1). O sinal do objeto fica:
+
+    S_obj = S / (e * tau1 * tau2)
+            - (1 - e) / e * R(T_refl)                              (radiação refletida)
+            - (1 - tau1) / (e * tau1) * R(T_atm)                   (atmosfera, 1ª metade)
+            - (1 - tau2) / (e * tau1 * tau2) * R(T_atm)            (atmosfera, 2ª metade)
+
+e a temperatura do objeto é T = B / ln( R1 / ( R2 * (S_obj + O) ) + F ) - 273,15.
+
+Transmissão da atmosfera, a partir do vapor d'água (Ta em °C, UR de 0 a 1):
+
+    H2O = UR * exp( 1,5587 + 0,06939*Ta - 0,00027816*Ta^2 + 0,00000068455*Ta^3 )
+
+    tau = X * exp( -sqrt(d/2) * (alfa1 + beta1*sqrt(H2O)) )
+          + (1 - X) * exp( -sqrt(d/2) * (alfa2 + beta2*sqrt(H2O)) )
+
+com tau1 = tau2 = tau, cada metade com metade da distância.
+
+
+4. EXEMPLO NUMÉRICO (FLIR2620.jpg)
+
+Parâmetros gravados pela câmera:
+    e = 0,95    d = 10,0 m    T_refl = T_atm = 20,0 °C    UR = 0,50
+    R1 = 16683,016    R2 = 0,0197165    B = 1430,30    F = 1,0    O = -2099
+    alfa1 = 5,405e-8    alfa2 = 7,026e-6    beta1 = 0,0026143    beta2 = 0,0035769    X = 0,99999
+
+Ponto mais quente dentro da caixa do para-raio: coluna 98, linha 51 da matriz, S = 9357.
+
+    H2O = 0,50 * exp(1,5587 + 1,3878 - 0,1113 + 0,0055) = 8,564
+    tau = 0,98304   (para d/2 = 5 m)
+    R(20 °C) = 8582,43
+
+    S / (e * tau^2)                 = 9357 / (0,95 * 0,98304^2)      = 10192,30
+    refletida   (1 - e)/e * R       = 0,0526 * 8582,43               =   451,71
+    atmosfera 1 (1 - tau)/(e*tau)   * R                              =   155,88
+    atmosfera 2 (1 - tau)/(e*tau^2) * R                              =   158,57
+    S_obj = 10192,30 - 451,71 - 155,88 - 158,57                      =  9426,15
+
+    T = 1430,30 / ln( 16683,016 / (0,0197165 * (9426,15 - 2099)) + 1 )
+      = 1430,30 / ln( 116,481 ) = 1430,30 / 4,75773 = 300,63 K = 27,48 °C
+
+O aplicativo mostra 27,5 °C. Sem as correções (só a inversa de Planck aplicada a S), o resultado
+seria 26,88 °C: as correções somam +0,6 °C neste caso. A câmera mostra 27,4 °C na tela para a sua
+própria área de medição, que nesta imagem cobre o mesmo ponto.
+
+Conferência com a câmera: em 11 imagens de teste em que o valor exibido pela câmera pode ser lido
+(máximo dentro da área de medição dela), a diferença para o valor calculado pelo aplicativo na
+mesma área foi de 0,1 °C na mediana, até 0,3 °C em 90% dos casos e no máximo 0,5 °C. A câmera
+mostra uma casa decimal, e a área de medição dela é localizada na imagem de forma aproximada.
+
+
+5. DETECÇÃO DAS PEÇAS
+
+Detector: RF-DETR Medium (detector de objetos de arquitetura transformer, com extrator de
+características DINOv2), exportado em ONNX e executado pelo ONNX Runtime, na placa de vídeo
+(DirectML) quando disponível ou no processador.
+
+Classes: para-raio, saias, terminal superior, terminal inferior.
+
+Entrada: a imagem em paleta exibida pela câmera, redimensionada para 640 x 640 e normalizada por
+canal (média 0,485 / 0,456 / 0,406; desvio 0,229 / 0,224 / 0,225).
+
+Saída: um conjunto fixo de caixas (centro, largura e altura em fração da imagem) com uma nota por
+classe. A probabilidade de cada classe é a função logística da nota; cada caixa fica com a classe de
+maior probabilidade e é mantida se essa probabilidade for de pelo menos 0,50.
+
+Dados de treino: 163 imagens térmicas de para-raios do conjunto ScienceDB 10185, com 1.183 caixas
+anotadas no CVAT (formato COCO), divididas em treino (111), validação (25) e teste (27). As imagens
+de teste não participam do treino nem da escolha do modelo.
+
+Resultado no conjunto de teste (27 imagens, 177 instâncias; caixa correta quando a interseção sobre
+a união com a caixa anotada é de pelo menos 0,5):
+
+    instâncias detectadas   159 de 177
+    precisão                0,888   (VP / (VP + FP))
+    recall                  0,898   (VP / (VP + FN))
+    mAP50                   0,891
+    AP50 por classe         para-raio 0,989; saias 1,000; terminal superior 0,844;
+                            terminal inferior 0,731
+
+O terminal inferior é a classe com mais erros: é pequeno e fica parcialmente encoberto pela
+estrutura de suporte.
+
+Comparação feita na mesma divisão de dados (mAP50 no teste): Faster R-CNN com extrator MobileNetV3,
+0,893; YOLO26s, 0,909; RF-DETR Medium, 0,911. A diferença entre os três é de 1,8 ponto percentual.
+
+
+6. PONTO MAIS QUENTE E PARTE ONDE ELE ESTÁ
+
+As caixas estão em fração da imagem, o que permite levá-las diretamente à matriz de 160 x 120: a
+caixa (x0, y0, x1, y1) cobre as linhas de floor(y0*120) a ceil(y1*120) e as colunas de
+floor(x0*160) a ceil(x1*160). Dentro dela, o ponto mais quente é o máximo da matriz de temperatura;
+a posição informada é o centro desse ponto.
+
+A parte onde o máximo está é escolhida entre as caixas de saias e terminais que têm pelo menos 60%
+da área dentro da caixa do para-raio: fica a menor delas que contém o ponto. Se nenhuma contém, o
+resultado é "corpo do para-raio". A máxima de cada parte é calculada da mesma forma, dentro da
+caixa da parte.
+
+Efeito do detector sobre a temperatura: no conjunto de teste, a máxima calculada com as caixas do
+detector foi comparada com a máxima calculada com as caixas anotadas, para as 159 instâncias
+detectadas. A diferença foi de 0,0 °C na mediana e de até 0,94 °C em 90% dos casos.
+
+
+7. LIMITAÇÕES E OBSERVAÇÕES
+
+- A emissividade é única para a imagem inteira (o valor ajustado na câmera, 0,95 nestas imagens).
+  Superfícies com emissividade diferente, como metal sem pintura dos terminais, têm leitura com erro
+  que o aplicativo não corrige por região.
+- As temperaturas refletida e atmosférica são as configuradas na câmera (20 °C nas imagens usadas).
+- O céu aparece com valores de -20 a -33 °C. A faixa de medição gravada pela câmera é de -20 a
+  150 °C, então valores abaixo de -20 °C estão fora da calibração e não são confiáveis. Não afetam
+  o resultado, porque a busca do máximo é feita dentro da caixa do para-raio.
+- A escala de cores exibida pela câmera (por exemplo, 19,8 a 30,0 °C, travada pelo operador) é só
+  de visualização. Pontos abaixo dela aparecem com a cor mais escura, mas a medição usa os valores
+  brutos.
+- O círculo vermelho que a câmera desenha marca o máximo apenas dentro da área de medição
+  posicionada pelo operador. O aplicativo procura o máximo no para-raio inteiro, por isso os dois
+  pontos podem não coincidir.
+- O modo "Câmera do celular" faz apenas a identificação das peças em tempo real. A foto tirada pelo
+  celular não contém os dados do sensor; a temperatura só é medida com o JPEG radiométrico.
+
+
+8. ONDE ESTÁ NO CÓDIGO
+
+    sistema\pyron\apresentacao\flir.py       leitura do arquivo e conversão em temperatura (seções 2 a 4)
+    sistema\pyron\apresentacao\detector.py   detecção (seção 5)
+    sistema\pyron\apresentacao\analise.py    ponto mais quente e parte (seção 6)
+
+Referências: modelo radiométrico da FLIR Systems; descrição dos campos FLIR no ExifTool (P. Harvey);
+pacote Thermimage para R (G. Tattersall).
+
+Imagens: Infrared Power Equipment Dataset (ScienceDB 10185, doi 10.57760/sciencedb.10185), licença
+CC BY-NC-SA 4.0, uso não comercial.

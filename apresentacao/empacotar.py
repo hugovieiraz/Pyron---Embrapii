@@ -61,6 +61,8 @@ COMO ABRIR
 
 O QUE TEM AQUI
 - Abrir Pyron Apresentação.bat   o atalho do aplicativo
+- LEIA-ME TÉCNICO.txt            como a detecção e a leitura de temperatura funcionam, com um exemplo
+                                 numérico completo
 - modelos\\                       os modelos treinados
     {modelo}\\  RF-DETR Medium (o usado pelo aplicativo):
         modelo.onnx    o modelo exportado em ONNX (roda na placa de vídeo pelo DirectML, ou no processador)
@@ -189,6 +191,9 @@ def montar(destino: Path, com_zip: bool) -> Path:
         "Licença CC BY-NC-SA 4.0: uso não comercial, com crédito, compartilhamento pela mesma licença.\n", encoding="utf-8")
     (destino / f"Abrir {NOME}.bat").write_text(BAT.format(modelo=modelo).replace("\n", "\r\n"), encoding="ascii")
     (destino / "LEIA-ME.txt").write_text(LEIA_ME.format(modelo=modelo), encoding="utf-8-sig")
+    tecnico = (RAIZ / "apresentacao" / "LEIA-ME-TECNICO.txt").read_text(encoding="utf-8")
+    # quebras de linha do Windows: o Bloco de Notas antigo mostra tudo numa linha só sem elas
+    (destino / "LEIA-ME TÉCNICO.txt").write_text(tecnico, encoding="utf-8-sig", newline="\r\n")
     if not com_zip:
         return destino
     arquivo = destino.with_suffix(".zip")
