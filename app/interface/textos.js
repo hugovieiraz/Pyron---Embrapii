@@ -143,7 +143,7 @@ export const TEXTOS = {
     barraT: "Barra de ferramentas", selecionar: "Selecionar", novaRegiao: "Região", ponto: "Ponto", linhaT: "Linha", camadas: "Camadas", foto: "Foto", semFoto: "esta imagem não tem foto visível",
     painelT: "Painel de detalhe (trilho e seções)", regiaoT: "Conexão X1", leituras: "Leituras", dimensoes: "Dimensões estimadas", pendentesT: "Pendentes", doisAlertas: "2 alertas pendentes.",
     ilustracoesT: "Ilustrações dos estados",
-    ilu: { captura: "Captura sem câmera", inspecoes: "Inspeções sem imagem", pendencias: "Pendências zeradas", equipamentos: "Equipamentos vazio", "sem-conexao": "Sem conexão com o servidor", modelos: "Modelos sem detector" },
+    ilu: { captura: "Captura sem câmera", inspecoes: "Inspeções sem imagem", pendencias: "Pendências zeradas", equipamentos: "Equipamentos vazio", "sem-conexao": "Sem conexão com o servidor", modelos: "Modelos sem detector", analise: "Análise sem regiões", laudo: "Laudo pronto", busca: "Busca sem resultado", celular: "Conectar o celular" },
     vazioIlustrado: "Vazio com ilustração (tela inteira)", procurandoT: "Procurando (único movimento contínuo permitido)",
     procurando: "Procurando a câmera…", procurandoTexto: "Mantenha a câmera ligada e na mesma rede.",
     conferenciaT: "Conferência", conferenciaDica: "Use o botão Conferir acessibilidade no topo. Repita no tema escuro e com ?toque no endereço.",

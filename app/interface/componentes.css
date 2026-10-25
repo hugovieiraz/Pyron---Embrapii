@@ -326,10 +326,21 @@ dialog.busca-rapida::backdrop { background: var(--veu); }
 .painel-conteudo [role="tabpanel"] > h2 { padding: var(--e-4); font-size: var(--t-2); line-height: var(--a-2); border-bottom: 1px solid var(--borda); }
 
 /* ---------------------------------------------------------------- ilustração de estado */
-.ilustracao { width: var(--ilu); max-width: 100%; height: auto; overflow: visible; animation: entrar-item var(--dur-lenta) var(--ease-entrada) both; }
+.ilustracao { width: var(--ilu); max-width: 100%; height: auto; overflow: visible; }
 .ilustracao .aresta { stroke: var(--ilu-aresta); stroke-width: 1px; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.ilustracao .brilho { fill: none; stroke: var(--ilu-brilho); stroke-width: 1px; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; }
+/* montagem: o chão aparece, cada peça desce ao lugar em sequência e o acento térmico acende por último */
+.ilustracao .chao { animation: surgir var(--dur-lenta) var(--ease-padrao) both; }
+.ilustracao .peca { animation: assentar var(--dur-lenta) var(--ease-entrada) both; animation-delay: calc(var(--i) * var(--escalonar) * 2); }
+.ilustracao .acento { animation: surgir var(--dur-lenta) var(--ease-padrao) both; animation-delay: calc(var(--i) * var(--escalonar) * 2 + var(--dur-media)); }
+@keyframes surgir { from { opacity: 0; } }
+@keyframes assentar { from { opacity: 0; transform: translateY(calc(var(--e-1) * -1)); } }
+/* procurando (indicador de espera): o pontilhado e a varredura acendem em sequência */
+.ilustracao .varredura { opacity: 0; }
 .ilustracao.procurando .ponto-ligacao { animation: acender var(--dur-procura) var(--ease-padrao) infinite; animation-delay: calc(var(--i) * var(--escalonar) * 3); }
+.ilustracao.procurando .varredura { animation: varrer var(--dur-procura) var(--ease-padrao) infinite; animation-delay: calc(var(--i) * var(--escalonar) * 4); }
 @keyframes acender { 0%, 100% { opacity: .2; } 35% { opacity: 1; } }
+@keyframes varrer { 0%, 100% { opacity: 0; } 30% { opacity: .7; } }
 .vazio.com-ilustracao { border: 0; background: none; gap: var(--e-4); padding: var(--e-10) var(--e-6); }
 .vazio.com-ilustracao h2 { margin-top: var(--e-2); }
 .vazio.com-ilustracao p { font-size: var(--t-2); line-height: var(--a-2); color: var(--texto-3); }

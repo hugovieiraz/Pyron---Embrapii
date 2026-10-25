@@ -1,0 +1,119 @@
+# Acabamento: ilustrações, animações e toques finais
+
+Feito numa conversa na nuvem em 25/10, para a próxima conversa implementar. A parte 1 já está no
+código (branch `interface-nova`); as partes 2 a 4 são a lista do que fazer, em ordem de prioridade.
+Referência de nível: FLIR Thermal Studio (`2-direcao.md`, seção 6).
+
+Capturas: `capturas/etapa3b/ilustracoes-antes-claro.png` (antes) e `ilustracoes-claro.png` /
+`ilustracoes-escuro.png` (depois).
+
+## 1. Já feito: ilustrações v2
+
+**Motor (`js/ilustracoes.js`)**
+- **Moldura comum 4:3**: toda cena cabe na mesma moldura, centrada na largura e assentada no chão.
+  Antes cada uma tinha a escala do próprio conteúdo (a Captura saía pequena e as legendas desalinhavam).
+- **Volume**: faces com gradiente suave (topo mais claro no fundo, laterais escurecendo no pé),
+  filete de luz na aresta da frente do topo (`.brilho`) e sombra difusa no chão (gradiente radial,
+  escura onde a peça toca). É o que dava o ar "colado" de antes.
+- **Peças** (`c.peca(fn, classe)`): cada cena é dividida em até 6 grupos que entram em sequência.
+  Classes: `chao` (sombra, só aparece), `peca` (desce 4 px ao lugar), `acento` (o dado térmico,
+  acende por último).
+- Novos utilitários: `disco()` (elipse deitada), `visto()` (sinal de conferido reto na tela),
+  `termovisor()` e `folha()` (peças reutilizáveis).
+
+**Tokens novos (`tokens.css`, claro e escuro)**: `--ilu-sombra-contato`, `--ilu-luz`,
+`--ilu-oclusao`, `--ilu-brilho`.
+
+**Movimento (`componentes.css`)**: `surgir` e `assentar` (entrada, uma vez, 400 ms, 60 ms entre
+peças) e `varrer` (linhas de varredura no estado `procurando`). Só `transform` e `opacity`;
+`prefers-reduced-motion` desliga tudo (regra global do `base.css`). Loop só em `procurando`.
+
+**Cenas: as 6 corrigidas e 4 novas, e onde usar cada uma**
+
+| Nome | Desenho | Onde entra |
+|---|---|---|
+| `captura` | termovisor apontado para isolador sobre base | Captura sem câmera; `procurando` enquanto busca a câmera |
+| `inspecoes` | pasta aberta com termogramas | Inspeções vazia; também na camada de soltar arquivos |
+| `pendencias` | prancheta com a lista conferida | Pendências zeradas (estado bom, não vazio) |
+| `equipamentos` | transformador com radiador, buchas e placa | Equipamentos vazio |
+| `sem-conexao` | notebook com o cabo solto | Sem conexão; `procurando` enquanto tenta reconectar |
+| `modelos` | placa com o chip e componentes | Modelos sem detector instalado |
+| `analise` (nova) | termograma de pé com a mira no ponto quente | Análise sem regiões; `procurando` = processando a imagem |
+| `laudo` (nova) | folha com termograma e carimbo de conferido | Laudo gerado (com "Abrir PDF" e "Mostrar na pasta") |
+| `busca` (nova) | lupa sobre folha | Busca (Ctrl+K) e filtros sem resultado |
+| `celular` (nova) | celular de pé com o código ligado ao notebook | Captura › Celular: aguardando o celular (`procurando`) |
+
+Correções nas antigas: radiador ligado ao tanque por coletores e trafo sobre trilhos; prendedor da
+prancheta assentado; pasta lida como pasta (fundo alto com aba, frente baixa); termovisor maior e
+isolador sobre base de concreto; placa com capacitores.
+
+Conferido: testes da interface (10/10), `node --check`, os dois temas.
+
+## 2. Toques finais: prioridade alta (Etapas 4 e 5)
+
+**Termograma (Análise), o coração do produto**
+1. **Mira com leitura ao vivo** (como o medidor pontual da FLIR): cursor em cruz sobre o termograma,
+   com a temperatura do pixel num rótulo que segue o mouse (fonte mono, `tabular-nums`).
+   Alt fixa um ponto de leitura; Esc limpa.
+2. **Escala de cores ligada ao cursor**: um marcador corre na barra da paleta mostrando onde a
+   temperatura do pixel cai. Faixa mín–máx editável arrastando as pontas da barra.
+3. **Ligação lista ↔ imagem**: passar o mouse numa região da lista realça a caixa no termograma, e
+   o contrário. A selecionada ganha contorno mais grosso e alças; as outras ficam a 60 %.
+4. **Zoom e arrasto**: roda do mouse com zoom no ponto do cursor, espaço + arrastar para mover,
+   0 para encaixar. Indicador de zoom (100 %) na barra de ferramentas.
+5. **Cortina visível × térmica**, quando houver as duas imagens: divisor arrastável.
+
+**Estados e retorno**
+6. **Botão ocupado**: ao salvar, analisar ou gerar laudo, o botão mostra o giro dentro dele, mantém
+   a largura e fica indisponível. Nada de giro no meio da tela.
+7. **Progresso de importação num lugar fixo** (barra determinada "12 de 40" no topo de Inspeções),
+   no lugar do aviso que some. Ao terminar: aviso com "Abrir".
+8. **Desfazer em vez de confirmar** para ações reversíveis (excluir região, arquivar inspeção):
+   `avisar(texto, { acao: { rotulo: "Desfazer" } })` já existe. Diálogo só para o que não volta.
+9. **"Salvo"** discreto no cabeçalho da Análise ("Salvo · há 2 min"), em vez de aviso a cada edição.
+10. **Camada de soltar arquivos com a ilustração `inspecoes`** no lugar do ícone (`ligarSoltar()` na casca).
+
+## 3. Toques finais: prioridade média
+
+11. **Barra de status no rodapé** (24 px, texto 14 px): servidor ● conectado, câmera, detector
+    carregado, versão. Clicar abre o item correspondente. Padrão de software técnico.
+12. **Dica com atalho** nos botões da barra de ferramentas: "Importar · Ctrl+I", aparece em 600 ms.
+13. **Menu de contexto** (botão direito) nas linhas das tabelas e nas regiões: Abrir, Renomear,
+    Exportar, Excluir. Usa o `menu()` que já existe.
+14. **Migalhas no cabeçalho do detalhe**: Inspeções › Subestação X › IR_0012.jpg.
+15. **Números do Painel entrando uma vez**: contagem de 0 ao valor em 400 ms na primeira carga;
+    nunca de novo ao atualizar (a mudança aparece só no número).
+16. **Datas relativas** ("há 3 dias") com a data completa no `title`; temperaturas sempre com
+    `font-variant-numeric: tabular-nums` e a unidade em `--texto-3`.
+17. **Texto longo cortado com reticências** e o texto inteiro no `title` (nomes de arquivo, caminhos).
+
+## 4. Toques finais: primeira impressão
+
+18. **Tela de abertura** enquanto o servidor sobe: logo, nome, versão e uma barra fina de progresso,
+    fundo branco (ou grafite no escuro). Some com `surgir` invertido quando `/api/status` responde.
+19. **Primeira execução**: três passos lado a lado com as ilustrações `inspecoes` → `analise` →
+    `laudo` ("Importe", "Analise", "Gere o laudo"), um botão primário "Importar termogramas" e
+    "Usar dados de demonstração". Só aparece sem nenhuma inspeção.
+20. **Sobre** (em Configurações): logo, versão, créditos, licença do dataset, sem texto longo.
+
+## 5. Ajustes de direção (conversa de 25/10, para decidir com o usuário)
+
+Comparado com a FLIR, o que mais afasta o Pyron de "software profissional" é cor demais na
+estrutura. Proposta de uma Etapa 3c antes da Etapa 4:
+- ação, aba ativa e seleção em grafite ou preto (branco no tema escuro), sem cobalto; a cor fica
+  para o termograma, a severidade e o acento das ilustrações;
+- cinzas neutros no lugar da ardósia; corpo de texto em 15 px, tabelas em 14 px; raios de 2 a 4 px;
+- título de página grande em peso leve; estados vazios direto no fundo, sem cartão em volta;
+- estrutura padrão de tela: barra de ferramentas, área e painel de detalhes à direita com trilho
+  de ícones (já existem no catálogo); Configurações como diálogo com categorias à esquerda.
+
+A logo continua a original; o redesenho fica para um designer ou uma ferramenta de vetor.
+
+## Pedido para colar na próxima conversa
+
+```text
+Leia docs/interface/acabamento.md. A parte 1 já está no branch interface-nova: confira o catálogo
+(/nova/catalogo.html, claro e escuro) e use as ilustrações novas nos estados indicados na tabela.
+Depois implemente a parte 2 junto com a Etapa 4 (Análise) e as partes 3 e 4 na Etapa 5.
+Antes, pergunte ao Hugo se aprova a Etapa 3c (parte 5).
+```

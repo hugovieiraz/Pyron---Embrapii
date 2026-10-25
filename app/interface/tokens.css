@@ -120,6 +120,10 @@
   --ilu-traco: #B4BCC8;                   /* linhas de texto desenhadas, trilhas */
   --ilu-ponto: #5A6474;                   /* pontilhado de ligação */
   --ilu-sombra: rgba(22, 27, 34, .10);    /* sombra no chão */
+  --ilu-sombra-contato: rgba(22, 27, 34, .22); /* centro da sombra, onde a peça toca o chão */
+  --ilu-luz: #FFFFFF;                     /* luz que clareia o fundo do topo (gradiente da face) */
+  --ilu-oclusao: #0B0E13;                 /* escurece o pé das laterais (gradiente da face) */
+  --ilu-brilho: rgba(255, 255, 255, .9);  /* filete de luz na aresta da frente do topo */
 
   /* ---------------------------------------------------------------- tipografia (proporção 1,2; 2 famílias)
      nada abaixo de 14 px na tela: o projetor apaga o que for menor */
@@ -266,6 +270,9 @@
   --ilu-traco: #4A5262;
   --ilu-ponto: #8B95A5;
   --ilu-sombra: rgba(0, 0, 0, .45);
+  --ilu-sombra-contato: rgba(0, 0, 0, .7);
+  --ilu-luz: #9AA3B2;
+  --ilu-brilho: rgba(255, 255, 255, .14);
   --sombra-1: 0 1px 2px rgba(0, 0, 0, .4);
   --sombra-2: 0 6px 16px -4px rgba(0, 0, 0, .5);
   --sombra-3: 0 24px 48px -12px rgba(0, 0, 0, .7);
