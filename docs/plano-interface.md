@@ -123,6 +123,17 @@ Modelo: **Opus**, esforço **alto**. Base: `docs/interface/2-direcao.md`, seçã
 - **Pronto quando:** o catálogo mostra tudo nos dois temas, contraste e alvos com 0 falhas, e a
   captura do estado "Captura sem câmera" ao lado da referência da FLIR mostra o mesmo nível de acabamento.
 
+## Etapa 3c · Estilo FLIR (pedido do Hugo, 25/10)
+Modelo: **Opus**, esforço **alto**. Base: `docs/interface/acabamento.md`, parte 5.
+- [ ] Revisar a direção em `2-direcao.md`: interface monocromática; cor só no termograma, na
+      severidade e no acento das ilustrações.
+- [ ] Tokens: ação, aba ativa e seleção em grafite (branco no escuro), sem cobalto; cinzas neutros;
+      corpo 15 px e tabelas 14 px; raios de 2 a 4 px; título de página grande em peso leve.
+- [ ] Estrutura padrão de tela (barra de ferramentas, área, painel de detalhes com trilho);
+      estados vazios sem cartão; Configurações como diálogo com categorias.
+- [ ] Catálogo, contraste e alvos conferidos de novo; `CLAUDE.md` seção 0 atualizada.
+- **Pronto quando:** catálogo e Captura no estilo novo, nos dois temas, com 0 falhas.
+
 ## Etapa 4 · Tela de referência
 Modelo: **Opus**, esforço **alto**.
 - [ ] Construir a **Análise** completa na interface nova, ligada à API real, já com o acabamento da Etapa 3b.
@@ -158,7 +169,7 @@ Modelo: Opus com esforço **médio**.
 | 3 | 25/10/2026 | Tokens, base, 13 componentes, casca (rotas, atalhos, busca Ctrl+K, soltar arquivo, sem conexão, sinal de janela, tema), catálogo, conferência automática, 10 testes; `docs/interface/3-sistema.md` | Pasta e tokens próprios para não mexer na interface atual; módulos ES sem build; número aceita vírgula; contraste 0 falhas em 359 textos e alvos 0 falhas em 70, nos dois temas e em toque | Etapa 4: Análise completa na interface nova |
 | plano | 25/10/2026 | Referência de acabamento do usuário (FLIR Thermal Studio) traduzida em regras: `2-direcao.md` seção 6; Etapa 3b criada | Ilustração vetorial própria nos estados; Bahnschrift como fonte de estrutura (já vem no Windows); barra de ferramentas e seções recolhíveis; sombra só no que flutua; logo original mantida, redesenho descartado | Etapa 3b antes da Etapa 4 |
 | 3b (em andamento) | 25/10/2026 | Tokens (estrutura, ilustração, ferro, fundo de trabalho); Bahnschrift semicondensada na navegação, abas, cabeçalho de tabela e ferramentas (medido: 15 % mais estreita); barra de ferramentas, seção recolhível, painel com trilho; 6 ilustrações isométricas em `js/ilustracoes.js`; `/nova#captura` mostra o estado sem fonte com dados reais; catálogo: 0 falhas em 395 textos e 83 alvos (claro, escuro, toque); Captura: 0 falhas | Barra de título própria (WCO) não dá: na janela `--app` a API existe mas fica desligada (`visible: false`); só funciona instalando como PWA, o que muda o lançador | Falta: revisar a olho as 5 outras ilustrações nos dois temas, CLAUDE.md seções 1 e 2, comparação lado a lado com a FLIR (`saida/`), marcar as caixas |
-| 3b (nuvem) | 25/10/2026 | Ilustrações v2: moldura 4:3 comum, gradiente nas faces, filete de luz, sombra difusa; 6 corrigidas e 4 novas (`analise`, `laudo`, `busca`, `celular`); entrada peça a peça e varredura no `procurando`; 4 tokens `--ilu-*`; capturas em `docs/interface/capturas/etapa3b/`; lista de toques finais em `docs/interface/acabamento.md` | Cada ilustração em até 6 peças (chão, peças, acento por último); loop só em `procurando`; logo nova aprovada em `marca/vetor/` (símbolo vetorizado da referência do Hugo + Chakra Petch Bold), ainda não aplicada | Usar as ilustrações nos estados da tabela de `acabamento.md`; aplicar a logo nova (`acabamento.md`, parte 6); CLAUDE.md seções 1 e 2; comparação com a FLIR; decidir a Etapa 3c (`acabamento.md`, parte 5) |
+| 3b (nuvem) | 25/10/2026 | Ilustrações v2: moldura 4:3 comum, gradiente nas faces, filete de luz, sombra difusa; 6 corrigidas e 4 novas (`analise`, `laudo`, `busca`, `celular`); entrada peça a peça e varredura no `procurando`; 4 tokens `--ilu-*`; capturas em `docs/interface/capturas/etapa3b/`; lista de toques finais em `docs/interface/acabamento.md` | Cada ilustração em até 6 peças (chão, peças, acento por último); loop só em `procurando`; logo nova aprovada em `marca/vetor/` (símbolo vetorizado da referência do Hugo + Chakra Petch Bold), ainda não aplicada | Usar as ilustrações nos estados da tabela de `acabamento.md`; aplicar a logo nova (`acabamento.md`, parte 6); CLAUDE.md seções 1 e 2; comparação com a FLIR; Etapa 3c (`acabamento.md`, parte 5), pedida pelo Hugo |
 
 ### Medição de equipamentos (Etapa 0)
 

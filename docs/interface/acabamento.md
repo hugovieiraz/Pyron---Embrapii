@@ -96,10 +96,11 @@ Conferido: testes da interface (10/10), `node --check`, os dois temas.
     "Usar dados de demonstração". Só aparece sem nenhuma inspeção.
 20. **Sobre** (em Configurações): logo, versão, créditos, licença do dataset, sem texto longo.
 
-## 5. Ajustes de direção (conversa de 25/10, para decidir com o usuário)
+## 5. Etapa 3c: estilo FLIR (pedido do Hugo em 25/10)
 
-Comparado com a FLIR, o que mais afasta o Pyron de "software profissional" é cor demais na
-estrutura. Proposta de uma Etapa 3c antes da Etapa 4:
+O Hugo mostrou telas do FLIR Thermal Studio e pediu o Pyron nesse estilo: fundo branco (ou preto no
+tema escuro), enxuto, profissional, sem cor espalhada na estrutura. Isso vira a Etapa 3c, feita antes
+da Etapa 4. Os detalhes o Claude decide pelos critérios do plano (não espera escolha do Hugo):
 - ação, aba ativa e seleção em grafite ou preto (branco no tema escuro), sem cobalto; a cor fica
   para o termograma, a severidade e o acento das ilustrações;
 - cinzas neutros no lugar da ardósia; corpo de texto em 15 px, tabelas em 14 px; raios de 2 a 4 px;
@@ -135,5 +136,6 @@ preto e branco, e o ícone do aplicativo. Nada foi trocado no aplicativo ainda. 
 Leia docs/interface/acabamento.md. A parte 1 já está no branch interface-nova: confira o catálogo
 (/nova/catalogo.html, claro e escuro) e use as ilustrações novas nos estados indicados na tabela.
 Aplique a logo nova (parte 6). Depois implemente a parte 2 junto com a Etapa 4 (Análise) e as
-partes 3 e 4 na Etapa 5. Antes da Etapa 4, pergunte ao Hugo se aprova a Etapa 3c (parte 5).
+partes 3 e 4 na Etapa 5. Faça a Etapa 3c (parte 5) antes da Etapa 4. Nada aqui espera escolha
+do Hugo: o Claude decide, como manda o plano.
 ```
