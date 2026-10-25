@@ -532,6 +532,7 @@ const TEXTOS = {
     acaoPlanilha: "Exportar planilha de inspeções (Excel)",
     acaoTema: "Alternar tema claro ou escuro",
     acaoAtalhos: "Atalhos de teclado",
+    acaoInterfaceNova: "Abrir a interface nova (em construção)",
   },
 
   atalhos: {

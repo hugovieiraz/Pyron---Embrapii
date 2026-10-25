@@ -3,7 +3,20 @@
 Software de manutenção preditiva por termografia (FastAPI local + interface web em `app/estatico/`,
 núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Textos em português do Brasil.
 
-## 1. Sistema de design (fonte única: `app/estatico/tokens.css`)
+## 0. Interface nova (em construção, `docs/plano-interface.md`)
+
+- Código em `app/interface/`, servido em `/nova`; a interface atual (seções 1 a 3) continua em `/`
+  até a Etapa 6. Na interface atual, Ctrl+K › "Abrir a interface nova" leva até ela.
+- **Fonte única dela: `app/interface/tokens.css`** (direção em `docs/interface/2-direcao.md`, sistema
+  em `docs/interface/3-sistema.md`): cobalto só em ação e seleção, neutros ardósia, palco grafite,
+  sem violeta nem índigo (no termograma significam frio), navegação no topo, nada abaixo de 14 px,
+  alvo 44 px (compacto 36 px só com mouse).
+- Módulos ES sem build: `js/base.js`, `js/componentes.js`, `js/casca.js`, uma tela por arquivo em
+  `js/telas/` (mapa em `js/rotas.js`). Textos do JS em `app/interface/textos.js`.
+- Conferir: `testes/test_interface_nova.py` (regra dura do CSS, foco, módulos) e o catálogo
+  `/nova/catalogo.html` com "Conferir acessibilidade" (claro, `?tema=escuro`, `?toque`).
+
+## 1. Sistema de design da interface atual (fonte única: `app/estatico/tokens.css`)
 
 - **Direção estética:** software industrial claro. Fundo branco e neutros frios levemente azulados;
   azul-índigo como cor de ação; violeta só em subtom (barra lateral, realces). A cor forte fica
@@ -77,7 +90,8 @@ núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Te
   (gera pasta + .zip na Área de Trabalho; apagar os anteriores antes). Nota técnica para o leitor:
   `apresentacao/LEIA-ME-TECNICO.txt`.
 
-**Git:** trabalhar no branch `melhorias-0.7`; publicar com push do branch e fast-forward do `main`
+**Git:** a interface nova vive no branch `interface-nova` (push só do branch; o `main` recebe na
+Etapa 6). O resto: trabalhar no branch `melhorias-0.7`; publicar com push do branch e fast-forward do `main`
 (`git push origin melhorias-0.7:main`). Antes de publicar, `git fetch` e conferir
 `git log HEAD..origin/main`: o colaborador GS87 (Gabriel) também envia commits direto ao `main`
 (Postgres, Grafana, BI). Havendo commits dele, integrar com merge (nunca forçar) e rodar os testes.
@@ -87,5 +101,5 @@ núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Te
   com CUDA e o pacote `onnx` são bloqueados de forma intermitente pelo SAC: não depender deles em
   tempo de execução (testes que precisam deles se pulam sozinhos).
 - Tela de 1536 × 816 úteis: janelas `--start-maximized`; conferir telas nesse tamanho.
-- A janela do Edge em modo aplicativo guarda arquivos em cache: a página serve os `.js`/`.css` com a
-  data de alteração no endereço (`?v=`); manter isso ao criar arquivos novos.
+- A janela do Edge em modo aplicativo guarda arquivos em cache: o servidor manda `Cache-Control: no-cache`
+  em tudo que não é `/api` (middleware `sem_cache_da_interface`), então arquivo novo entra sem `?v=`.

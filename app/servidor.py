@@ -25,7 +25,7 @@ from time import perf_counter
 
 import numpy as np
 from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
 
@@ -2183,4 +2183,11 @@ async def sem_cache_da_interface(request, chamar_proximo):
     return resposta
 
 
+# Interface nova, construída em paralelo (docs/plano-interface.md); a atual continua em "/" até a Etapa 6.
+@app.get("/nova", include_in_schema=False)
+def interface_nova() -> RedirectResponse:
+    return RedirectResponse("/nova/")
+
+
+app.mount("/nova", StaticFiles(directory=PASTA_APP / "interface", html=True), name="interface")
 app.mount("/", StaticFiles(directory=PASTA_APP / "estatico", html=True), name="estatico")

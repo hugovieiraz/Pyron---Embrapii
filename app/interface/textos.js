@@ -1,0 +1,122 @@
+// Todo texto que o JavaScript da interface nova mostra. O texto fixo da casca fica no index.html.
+
+export const TEXTOS = {
+  geral: {
+    semValor: "—",
+    tentarDeNovo: "Tentar de novo",
+    fechar: "Fechar",
+    cancelar: "Cancelar",
+    desfazer: "Desfazer",
+    salvar: "Salvar",
+    carregando: "Carregando…",
+    semResposta: "O servidor do Pyron não respondeu.",
+    erroServidor: (status) => `O servidor respondeu com erro ${status}.`,
+    versaoDiferente: (servidor, tela) => `O servidor está na versão ${servidor} e esta tela na ${tela}. Feche o Pyron e abra de novo pela área de trabalho.`,
+  },
+
+  casca: {
+    titulo: (tela) => `${tela} · Pyron`,
+    offline: "Sem conexão com o servidor do Pyron.",
+    offlineDica: "Se a janela principal foi fechada, abra o Pyron de novo pela área de trabalho.",
+    reconectando: "Reconectando…",
+    voltou: "Conexão restabelecida.",
+    alertas: (n) => (n ? `Alertas: ${n} não ${n === 1 ? "lido" : "lidos"}` : "Alertas"),
+    vencidas: (n) => `${n} ${n === 1 ? "pendência vencida" : "pendências vencidas"}`,
+    soltarTitulo: "Soltar para importar",
+    soltarDica: "JPEG radiométrico, PNG, WebP ou BMP",
+  },
+
+  // nomes das telas (navegação, título da janela, busca rápida)
+  telas: {
+    painel: "Painel",
+    inspecoes: "Inspeções",
+    equipamentos: "Equipamentos",
+    pendencias: "Pendências",
+    captura: "Captura",
+    modelos: "Modelos",
+    configuracoes: "Configurações",
+    catalogo: "Catálogo de componentes",
+  },
+
+  provisoria: {
+    titulo: "Em construção",
+    texto: (tela) => `A tela ${tela} entra na próxima etapa da interface nova. A interface atual continua completa.`,
+    abrirAtual: "Abrir na interface atual",
+  },
+
+  busca: {
+    rotulo: "Buscar tela, inspeção ou equipamento",
+    marcador: "Buscar tela, inspeção ou equipamento",
+    grupoTelas: "Telas",
+    grupoInspecoes: "Inspeções",
+    grupoEquipamentos: "Equipamentos",
+    grupoAcoes: "Ações",
+    nada: (termo) => `Nada encontrado para "${termo}".`,
+    carregando: "Carregando inspeções e equipamentos…",
+    dicaNavegar: "↑ ↓ escolher",
+    dicaAbrir: "Enter abrir",
+    dicaFechar: "Esc fechar",
+    acaoImportar: "Importar termogramas",
+    acaoAtalhos: "Atalhos de teclado",
+    acaoTema: "Alternar tema claro e escuro",
+  },
+
+  atalhos: {
+    titulo: "Atalhos de teclado",
+    lista: [
+      ["Ctrl K", "Buscar tela, inspeção ou equipamento"],
+      ["Ctrl O", "Importar termogramas"],
+      ["Alt 1 … 6", "Ir para Painel, Inspeções, Equipamentos, Pendências, Captura, Modelos"],
+      ["Alt 0", "Configurações"],
+      ["?", "Esta lista"],
+      ["Esc", "Fechar menu, diálogo ou busca"],
+    ],
+  },
+
+  importar: {
+    enviando: (i, n) => (n > 1 ? `Importando ${i} de ${n}…` : "Importando…"),
+    pronto: (ok, n) => (n > 1 ? `${ok} de ${n} termogramas importados.` : "Termograma importado."),
+    falhou: (nome, erro) => `${nome}: ${erro}`,
+    formato: (nome) => `${nome} não é uma imagem que o Pyron lê (JPEG, PNG, WebP ou BMP).`,
+    verInspecoes: "Ver inspeções",
+    abrir: "Abrir",
+  },
+
+  // página de catálogo (conferência dos componentes; não é tela de uso)
+  catalogo: {
+    sub: "Cada componente em todos os estados. Fonte dos valores: tokens.css.",
+    tema: "Tema", claro: "Claro", escuro: "Escuro", conferir: "Conferir acessibilidade",
+    contraste: (r, fundo) => `${r}:1 sobre ${fundo}`,
+    cores: "Cores", acao: "Ação (cobalto)", neutros: "Neutros (ardósia)", papeis: "Papéis e contraste", severidade: "Severidade", palco: "Palco do termograma",
+    palcoTexto: "Leitura sobre o palco", palcoTexto2: "Texto secundário sobre o palco",
+    tipografia: "Tipografia", numeros: "Números e leituras",
+    usoTipo: { 1: "Tabela, controle e legenda", 2: "Corpo de texto da tela", 3: "Título de seção", 4: "Título de página", 5: "Leitura de destaque", 6: "96,4 °C" },
+    medidas: "Espaçamento, raio e sombra", espacamento: "Espaçamento (múltiplos de 4 px)", raios: "Raios", sombras: "Sombras",
+    botoes: "Botões", variantes: "Primário (um por tela), secundário, fantasma, perigo, só ícone, com atalho", estadosBotao: "Ocupado, desabilitado, com contador", compactos: "Compactos (dentro de tabela e ferramentas)",
+    gerarLaudo: "Gerar laudo", detectarDeNovo: "Detectar de novo", cancelar: "Cancelar", apagar: "Apagar", mais: "Mais opções", importar: "Importar termogramas", salvar: "Salvar", alertas: "Alertas", editar: "Editar",
+    campos: "Campos", instalacao: "Instalação", ambiente: "Temperatura ambiente", emissividade: "Emissividade", emissividadeAjuda: "Entre 0,05 e 1. Metal oxidado: 0,78.",
+    carga: "Carga no momento", cargaErro: "Use um valor entre 1 e 200 %.", material: "Material da superfície", materiais: ["Cobre oxidado", "Alumínio", "Porcelana", "Aço pintado"],
+    responsavel: "Responsável técnico", responsaveis: ["Eng. Ana Souza, CREA-PB 123456", "Téc. Bruno Lima"], observacoes: "Observações", observacoesMarcador: "Vento, sol, acesso",
+    opcoes: "Opções do laudo", incluirFoto: "Incluir foto visível", incluirOriginal: "Incluir imagem original",
+    selecao: "Seleção", segmentadoT: "Segmentado (filtro com contagem)", filtro: "Filtro de severidade", todas: "Todas", criticas: "Críticas", programar: "Programar", atencao: "Atenção",
+    abasT: "Abas", regioes: "Regiões", condicoes: "Condições", identificacao: "Identificação", conteudoAba: (nome) => `Conteúdo da aba ${nome}. Setas, Home e End trocam de aba.`,
+    menuT: "Menu", modelo: "Modelo", pontosQuentes: "Pontos quentes", identificarComponentes: "Identificar componentes", exportarImagem: "Exportar imagem", exportarCsv: "Exportar temperaturas (CSV)", indisponivel: "Indisponível", escolhido: "Opção escolhida.",
+    estrutura: "Estrutura", cabecalhoT: "Cabeçalho de página", cartaoT: "Cartão e cartão recuado", recuado: "Recuado", recuadoTexto: "Agrupa sem borda, sobre o fundo secundário.",
+    selos: "Selos (cor e nome do nível)", barras: "Barras (% da MTA)", indicadores: "Indicadores",
+    criticasNota: "urgente ou imediato", pendenciasVencidas: "Pendências vencidas", pendenciasNota: "de 9 abertas", inspecoesVencidas: "Inspeções vencidas", inspecoesNota: "de 18 equipamentos", alertasNota: "nenhum não lido",
+    tabelaT: "Tabela", equipamento: "Equipamento", regiao: "Região", tmax: "Tmáx", criterio: "Critério", severidadeCol: "Severidade", prazo: "Prazo", acoes: "Ações", editarItem: (n) => `Editar ${n}`, ordenar: "Ordenação trocada.",
+    estados: "Estados", esqueletoT: "Carregando (esqueleto)", vazioT: "Vazio", vazioTitulo: "Nenhuma inspeção", vazioTexto: "Importe os termogramas da câmera para começar.",
+    erroT: "Erro", erroTitulo: "Não foi possível carregar as inspeções", erroDetalhe: "O servidor respondeu com erro 500.", tentando: "Tentando de novo…", semConexao: "Sem conexão (faixa do topo)",
+    retorno: "Avisos e diálogos", avisosT: "Avisos", avisoSimples: "Aviso", avisoDesfazer: "Aviso com Desfazer", avisoErro: "Aviso de erro",
+    laudoGerado: "Laudo gerado.", regiaoApagada: "Região apagada.", desfeito: "Região restaurada.",
+    dialogosT: "Diálogos", abrirDialogo: "Abrir diálogo", dialogoTitulo: "Atualizar pendência", ordemServico: "Ordem de serviço", salvo: "Pendência atualizada.",
+    abrirConfirmar: "Apagar inspeção", confirmarTitulo: "Apagar a inspeção?", confirmarTexto: "A imagem, as regiões e o laudo desta inspeção saem do Pyron.", apagado: "Inspeção apagada.",
+    iconesT: "Ícones",
+    conferenciaT: "Conferência", conferenciaDica: "Use o botão Conferir acessibilidade no topo. Repita no tema escuro e com ?toque no endereço.",
+    resultadoContraste: (n, f) => (f ? `Contraste: ${f} de ${n} textos abaixo do mínimo.` : `Contraste: ${n} textos conferidos, todos no mínimo da WCAG.`),
+    resultadoAlvos: (n, f, toque) => (f ? `Alvos: ${f} de ${n} abaixo do tamanho mínimo${toque ? " em toque" : ""}.` : `Alvos: ${n} conferidos, todos com o tamanho mínimo${toque ? " em toque (44 px)" : ""}.`),
+  },
+
+  niveis: { normal: "Normal", atencao: "Atenção", programar: "Programar", urgente: "Urgente", imediato: "Imediato", sem_medida: "Sem medida", nao_avaliado: "Não avaliado" },
+  indicativa: "Indicativa: confira antes de agir",
+};

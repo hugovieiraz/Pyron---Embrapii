@@ -1,0 +1,59 @@
+// Ícones de traço (24 × 24), um só lugar para a casca e o catálogo. instalarIcones() põe o sprite no <body>.
+const ICONES = {
+  painel: '<rect x="3.5" y="3.5" width="7" height="9" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="5" rx="1.5"/><rect x="13.5" y="11.5" width="7" height="9" rx="1.5"/><rect x="3.5" y="15.5" width="7" height="5" rx="1.5"/>',
+  inspecoes: '<rect x="3.5" y="3.5" width="17" height="17" rx="2.5"/><path d="M8 9h8M8 12.5h8M8 16h5"/>',
+  equipamentos: '<path d="M3 20.5h18M4.5 20.5V10l5 3.2V10l5 3.2V6.5h5v14"/>',
+  pendencias: '<path d="M14.7 6.3a4.5 4.5 0 0 0 5.6 5.6l-8.6 8.6a2.1 2.1 0 0 1-3-3l8.6-8.6"/><path d="M20.3 11.9a4.5 4.5 0 0 1-5.6-5.6l2.6 2.6 2.4-.4.4-2.4-2.6-2.6"/>',
+  captura: '<path d="M3.5 8.5a2 2 0 0 1 2-2h2l1.5-2h6l1.5 2h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5"/>',
+  modelos: '<rect x="6.5" y="6.5" width="11" height="11" rx="2"/><path d="M9.5 2.5v4M14.5 2.5v4M9.5 17.5v4M14.5 17.5v4M2.5 9.5h4M2.5 14.5h4M17.5 9.5h4M17.5 14.5h4"/>',
+  config: '<path d="M4 6.5h9M17 6.5h3M4 12h3M11 12h9M4 17.5h11M19 17.5h1"/><circle cx="15" cy="6.5" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17.5" r="2"/>',
+  busca: '<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',
+  sino: '<path d="M6 16.5V11a6 6 0 1 1 12 0v5.5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
+  importar: '<path d="M12 15.5V4M7 8.5 12 3.8l5 4.7"/><path d="M4 14.5v3.5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3.5"/>',
+  baixar: '<path d="M12 4v11.5M7 10.5l5 5 5-5"/><path d="M4 16.5V18a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1.5"/>',
+  laudo: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 16.5h6"/>',
+  anterior: '<path d="M15 5.5 8.5 12l6.5 6.5"/>',
+  proxima: '<path d="m9 5.5 6.5 6.5L9 18.5"/>',
+  baixo: '<path d="m6 9 6 6 6-6"/>',
+  ordenar: '<path d="M12 5v14M7 14l5 5 5-5"/>',
+  selecionar: '<path d="M5 3.5 18.5 10l-6 1.8L10 18z"/>',
+  regiao: '<rect x="4" y="4" width="16" height="16" rx="1.5" stroke-dasharray="3 2.6"/><path d="M12 9v6M9 12h6"/>',
+  ponto: '<circle cx="12" cy="12" r="6.5"/><path d="M12 2.5v5M12 16.5v5M2.5 12h5M16.5 12h5"/>',
+  linha: '<path d="M6 18 18 6"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="5" r="2"/>',
+  camadas: '<path d="m12 4 8.5 4.5L12 13 3.5 8.5z"/><path d="m3.5 12.5 8.5 4.5 8.5-4.5"/>',
+  detectar: '<path d="M4 9V5h4M16 5h4v4M20 15v4h-4M8 19H4v-4"/><circle cx="12" cy="12" r="3"/>',
+  "mais-opcoes": '<circle cx="5.5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="18.5" cy="12" r="1.3"/>',
+  adicionar: '<path d="M12 5v14M5 12h14"/>',
+  foto: '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M21 15.5 16 11l-8.5 8"/>',
+  regua: '<rect x="2.5" y="8" width="19" height="8" rx="1.5"/><path d="M6.5 8v3M10 8v4M13.5 8v3M17 8v4"/>',
+  escala: '<rect x="9" y="3.5" width="6" height="17" rx="3"/><path d="M4 7h3M4 12h3M4 17h3M17 9.5h3M17 14.5h3"/>',
+  termometro: '<path d="M14 14.6V5a2 2 0 1 0-4 0v9.6a4 4 0 1 0 4 0z"/><path d="M12 9v7.5"/>',
+  x: '<path d="M6 6l12 12M18 6 6 18"/>',
+  check: '<path d="m5 12.5 4.5 4.5L19.5 7"/>',
+  alerta: '<path d="M10.3 4.2 2.6 17.5A2 2 0 0 0 4.3 20.5h15.4a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0z"/><path d="M12 9.5v4M12 16.8v.2"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.8v.2"/>',
+  offline: '<path d="M3 3l18 18"/><path d="M8.5 16.5a5 5 0 0 1 7 0M5 13a10 10 0 0 1 4.3-2.5M19 13a10 10 0 0 0-2.3-1.6M2 9.5a15 15 0 0 1 4.5-2.8M22 9.5A15 15 0 0 0 11 5.1M12 20v.1"/>',
+  refazer: '<path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20.5 4v5h-5"/>',
+  desfazer: '<path d="M4 8.5h10.5a5.5 5.5 0 0 1 0 11H9"/><path d="M8 4.5 4 8.5l4 4"/>',
+  lixo: '<path d="M4 7h16M10 11v6M14 11v6M6 7l.9 12.1A2 2 0 0 0 8.9 21h6.2a2 2 0 0 0 2-1.9L18 7M9 7V4.5h6V7"/>',
+  editar: '<path d="M4 20h4.5L19.3 9.2a2.1 2.1 0 0 0-3-3L5.5 17v3z"/><path d="m14.5 8 3 3"/>',
+  calendario: '<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/>',
+  pasta: '<path d="M3.5 7a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>',
+  video: '<rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10.5 5-3v9l-5-3z"/>',
+  celular: '<rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18.5h3"/>',
+  grafico: '<path d="M3.5 20.5h17"/><rect x="5" y="11" width="3.5" height="7" rx="1"/><rect x="10.25" y="5.5" width="3.5" height="12.5" rx="1"/><rect x="15.5" y="8.5" width="3.5" height="9.5" rx="1"/>',
+  sobe: '<path d="M4 17.5 10 11.5l3.5 3.5L20 8.5"/><path d="M14.5 8.5H20V14"/>',
+  desce: '<path d="M4 6.5 10 12.5l3.5-3.5L20 15.5"/><path d="M14.5 15.5H20V10"/>',
+  estavel: '<path d="M4 12h15.5M15 7.5l4.5 4.5-4.5 4.5"/>',
+  externo: '<path d="M14 4.5h5.5V10M19.5 4.5 11 13"/><path d="M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/>',
+  teclado: '<rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>',
+  tema: '<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="currentColor"/>',
+};
+
+export function instalarIcones() {
+  if (document.getElementById("sprite-pyron")) return;
+  const simbolos = Object.entries(ICONES).map(([id, d]) => `<symbol id="i-${id}" viewBox="0 0 24 24">${d}</symbol>`).join("");
+  document.body.insertAdjacentHTML("afterbegin", `<svg id="sprite-pyron" class="sprite" aria-hidden="true">${simbolos}</svg>`);
+}
+
+export const NOMES_ICONES = Object.keys(ICONES);

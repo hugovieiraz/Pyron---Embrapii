@@ -93,11 +93,11 @@ Modelo: **Opus**, esforço **alto**.
 
 ## Etapa 3 · Sistema visual e estrutura
 Modelo: **Opus**, esforço **alto**.
-- [ ] Tokens da direção escolhida (valor novo entra em `tokens.css` primeiro).
-- [ ] Componentes base em `app/interface/`: botões, campos, cartões, tabelas, selos de severidade,
-      estados (esqueleto, vazio, erro, sem conexão), diálogos, avisos.
-- [ ] Página de catálogo dos componentes, para conferência.
-- [ ] Casca: navegação nova, cabeçalho, roteamento, atalhos; servir em `/nova`.
+- [x] Tokens da direção escolhida (valor novo entra em `tokens.css` primeiro): `app/interface/tokens.css`.
+- [x] Componentes base em `app/interface/`: botões, campos, cartões, tabelas, selos de severidade,
+      estados (esqueleto, vazio, erro, sem conexão), diálogos, avisos (e menu, abas, segmentado, indicador).
+- [x] Página de catálogo dos componentes, para conferência: `/nova/catalogo.html`.
+- [x] Casca: navegação nova, cabeçalho, roteamento, atalhos; servir em `/nova`.
 - **Pronto quando:** catálogo completo; foco visível, contraste ≥ 4,5:1 e alvos ≥ 44 px conferidos.
 
 ## Etapa 4 · Tela de referência
@@ -131,6 +131,7 @@ Modelo: Opus com esforço **médio**.
 | 0 | 25/10/2026 | Branch `interface-nova` a partir do `main` em `b41b802` (commit do Gabriel); 3 correções de integração; 232 testes passam, 8 pulados | Medição não é tela própria: entra na Análise, como dado da região | Avisar o Gabriel das 3 correções; observações para a Etapa 1 abaixo |
 | 1 | 25/10/2026 | Inventário de 14 telas, capturas em `saida/capturas/antes/`, arquitetura em `docs/interface/1-diagnostico.md` | Navegação: Painel, Inspeções, Equipamentos, Pendências, Captura, Modelos + Configurações; Nova análise vira ação de Inspeções; Análise é detalhe da inspeção e cabe sem rolar; Monitoramento + Vídeo + Celular = Captura; Modelos + Avaliação; Sobre em Configurações; um primário por tela, sem primário global | Etapa 2: esboços do Painel e da Análise |
 | 2 | 25/10/2026 | Brief, paleta nova, três esboços (A mesa, B cartões, C leitura ampla) com capturas e medidas em 1536 × 816; `docs/interface/2-direcao.md` | Direção C: navegação no topo, corpo 17 px, nada abaixo de 14 px, termograma com 33 % da tela; cor "aço e cobalto" (cobalto para ação, ardósia, palco grafite; violeta e índigo saem porque significam frio no termograma) | Etapa 3: tokens novos em `tokens.css`, `CLAUDE.md` seção 1 atualizada, componentes e casca em `/nova` |
+| 3 | 25/10/2026 | Tokens, base, 13 componentes, casca (rotas, atalhos, busca Ctrl+K, soltar arquivo, sem conexão, sinal de janela, tema), catálogo, conferência automática, 10 testes; `docs/interface/3-sistema.md` | Pasta e tokens próprios para não mexer na interface atual; módulos ES sem build; número aceita vírgula; contraste 0 falhas em 359 textos e alvos 0 falhas em 70, nos dois temas e em toque | Etapa 4: Análise completa na interface nova |
 
 ### Medição de equipamentos (Etapa 0)
 

@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="pt-BR" data-tema="claro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Esboço · Marca do Pyron</title>
+<link rel="stylesheet" href="../../../app/interface/tokens.css">
+<style>
+/* Esboço da marca: três variações do símbolo (mão com a chama) em vetor, para escolher antes de aplicar.
+   Tudo é SVG desenhado numa grade de 48 × 48; as cores saem de variáveis, então o mesmo desenho
+   serve ao tema claro, ao escuro e à versão de uma cor. */
+:root {
+  /* propostas de token da marca (entram em tokens.css na aplicação) */
+  --marca-mao: var(--n-900);
+  --marca-chama-1: #C9301C;   /* borda da chama: vermelho */
+  --marca-chama-2: #F06A1A;   /* corpo: brasa (o --marca-brasa de hoje) */
+  --marca-chama-3: #FFB21F;   /* núcleo: âmbar, o mais quente */
+  --marca-grande: 160px;
+  --ladrilho: 96px;
+}
+:root[data-tema="escuro"] { --marca-mao: var(--n-900); }
+* { box-sizing: border-box; margin: 0; }
+body { font: var(--p-normal) var(--t-2) / var(--a-2) var(--fonte); color: var(--texto); background: var(--fundo); padding: var(--e-8) var(--e-8) var(--e-16); }
+.cab { display: flex; align-items: flex-start; gap: var(--e-4); max-width: var(--conteudo-max); margin: 0 auto var(--e-8); }
+.cab h1 { font: var(--p-forte) var(--t-4) / var(--a-4) var(--fonte-titulo); }
+.cab p { color: var(--texto-3); max-width: var(--medida); }
+.cab .btn { margin-left: auto; }
+.btn { display: inline-flex; align-items: center; gap: var(--e-2); height: var(--alvo); padding: 0 var(--e-4); border-radius: var(--r-p); border: 1px solid var(--borda-campo); background: var(--superficie); color: var(--texto); font: var(--p-medio) var(--t-1) var(--fonte); cursor: pointer; flex: none; }
+.btn:hover { background: var(--hover); }
+.btn:focus-visible { outline: var(--borda-sel) solid var(--foco); outline-offset: 2px; }
+
+.grade { display: grid; gap: var(--e-6); max-width: var(--conteudo-max); margin: 0 auto; }
+.variacao { display: grid; grid-template-columns: 300px 1fr; gap: var(--e-6); padding: var(--e-6); border: 1px solid var(--borda); border-radius: var(--r-g); background: var(--superficie); }
+.variacao.original { opacity: .9; }
+.titulo h2 { font: var(--p-forte) var(--t-3) / var(--a-3) var(--fonte-titulo); }
+.titulo .letra { display: inline-grid; place-items: center; width: var(--e-8); height: var(--e-8); border-radius: var(--r-p); background: var(--acao-suave); color: var(--acao); font-weight: var(--p-forte); margin-right: var(--e-2); }
+.titulo p { color: var(--texto-2); margin-top: var(--e-2); font-size: var(--t-1); line-height: var(--a-1); }
+.titulo ul { color: var(--texto-3); margin-top: var(--e-3); padding-left: var(--e-5); font-size: var(--t-1); line-height: var(--a-1); display: grid; gap: var(--e-1); }
+.grande { display: grid; place-items: center; height: 200px; margin-top: var(--e-5); border-radius: var(--r-m); background: var(--superficie-2); }
+.grande svg, .grande img { width: var(--marca-grande); height: var(--marca-grande); }
+
+.provas { display: grid; gap: var(--e-5); align-content: start; }
+.prova h3 { font-size: var(--t-1); line-height: var(--a-1); font-weight: var(--p-medio); color: var(--texto-3); margin-bottom: var(--e-2); }
+.linha { display: flex; flex-wrap: wrap; align-items: end; gap: var(--e-5); padding: var(--e-4); border-radius: var(--r-m); border: 1px solid var(--borda); }
+.linha.palco { background: var(--palco); border-color: var(--palco); color: var(--palco-texto); --marca-mao: var(--n-100); }
+:root[data-tema="escuro"] .linha.palco { --marca-mao: var(--n-900); }
+.tam { display: grid; justify-items: center; gap: var(--e-1); font: var(--t-1) var(--fonte-num); color: var(--texto-3); }
+.palco .tam { color: var(--palco-texto-2); }
+.tam svg, .tam img { display: block; }
+.mono { color: var(--texto); --marca-chama-1: currentColor; --marca-chama-2: currentColor; --marca-chama-3: currentColor; }
+.mono.recorte { --marca-chama-2: var(--superficie); --marca-chama-3: currentColor; }
+
+/* conjunto horizontal: como fica na barra superior da interface nova (56 px) */
+.barra { display: flex; align-items: center; gap: var(--e-6); height: var(--topo); padding: 0 var(--e-5); border: 1px solid var(--borda); border-radius: var(--r-m); background: var(--superficie); }
+.conjunto { display: flex; align-items: center; gap: var(--e-2); }
+.conjunto svg, .conjunto img { width: var(--e-8); height: var(--e-8); }
+.nome { font: var(--p-forte) var(--t-3) / 1 var(--fonte-titulo); letter-spacing: .06em; }
+.barra .falsa { color: var(--texto-3); font-size: var(--t-1); font-weight: var(--p-medio); }
+.barra .falsa b { color: var(--texto); }
+
+/* assinatura grande: tela de abertura e Sobre */
+.assinatura { display: flex; align-items: center; gap: var(--e-4); }
+.assinatura svg, .assinatura img { width: var(--e-16); height: var(--e-16); }
+.assinatura .nome { font-size: var(--t-6); }
+.assinatura small { display: block; margin-top: var(--e-2); font: var(--t-1) var(--fonte); letter-spacing: 0; color: var(--texto-3); }
+
+/* ladrilho de ícone do Windows / atalho */
+.ladrilhos { display: flex; gap: var(--e-4); align-items: center; }
+.ladrilho { width: var(--ladrilho); height: var(--ladrilho); border-radius: 22%; display: grid; place-items: center; background: var(--branco); border: 1px solid var(--n-300); --marca-mao: #161B22; }
+.ladrilho.escuro { background: #161B22; border-color: #161B22; --marca-mao: #F1F3F6; }
+.ladrilho svg, .ladrilho img { width: 80%; height: 80%; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- mão comum a A e B: punho, palma com dedos subindo à direita, polegar marcado por um corte -->
+    <mask id="corte-polegar" maskUnits="userSpaceOnUse" x="0" y="0" width="48" height="48">
+      <rect width="48" height="48" fill="#fff"/>
+      <path d="M12 35.6H24.2C26.4 35.6 27.6 34.6 28.2 32.8" fill="none" stroke="#000" stroke-width="1.8" stroke-linecap="round"/>
+    </mask>
+    <g id="mao-solida" style="fill: var(--marca-mao)">
+      <rect x="3" y="30" width="7.5" height="13" rx="1.6"/>
+      <path mask="url(#corte-polegar)" d="M12.5 31H30.5L39.4 23.4C40.9 22.1 43.3 22.9 43.3 24.9C43.3 25.6 43.1 26.1 42.7 26.7L35.6 37.6C34.1 40 31.7 42 28.4 42H12.5Z"/>
+    </g>
+  </defs>
+
+  <!-- A · Sólida: chama lisa em três camadas, do vermelho da borda ao âmbar do núcleo -->
+  <symbol id="simbolo-a" viewBox="0 0 48 48">
+    <use href="#mao-solida"/>
+    <path style="fill: var(--marca-chama-1)" d="M24 3.5C25.5 8.5 33 11.5 33 19.5C33 25 29 28.5 24 28.5C19 28.5 15 25 15 19.5C15 15.5 17.3 12.8 19.3 10.2C19.6 12.6 20.6 14 22 14.6C21.5 10.5 22.3 6.8 24 3.5Z"/>
+    <path style="fill: var(--marca-chama-2)" d="M24.6 11.2C26.2 14.8 30.2 16.9 30.2 21.6C30.2 25.3 27.4 27.7 24 27.7C20.6 27.7 17.8 25.3 17.8 21.8C17.8 19.6 19 18 20.2 16.8C20.5 18.4 21.3 19.4 22.3 19.8C22 16.6 23 13.6 24.6 11.2Z"/>
+    <path style="fill: var(--marca-chama-3)" d="M24.3 18.2C25.7 20.5 27.4 21.8 27.4 24.2C27.4 26.1 25.9 27.4 24 27.4C22.1 27.4 20.6 26.1 20.6 24.2C20.6 22.2 22.5 20.8 24.3 18.2Z"/>
+  </symbol>
+
+  <!-- B · Pixel térmico: a chama feita de pixels de termograma (grade de 3 unidades = 1 px em 16 px) -->
+  <symbol id="simbolo-b" viewBox="0 0 48 48">
+    <use href="#mao-solida"/>
+    <g id="chama-pixel"></g>
+  </symbol>
+
+  <!-- C · Traço: a mão no mesmo traço dos ícones da interface (1,7 na grade de 24), chama cheia -->
+  <symbol id="simbolo-c" viewBox="0 0 48 48">
+    <g fill="none" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" style="stroke: var(--marca-mao)">
+      <path d="M7.5 31V42"/>
+      <path d="M14.5 31.2H30.3L39.3 23.6C40.6 22.5 42.6 23.4 42.4 25.1C42.3 25.6 42.2 26 41.9 26.4L35.2 37C33.8 39.3 31.6 41 28.6 41H14.5"/>
+      <path d="M14.5 36.1H24.4C26.3 36.1 27.6 35 28.1 33.4"/>
+    </g>
+    <path style="fill: var(--marca-chama-2)" fill-rule="evenodd" d="M24 3.5C25.5 8.5 33 11.5 33 19.5C33 25 29 28.5 24 28.5C19 28.5 15 25 15 19.5C15 15.5 17.3 12.8 19.3 10.2C19.6 12.6 20.6 14 22 14.6C21.5 10.5 22.3 6.8 24 3.5ZM24.3 16.6C25.9 19.2 27.9 20.9 27.9 23.7C27.9 25.9 26.2 27.4 24 27.4C21.8 27.4 20.1 25.9 20.1 23.7C20.1 21.4 22.3 19.6 24.3 16.6Z"/>
+    <path style="fill: var(--marca-chama-3)" d="M24.3 19.6C25.3 21.2 26.3 22.2 26.3 23.8C26.3 25.1 25.3 26 24 26C22.7 26 21.7 25.1 21.7 23.8C21.7 22.4 23 21.4 24.3 19.6Z"/>
+  </symbol>
+</svg>
+
+<header class="cab">
+  <div>
+    <h1>Marca do Pyron · três variações do símbolo</h1>
+    <p>A mesma ideia da logo atual (a mão segurando a chama), redesenhada em vetor numa grade de 48 × 48. Cada variação aparece nos tamanhos em que a marca é usada de verdade: barra superior (32 px), favicon (16 px), ícone do Windows, tela de abertura, tema escuro e versão de uma cor.</p>
+  </div>
+  <button class="btn" type="button" id="tema">Tema escuro</button>
+</header>
+
+<main class="grade" id="grade"></main>
+
+<template id="modelo">
+  <section class="variacao">
+    <div class="titulo">
+      <h2><span class="letra"></span><span class="rotulo"></span></h2>
+      <p class="desc"></p>
+      <ul class="notas"></ul>
+      <div class="grande"></div>
+    </div>
+    <div class="provas">
+      <div class="prova"><h3>Tamanhos reais (px)</h3><div class="linha tamanhos"></div></div>
+      <div class="prova"><h3>Sobre fundo escuro (palco do termograma, tema escuro)</h3><div class="linha palco tamanhos"></div></div>
+      <div class="prova"><h3>Uma cor (carimbo no laudo, impressão, marca-d'água)</h3><div class="linha mono-linha"></div></div>
+      <div class="prova"><h3>Barra superior da interface nova</h3>
+        <div class="barra"><span class="conjunto"></span><span class="falsa"><b>Painel</b>&emsp;Inspeções&emsp;Equipamentos&emsp;Pendências</span></div>
+      </div>
+      <div class="prova"><h3>Tela de abertura e ícone do Windows</h3>
+        <div class="linha"><div class="assinatura"></div><div class="ladrilhos"></div></div>
+      </div>
+    </div>
+  </section>
+</template>
+
+<script>
+// Chama em pixels da variação B: r = borda vermelha, o = brasa, a = núcleo âmbar. Uma linha = 3 unidades.
+const PIXELS = [
+  "...........r....",
+  ".........r......",
+  "........rr......",
+  ".......ror......",
+  "......roorr.....",
+  ".....rooaor.....",
+  "....rooaaoor....",
+  "....roaaaaor....",
+  "....roaaaaor....",
+  ".....roaaor.....",
+];
+const COR = { r: "var(--marca-chama-1)", o: "var(--marca-chama-2)", a: "var(--marca-chama-3)" };
+const NS = "http://www.w3.org/2000/svg";
+const chama = document.getElementById("chama-pixel");
+PIXELS.forEach((linha, y) => [...linha].forEach((c, x) => {
+  if (c === ".") return;
+  const r = document.createElementNS(NS, "rect");
+  Object.entries({ x: x * 3, y: y * 3, width: 3, height: 3 }).forEach(([k, v]) => r.setAttribute(k, v));
+  r.style.fill = COR[c];
+  chama.append(r);
+}));
+
+const VARIACOES = [
+  { id: "a", letra: "A", rotulo: "Sólida", desc: "Chama lisa em três camadas, mão cheia com o polegar marcado por um corte. A mais próxima de uma logo corporativa.",
+    notas: ["Lê bem do favicon à tela de abertura", "Cores da chama seguem a paleta ferro: borda vermelha, núcleo âmbar", "Na versão de uma cor, as camadas viram recortes"] },
+  { id: "b", letra: "B", rotulo: "Pixel térmico", desc: "Mantém o pixel da logo atual: a chama é feita de pixels de termograma, como uma imagem térmica ampliada. A mão continua lisa.",
+    notas: ["Grade de pixel casa com 16 px: o favicon fica nítido", "Liga a marca à termografia digital", "Mais informal que a A"] },
+  { id: "c", letra: "C", rotulo: "Traço", desc: "Mão desenhada com o mesmo traço dos ícones da interface, chama cheia. Conversa com o resto da tela.",
+    notas: ["Mais leve; parece da mesma família dos ícones", "Em 16 px o traço afina e perde força", "Bom para a barra; fraco como ícone do Windows"] },
+];
+
+const svg = (id, lado, extra = "") => `<svg width="${lado}" height="${lado}" ${extra} aria-hidden="true"><use href="#simbolo-${id}"/></svg>`;
+const img = (lado) => `<img src="../../../app/estatico/marca/simbolo.png" width="${lado}" height="${lado}" alt="">`;
+const TAMANHOS = [64, 48, 32, 24, 16];
+
+function montar(v, original) {
+  const no = document.getElementById("modelo").content.cloneNode(true);
+  const s = original ? img : (lado) => svg(v.id, lado);
+  const sec = no.querySelector(".variacao");
+  if (original) sec.classList.add("original");
+  no.querySelector(".letra").textContent = v.letra;
+  no.querySelector(".rotulo").textContent = v.rotulo;
+  no.querySelector(".desc").textContent = v.desc;
+  no.querySelector(".notas").innerHTML = v.notas.map((n) => `<li>${n}</li>`).join("");
+  no.querySelector(".grande").innerHTML = s(160);
+  no.querySelectorAll(".tamanhos").forEach((l) => { l.innerHTML = TAMANHOS.map((t) => `<span class="tam">${s(t)}${t}</span>`).join(""); });
+  no.querySelector(".mono-linha").innerHTML = original
+    ? `<span class="tam">não existe: a imagem só tem a versão colorida</span>`
+    : [64, 32, 16].map((t) => `<span class="tam mono">${svg(v.id, t)}${t}</span>`).join("")
+      + [64, 32].map((t) => `<span class="tam mono recorte">${svg(v.id, t)}recorte ${t}</span>`).join("");
+  no.querySelector(".conjunto").innerHTML = s(32) + `<span class="nome">PYRON</span>`;
+  no.querySelector(".assinatura").innerHTML = s(64) + `<span class="nome">PYRON<small>Manutenção preditiva por termografia</small></span>`;
+  no.querySelector(".ladrilhos").innerHTML = original
+    ? `<span class="ladrilho">${img(77)}</span>`
+    : `<span class="ladrilho">${svg(v.id, 77)}</span><span class="ladrilho escuro">${svg(v.id, 77)}</span>`;
+  document.getElementById("grade").append(no);
+}
+
+VARIACOES.forEach((v) => montar(v, false));
+montar({ letra: "·", rotulo: "Atual (PNG recortado)", desc: "Para comparar: o simbolo.png de hoje, recortado da imagem original.",
+  notas: ["Em 16 e 24 px a grade da mão e os pixels soltos viram borrão", "Mão escura fixa: some no fundo escuro", "Não tem versão de uma cor"] }, true);
+
+const botao = document.getElementById("tema");
+botao.addEventListener("click", () => {
+  const escuro = document.documentElement.dataset.tema !== "escuro";
+  document.documentElement.dataset.tema = escuro ? "escuro" : "claro";
+  botao.textContent = escuro ? "Tema claro" : "Tema escuro";
+});
+if (new URLSearchParams(location.search).has("escuro")) botao.click();
+</script>
+</body>
+</html>

@@ -1,0 +1,306 @@
+// Componentes da interface nova. Cada função devolve um nó pronto; o visual está em componentes.css.
+import { TEXTOS as T } from "../textos.js";
+import { el, icone, duracao, token, $ } from "./base.js";
+
+let sequencia = 0;
+const novoId = (prefixo) => `${prefixo}-${++sequencia}`;
+
+// ---------------------------------------------------------------- botão
+/**
+ * botao({ texto, icone, variante: "primario" | "secundario" | "fantasma" | "perigo", compacto, soIcone, atalho, onclick })
+ * Com soIcone, o texto vira aria-label e dica: todo botão de ícone tem nome acessível.
+ */
+export function botao({ texto, icone: ic, variante = "secundario", compacto = false, soIcone = false, atalho, onclick, tipo = "button", desabilitado = false, contador, ...resto } = {}) {
+  const classes = ["btn", variante !== "secundario" && variante, compacto && "compacto", soIcone && "icone"].filter(Boolean).join(" ");
+  const dica = atalho ? `${texto} (${atalho})` : texto;
+  const b = el("button", { type: tipo, class: classes, onclick, disabled: desabilitado, "aria-label": soIcone ? texto : null, title: soIcone || atalho ? dica : null, ...resto },
+    ic ? icone(ic) : null, soIcone ? null : el("span", {}, texto), contador ? contadorNo(contador) : null);
+  return b;
+}
+
+/** Mostra o indicador de carregamento no botão enquanto a ação roda; devolve o resultado da ação. */
+export async function ocupado(b, acao) {
+  b.setAttribute("aria-busy", "true");
+  try {
+    return await acao();
+  } finally {
+    b.removeAttribute("aria-busy");
+  }
+}
+
+function contadorNo(n) {
+  return el("span", { class: "contador", "aria-hidden": "true" }, n > 99 ? "99+" : String(n));
+}
+export const contador = contadorNo;
+
+// ---------------------------------------------------------------- campos
+/**
+ * campo({ rotulo, tipo, valor, unidade, ajuda, erro, opcoes, area, marcador, ...atributos })
+ * Rótulo sempre visível e ligado ao controle; ajuda e erro ficam em aria-describedby.
+ */
+export function campo({ rotulo, tipo = "text", valor, unidade, ajuda, erro, opcoes, area = false, marcador, id = novoId("campo"), classe, ...attrs } = {}) {
+  const idAjuda = ajuda ? `${id}-ajuda` : null;
+  const idErro = erro ? `${id}-erro` : null;
+  const comuns = { id, "aria-describedby": [idAjuda, idErro].filter(Boolean).join(" ") || null, "aria-invalid": erro ? "true" : null, ...attrs };
+  let controle;
+  if (opcoes) {
+    controle = el("select", comuns, opcoes.map((o) => (typeof o === "string" ? new Option(o, o) : new Option(o.texto, o.valor))));
+    if (valor != null) controle.value = valor;
+  } else if (area) {
+    controle = el("textarea", { ...comuns, placeholder: marcador }, valor ?? "");
+  } else if (tipo === "number") {
+    // número aceita vírgula ou ponto (lerNumero): o campo nativo de número recusa "31,5"
+    controle = el("input", { ...comuns, type: "text", inputmode: "decimal", autocomplete: "off", spellcheck: "false", class: "num", value: valor ?? "", placeholder: marcador });
+  } else {
+    controle = el("input", { ...comuns, type: tipo, value: valor ?? "", placeholder: marcador });
+  }
+  const corpo = unidade ? el("div", { class: "com-unidade" }, controle, el("span", { class: "unidade", "aria-hidden": "true" }, unidade)) : controle;
+  if (unidade) controle.setAttribute("aria-label", `${rotulo} (${unidade})`);
+  return el("div", { class: ["campo", classe].filter(Boolean).join(" ") },
+    el("label", { for: id }, rotulo),
+    corpo,
+    ajuda ? el("span", { class: "ajuda", id: idAjuda }, ajuda) : null,
+    erro ? el("span", { class: "erro-campo", id: idErro }, icone("alerta", "ic p"), erro) : null);
+}
+
+export function marcar({ rotulo, marcado = false, onchange, ...attrs } = {}) {
+  return el("label", { class: "marcar" }, el("input", { type: "checkbox", checked: marcado, onchange, ...attrs }), el("span", {}, rotulo));
+}
+
+// ---------------------------------------------------------------- segmentado e abas
+/** Grupo de opções exclusivas (filtro, modo): botões com aria-pressed. */
+export function segmentado({ rotulo, opcoes, valor, aoMudar }) {
+  const g = el("div", { class: "segmentado", role: "group", "aria-label": rotulo });
+  const marcarValor = (v) => [...g.children].forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.valor === v)));
+  for (const o of opcoes) {
+    g.append(el("button", { type: "button", dataset: { valor: o.valor }, "aria-pressed": String(o.valor === valor), onclick: () => { marcarValor(o.valor); aoMudar?.(o.valor); } },
+      o.texto, o.qtd != null ? el("span", { class: "qtd" }, String(o.qtd)) : null));
+  }
+  g.definir = marcarValor;
+  return g;
+}
+
+/** Abas com teclado: setas mudam de aba, Home e End vão às pontas (padrão WAI-ARIA). */
+export function abas({ rotulo, itens, ativa, aoMudar }) {
+  const lista = el("div", { class: "abas", role: "tablist", "aria-label": rotulo });
+  const botoes = itens.map((a) => el("button", {
+    type: "button", role: "tab", id: `aba-${a.id}`, "aria-controls": `painel-${a.id}`, "aria-selected": String(a.id === ativa), tabindex: a.id === ativa ? "0" : "-1",
+    dataset: { aba: a.id }, onclick: () => escolher(a.id, true),
+  }, a.texto, a.qtd != null ? el("span", { class: "qtd" }, String(a.qtd)) : null));
+  function escolher(id, avisarMudanca) {
+    for (const b of botoes) {
+      const sim = b.dataset.aba === id;
+      b.setAttribute("aria-selected", String(sim));
+      b.tabIndex = sim ? 0 : -1;
+    }
+    if (avisarMudanca) aoMudar?.(id);
+  }
+  lista.addEventListener("keydown", (ev) => {
+    const i = botoes.indexOf(document.activeElement);
+    if (i < 0) return;
+    const alvo = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: botoes.length - 1 }[ev.key];
+    if (alvo == null) return;
+    ev.preventDefault();
+    const b = botoes[(alvo + botoes.length) % botoes.length];
+    b.focus();
+    escolher(b.dataset.aba, true);
+  });
+  lista.append(...botoes);
+  lista.escolher = (id) => escolher(id, false);
+  return lista;
+}
+
+/** Painel de conteúdo ligado a uma aba de abas(). */
+export const painelAba = (id, ...filhos) => el("div", { role: "tabpanel", id: `painel-${id}`, "aria-labelledby": `aba-${id}`, tabindex: "0" }, ...filhos);
+
+// ---------------------------------------------------------------- cabeçalho de página
+export function cabecalho({ titulo, meta = [], acoes = [], antes = [] }) {
+  return el("header", { class: "cabecalho" }, antes,
+    el("div", { class: "titulo" }, el("h1", {}, titulo), meta.length ? el("div", { class: "meta" }, meta) : null),
+    acoes.length ? el("div", { class: "acoes" }, acoes) : null);
+}
+
+// ---------------------------------------------------------------- severidade e indicador
+/** Selo de severidade: cor + nome do nível (a cor nunca é o único sinal). */
+export function selo(nivel, { indicativa = false } = {}) {
+  return el("span", { class: `selo ${nivel}${indicativa ? " indicativa" : ""}`, title: indicativa ? T.indicativa : null }, T.niveis[nivel] || nivel);
+}
+
+/** Número de destaque da tela; com href ou onclick vira atalho para a lista filtrada. */
+export function indicador({ rotulo, valor, nota, severidade, href, onclick }) {
+  const tag = href ? "a" : onclick ? "button" : "div";
+  return el(tag, { class: `indicador${severidade ? ` sev-${severidade}` : ""}`, href, onclick, type: tag === "button" ? "button" : null },
+    el("span", { class: "valor" }, String(valor)), el("span", { class: "rotulo" }, rotulo), nota ? el("span", { class: "nota" }, nota) : null);
+}
+
+// ---------------------------------------------------------------- tabela
+/**
+ * tabela({ rotulo, colunas: [{ chave, titulo, classe, ordenavel, celula(linha) }], linhas, severidade(linha), href(linha), ordem, aoOrdenar })
+ * A linha inteira é clicável, mas o alvo de teclado é o link da primeira coluna de texto (sem div clicável).
+ */
+export function tabela({ rotulo, colunas, linhas, severidade, href, ordem, aoOrdenar, selecionada }) {
+  const comTraco = Boolean(severidade);
+  const cab = el("tr", {}, comTraco ? el("th", { "aria-hidden": "true" }) : null, colunas.map((c) => {
+    const sentido = ordem && ordem.chave === c.chave ? (ordem.sentido === "asc" ? "ascending" : "descending") : null;
+    return el("th", { scope: "col", class: c.classe, "aria-sort": sentido },
+      c.ordenavel ? el("button", { type: "button", onclick: () => aoOrdenar?.(c.chave) }, c.titulo, sentido ? icone("ordenar", "ic p") : null) : c.titulo);
+  }));
+  const corpo = el("tbody", {}, linhas.map((l) => {
+    const destino = href?.(l);
+    const tr = el("tr", { class: destino ? "clicavel" : null, "aria-selected": selecionada ? String(selecionada(l)) : null },
+      comTraco ? el("td", { class: `traco-celula sev-${severidade(l)}` }) : null,
+      colunas.map((c, i) => {
+        let conteudo = c.celula ? c.celula(l) : l[c.chave];
+        if (i === 0 && destino) conteudo = el("a", { href: destino, class: "forte" }, conteudo);
+        return el("td", { class: c.classe }, conteudo);
+      }));
+    if (destino) tr.addEventListener("click", (ev) => { if (!ev.target.closest("a, button, input, label")) location.hash = destino.replace(/^#/, ""); });
+    return tr;
+  }));
+  return el("div", { class: "tabela-caixa" }, el("table", { class: "tabela", "aria-label": rotulo }, el("thead", {}, cab), corpo));
+}
+
+// ---------------------------------------------------------------- estados de carregamento, vazio e erro
+const esq = (classe, estilo) => el("span", { class: `esq ${classe}`, style: estilo, "aria-hidden": "true" });
+export const esqueleto = {
+  linhas: (n = 3) => el("div", { class: "esqueleto", "aria-busy": "true", "aria-label": T.geral.carregando }, Array.from({ length: n }, (_, i) => esq("linha", { width: `${[92, 76, 84, 60][i % 4]}%` }))),
+  indicadores: (n = 4) => el("div", { class: "esqueleto" }, el("div", { class: "grade" }, Array.from({ length: n }, () => esq("bloco")))),
+  tabela: (n = 6) => el("div", { class: "esqueleto tabela-caixa", "aria-busy": "true", "aria-label": T.geral.carregando },
+    Array.from({ length: n }, () => el("div", { class: "linha-tabela" }, esq("linha"), esq("linha"), esq("linha"), esq("linha")))),
+  pagina: () => el("div", { class: "esqueleto", "aria-busy": "true", "aria-label": T.geral.carregando, style: { paddingTop: "var(--e-6)" } },
+    esq("titulo"), el("div", { class: "grade" }, Array.from({ length: 4 }, () => esq("bloco"))), esq("cheio")),
+};
+
+/** Vazio: uma frase útil e a ação que resolve. */
+export function estadoVazio({ icone: ic = "inspecoes", titulo, texto, acoes = [], compacto = false }) {
+  return el("div", { class: `vazio${compacto ? " compacto" : ""}` }, icone(ic), el("h2", {}, titulo), texto ? el("p", {}, texto) : null,
+    acoes.length ? el("div", { class: "grupo-btn" }, acoes) : null);
+}
+
+/** Erro: o que aconteceu, a mensagem do servidor e "Tentar de novo". */
+export function estadoErro({ titulo, erro, tentar }) {
+  return el("div", { class: "erro-estado", role: "alert" }, icone("alerta"), el("h2", {}, titulo),
+    erro ? el("p", { class: "detalhe" }, erro.message || String(erro)) : null,
+    tentar ? el("div", { class: "grupo-btn" }, botao({ texto: T.geral.tentarDeNovo, icone: "refazer", onclick: tentar })) : null);
+}
+
+// ---------------------------------------------------------------- aviso
+function caixaAvisos() {
+  let c = $(".avisos");
+  if (!c) {
+    c = el("div", { class: "avisos", "aria-live": "polite" });
+    document.body.append(c);
+  }
+  return c;
+}
+
+/**
+ * avisar(texto, { erro, acao: { rotulo, executar }, duracao })
+ * Fica parado enquanto o mouse ou o foco estão nele; com ação (Desfazer), dura mais.
+ */
+export function avisar(texto, { erro = false, acao = null, duracao: tempo } = {}) {
+  const total = tempo || (erro ? 8000 : acao ? 7000 : 4000);
+  const fechar = () => {
+    clearTimeout(relogio);
+    a.classList.add("saindo");
+    setTimeout(() => a.remove(), duracao("rapida"));
+  };
+  const a = el("div", { class: `aviso${erro ? " erro" : ""}`, role: erro ? "alert" : "status" },
+    icone(erro ? "alerta" : "check"), el("span", { class: "texto" }, texto),
+    acao ? el("button", { type: "button", class: "btn compacto acao", onclick: () => { fechar(); acao.executar(); } }, acao.rotulo) : null,
+    el("button", { type: "button", class: "btn compacto icone", "aria-label": T.geral.fechar, title: T.geral.fechar, onclick: () => fechar() }, icone("x", "ic p")));
+  let restante = total;
+  let inicio = performance.now();
+  let relogio = setTimeout(fechar, restante);
+  const pausar = () => { clearTimeout(relogio); restante -= performance.now() - inicio; };
+  const seguir = () => { inicio = performance.now(); relogio = setTimeout(fechar, Math.max(restante, 1500)); };
+  a.addEventListener("mouseenter", pausar);
+  a.addEventListener("mouseleave", seguir);
+  a.addEventListener("focusin", pausar);
+  a.addEventListener("focusout", seguir);
+  caixaAvisos().append(a);
+  return { fechar, atualizar: (novo) => { a.querySelector(".texto").textContent = novo; } };
+}
+
+// ---------------------------------------------------------------- diálogo
+/** dialogo({ titulo, corpo, acoes }): <dialog> nativo (foco preso, Esc fecha). Devolve { no, abrir, fechar }. */
+export function dialogo({ titulo, corpo = [], acoes = [], aoFechar, classe = "" }) {
+  const idTitulo = novoId("dialogo");
+  const d = el("dialog", { class: `dialogo ${classe}`, "aria-labelledby": idTitulo },
+    el("div", { class: "cab-dialogo" }, el("h2", { id: idTitulo }, titulo),
+      botao({ texto: T.geral.fechar, icone: "x", variante: "fantasma", soIcone: true, compacto: true, onclick: () => d.close() })),
+    el("div", { class: "corpo-dialogo" }, corpo),
+    acoes.length ? el("div", { class: "rodape-dialogo" }, acoes) : null);
+  d.addEventListener("close", () => { aoFechar?.(d.returnValue); d.remove(); });
+  d.addEventListener("click", (ev) => { if (ev.target === d) d.close(); }); // clique no véu fecha
+  return {
+    no: d,
+    abrir() { document.body.append(d); d.showModal(); return this; },
+    fechar(valor = "") { d.close(valor); },
+  };
+}
+
+/** Pergunta com duas saídas; resolve true se confirmar. Para ação irreversível, prefira avisar() com Desfazer. */
+export function confirmar({ titulo, texto, confirmar: rotulo, perigo = false }) {
+  return new Promise((resolver) => {
+    let ok = false;
+    const dlg = dialogo({
+      titulo,
+      corpo: [el("p", {}, texto)],
+      acoes: [
+        botao({ texto: T.geral.cancelar, onclick: () => dlg.fechar() }),
+        botao({ texto: rotulo, variante: perigo ? "perigo" : "primario", onclick: () => { ok = true; dlg.fechar("ok"); } }),
+      ],
+      aoFechar: () => resolver(ok),
+    }).abrir();
+  });
+}
+
+// ---------------------------------------------------------------- menu
+/**
+ * menu(gatilho, itens): itens = [{ texto, icone, executar, marcado, perigo, desabilitado } | { separador: true } | { grupo: "..." }]
+ * Usa popover nativo (fecha com Esc e clique fora); setas, Home e End percorrem os itens.
+ */
+export function menu(gatilho, itens) {
+  const m = el("div", { class: "menu", popover: "auto", role: "menu", id: novoId("menu") });
+  const comMarca = itens.some((i) => "marcado" in i);
+  for (const i of itens) {
+    if (i.separador) { m.append(el("div", { class: "separador", role: "separator" })); continue; }
+    if (i.grupo) { m.append(el("div", { class: "grupo-menu", role: "presentation" }, i.grupo)); continue; }
+    const papel = "marcado" in i ? "menuitemradio" : "menuitem";
+    m.append(el("button", {
+      type: "button", role: papel, class: i.perigo ? "perigo" : null, tabindex: "-1",
+      "aria-checked": "marcado" in i ? String(Boolean(i.marcado)) : null, "aria-disabled": i.desabilitado ? "true" : null,
+      onclick: () => { if (i.desabilitado) return; m.hidePopover(); i.executar?.(); },
+    }, i.icone ? icone(i.icone) : null, el("span", {}, i.texto), comMarca ? icone("check", "ic p marca") : null));
+  }
+  const itensFoco = () => [...m.querySelectorAll('[role^="menuitem"]:not([aria-disabled="true"])')];
+  m.addEventListener("keydown", (ev) => {
+    const lista = itensFoco();
+    const i = lista.indexOf(document.activeElement);
+    const alvo = { ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: lista.length - 1 }[ev.key];
+    if (alvo == null) return;
+    ev.preventDefault();
+    lista[(alvo + lista.length) % lista.length].focus();
+  });
+  m.addEventListener("toggle", (ev) => {
+    gatilho.setAttribute("aria-expanded", String(ev.newState === "open"));
+    if (ev.newState === "open") {
+      const r = gatilho.getBoundingClientRect();
+      const largura = m.offsetWidth;
+      const folga = parseFloat(token("e-1"));
+      const margem = parseFloat(token("e-2"));
+      m.style.top = `${Math.min(r.bottom + folga, innerHeight - m.offsetHeight - margem)}px`;
+      m.style.left = `${Math.max(margem, Math.min(r.right - largura, innerWidth - largura - margem))}px`;
+      itensFoco()[0]?.focus();
+    } else if (m.contains(document.activeElement) || document.activeElement === document.body) {
+      gatilho.focus();
+    }
+  });
+  gatilho.setAttribute("aria-haspopup", "menu");
+  gatilho.setAttribute("aria-expanded", "false");
+  gatilho.setAttribute("aria-controls", m.id);
+  document.body.append(m);
+  gatilho.popoverTargetElement = m; // o botão abre e fecha o popover sem brigar com o clique fora
+  return m;
+}

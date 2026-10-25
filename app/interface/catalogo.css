@@ -1,0 +1,34 @@
+/* Só a página de catálogo (conferência dos componentes); as telas não usam este arquivo. */
+.catalogo { gap: var(--e-12); padding-top: var(--e-6); }
+.catalogo > section { display: grid; gap: var(--e-5); scroll-margin-top: calc(var(--topo) + var(--e-4)); }
+.catalogo > section > h2 { padding-bottom: var(--e-2); border-bottom: 1px solid var(--borda); }
+.catalogo .exemplo { display: grid; gap: var(--e-3); }
+.catalogo .exemplo > h3 { color: var(--texto-3); font-size: var(--t-1); line-height: var(--a-1); font-weight: var(--p-medio); }
+.catalogo .linha-ex { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-3); }
+.catalogo .grade-ex { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--col-m), 1fr)); gap: var(--e-4); }
+.catalogo .grade-campos { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--col-m), 1fr)); gap: var(--e-4); align-items: start; }
+.amostras { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--col-num), 1fr)); gap: var(--e-2); }
+.amostra { border: 1px solid var(--borda); border-radius: var(--r-m); overflow: hidden; font-size: var(--t-1); line-height: var(--a-1); }
+.amostra .cor { height: var(--e-12); }
+.amostra .info { padding: var(--e-2); display: grid; }
+.amostra .info code { font-family: var(--fonte-num); font-size: var(--t-1); color: var(--texto-2); }
+.amostra .info span { color: var(--texto-3); }
+.tipos { display: grid; gap: var(--e-3); }
+.tipos .tipo { display: grid; grid-template-columns: var(--col-m) 1fr; align-items: baseline; gap: var(--e-4); }
+.tipos .tipo code { font-family: var(--fonte-num); font-size: var(--t-1); color: var(--texto-3); }
+.escala-esp { display: flex; align-items: flex-end; gap: var(--e-3); flex-wrap: wrap; }
+.escala-esp div { display: grid; justify-items: center; gap: var(--e-1); font-size: var(--t-1); color: var(--texto-3); }
+.escala-esp i { display: block; background: var(--acao-suave-2); border: 1px solid var(--acao-linha); }
+.caixa-sombra { height: var(--e-16); width: var(--col-num); display: grid; place-items: center; background: var(--superficie); border-radius: var(--r-m); font-size: var(--t-1); color: var(--texto-3); }
+.palco-ex { background: var(--palco); color: var(--palco-texto); padding: var(--e-5); border-radius: var(--r-g); display: flex; gap: var(--e-4); align-items: center; flex-wrap: wrap; }
+.palco-ex .etiqueta-imagem { background: var(--rotulo-imagem); color: var(--marca-imagem); padding: 0 var(--e-1); border-radius: var(--r-p); font-size: var(--t-1); line-height: var(--a-1); }
+.palco-ex .apagado { color: var(--palco-texto-2); font-size: var(--t-1); }
+.icones { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--col-num), 1fr)); gap: var(--e-2); }
+.icones div { display: grid; justify-items: center; gap: var(--e-1); padding: var(--e-3); border: 1px solid var(--borda); border-radius: var(--r-m); font-size: var(--t-1); color: var(--texto-3); }
+.icones .ic { color: var(--texto); }
+.resultado-conferencia { display: grid; gap: var(--e-3); }
+.resultado-conferencia .ok { color: var(--sucesso-texto); font-weight: var(--p-medio); }
+.resultado-conferencia .falha { color: var(--erro-texto); font-weight: var(--p-medio); }
+.aviso-estatico { position: static; animation: none; }
+.faixa-estatica { border-radius: var(--r-m); }
+.menu-estatico { position: static; display: block; box-shadow: var(--sombra-2); max-width: var(--col-g); }

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="pt-BR" data-tema="claro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Pyron</title>
+<link rel="icon" href="/marca/icone-64.png" type="image/png">
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="componentes.css">
+<script type="module" src="js/casca.js"></script>
+</head>
+<body>
+<button class="pular" type="button" id="pular">Pular para o conteúdo</button>
+
+<header class="topo">
+  <a class="topo-marca" href="#painel" aria-label="Pyron, painel"><img src="/marca/icone-192.png" alt="" width="32" height="32">Pyron</a>
+  <nav class="nav" aria-label="Seções" id="nav">
+    <a href="#painel" data-rota="painel" title="Painel (Alt 1)">Painel</a>
+    <a href="#inspecoes" data-rota="inspecoes" title="Inspeções (Alt 2)">Inspeções</a>
+    <a href="#equipamentos" data-rota="equipamentos" title="Equipamentos (Alt 3)">Equipamentos</a>
+    <a href="#pendencias" data-rota="pendencias" title="Pendências (Alt 4)">Pendências<span class="contador" id="contador-pendencias" hidden></span></a>
+    <a href="#captura" data-rota="captura" title="Captura (Alt 5)">Captura</a>
+    <a href="#modelos" data-rota="modelos" title="Modelos (Alt 6)">Modelos</a>
+  </nav>
+  <div class="topo-dir">
+    <button class="btn fantasma" type="button" id="btn-busca" title="Buscar (Ctrl K)"><svg class="ic" aria-hidden="true"><use href="#i-busca"/></svg><span>Buscar</span><kbd>Ctrl K</kbd></button>
+    <a class="btn fantasma icone" href="#captura/alertas" id="btn-alertas" aria-label="Alertas" title="Alertas"><svg class="ic" aria-hidden="true"><use href="#i-sino"/></svg><span class="contador" id="contador-alertas" hidden></span></a>
+    <a class="btn fantasma icone" href="#configuracoes" data-rota="configuracoes" aria-label="Configurações" title="Configurações (Alt 0)"><svg class="ic" aria-hidden="true"><use href="#i-config"/></svg></a>
+  </div>
+</header>
+
+<div class="faixa-conexao" id="faixa-conexao" role="alert" hidden>
+  <svg class="ic" aria-hidden="true"><use href="#i-offline"/></svg>
+  <span><b>Sem conexão com o servidor do Pyron.</b> Se a janela principal foi fechada, abra o Pyron de novo pela área de trabalho.</span>
+  <button class="btn compacto" type="button" id="btn-reconectar"><svg class="ic" aria-hidden="true"><use href="#i-refazer"/></svg><span>Tentar de novo</span></button>
+</div>
+
+<main class="conteudo" id="conteudo" tabindex="-1"></main>
+
+<input type="file" id="arquivos" accept=".jpg,.jpeg,.png,.webp,.bmp" multiple hidden>
+</body>
+</html>
