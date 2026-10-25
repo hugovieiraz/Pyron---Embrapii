@@ -69,7 +69,7 @@ núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Te
   apresentação o modo celular é **só identificação** (sem leitura da barra de cores).
 
 **Comandos** (na raiz, sempre com o Python do `.venv`):
-- Testes: `.venv/Scripts/python.exe -m pytest testes -q` (≈170 testes, ~40 s).
+- Testes: `.venv/Scripts/python.exe -m pytest -q` (pastas `testes` e `tests`, ≈240 testes, ~40 s).
 - Pyron para testar sem dados reais: pré-visualização `pyron-demo` (`.claude/launch.json`, porta 8790,
   dados em `saida/dados_demo`). Apresentação: pré-visualização `apresentacao` (porta 8792).
 - Abrir de verdade: atalhos "Abrir Pyron" e "Pyron Apresentação" da área de trabalho (`pythonw.exe -m apresentacao`).

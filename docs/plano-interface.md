@@ -60,9 +60,9 @@ limite do plano à toa. Cada conversa nova começa só com o CLAUDE.md, a memór
 
 ## Etapa 0 · Integrar a medição de equipamentos do Gabriel
 Modelo: **Sonnet** ou Opus com esforço **médio**.
-- [ ] `git fetch`; ler os commits novos do `main` (API, banco, telas).
-- [ ] Criar o branch `interface-nova` a partir do `main` atualizado; rodar os testes.
-- [ ] Descrever no Registro a funcionalidade de medição: rotas, dados, ações do usuário.
+- [x] `git fetch`; ler os commits novos do `main` (API, banco, telas).
+- [x] Criar o branch `interface-nova` a partir do `main` atualizado; rodar os testes.
+- [x] Descrever no Registro a funcionalidade de medição: rotas, dados, ações do usuário.
 - **Pronto quando:** testes passam e a medição está descrita para entrar no inventário.
 
 ## Etapa 1 · Diagnóstico e nova arquitetura (sem mexer em código)
@@ -126,6 +126,80 @@ Modelo: Opus com esforço **médio**.
 | Etapa | Data | Feito | Decisões | Pendências |
 |---|---|---|---|---|
 | plano | 25/10/2026 | Plano criado | Claude decide produto e design; construir em `/nova`, branch `interface-nova` | Etapa 0 quando o push do Gabriel chegar |
+| 0 | 25/10/2026 | Branch `interface-nova` a partir do `main` em `b41b802` (commit do Gabriel); 3 correções de integração; 232 testes passam, 8 pulados | Medição não é tela própria: entra na Análise, como dado da região | Avisar o Gabriel das 3 correções; observações para a Etapa 1 abaixo |
+
+### Medição de equipamentos (Etapa 0)
+
+Chegou no commit `b41b802` (GS87, 25/10): segmentação SAM 2, classificação DINOv2 e medição de
+dimensões por imagem única. Não há tela nova: tudo está na **Análise**, sobre cada região.
+
+**Como mede.** Para cada região, o SAM 2 recorta o contorno da peça dentro da caixa; desse contorno
+saem as dimensões e a temperatura só da peça (fundo descartado). Escala em metros por dois métodos:
+1. *Telemetria óptica* (preferido): distância gravada pela câmera FLIR + campo de visão da lente
+   (tabela de lentes T400, Ex, A300, FLIR ONE).
+2. *Geometria projetiva* (Criminisi): altura de referência da classe e pontos de fuga da cena.
+   Alturas padrão: isolador 0,80 m; bucha 1,25; para-raio 1,20; terminal superior 0,65;
+   transformador 1,60; conexão 0,50. O usuário pode trocar.
+
+**Rotas** (todas em `app/servidor.py`; corpo JSON com `regiao_id` ou `caixa` `[x0,y0,x1,y1]`;
+sem `regiao_id`, cria região nova):
+
+| Rota | Faz | Resposta |
+|---|---|---|
+| `POST /api/analises` | Com modelo `sam2-dinov2` ou `pontos-quentes-sam2`, já segmenta e mede cada região; etapa "Segmentação SAM 2" em `etapas` | análise |
+| `POST /api/analises/{id}/segmentar` | SAM 2 + medição + térmica da peça; aceita `altura_referencia` (m) ou `metric_ratio` (unidade/px) | `{ok, segmentacao, analise}` |
+| `POST /api/analises/{id}/classificar` | DINOv2; troca a classe da região se confiança > 0,60 | `{ok, classificacao, analise}` |
+| `POST /api/analises/{id}/metodologia_completa` | As duas acima juntas (DINOv2 usa a máscara do SAM 2) | `{ok, segmentacao, classificacao, analise}` |
+| `POST /api/analises/{id}/auto_identificar` | Descobre os ativos na imagem inteira; mantém as regiões manuais e troca as automáticas | análise |
+| `GET /api/modelos` | Lista também `sam2-dinov2`, com `disponivel` (acrescentado nesta etapa) | — |
+| `PUT /api/analises/{id}` | Preserva `segmentacao` e `classificacao_dinov2` ao editar regiões | análise |
+
+Erros: 503 quando o SAM 2 ou o DINOv2 não estão instalados; 422 caixa inválida ou máscara vazia; 404 região.
+
+**Dados** (gravados na região, dentro da análise):
+- `segmentacao.score` (0–1); `segmentacao.contorno` `[[x, y], …]` em coordenadas da matriz térmica.
+- `segmentacao.geometria`: `metodo_metrologia` (`telemetria_optica` | `geometria_projetiva_criminisi`),
+  `detalhes_metrologia` (câmera, distância, campo de visão), `height_meters`, `mean_width_meters`,
+  `max_diameter_meters`, `min_diameter_meters`, `projected_area_m2`, `aspect_ratio`,
+  `ref_height_meters`, `distancia_m`, `scale_y_m_per_px`; sem escala, só `length_px`, `width_px`,
+  `area_px`, `rotation_deg`.
+- `segmentacao.termica_isolada`: `t_max`, `t_min`, `t_media`, `t_mediana`, `desvio_padrao`,
+  `delta_t_ativo`, `area_pixels`.
+- `classificacao_dinov2`: `classe`, `nome`, `confianca`, `scores` por classe.
+
+**Ações do usuário na interface atual** (Análise):
+- Seletor "Detector": `sam2-dinov2` passa a ser o preferido quando instalado; botão "Anexar nova imagem".
+- Botão "Auto Identificar (SAM 2 + DINOv2)" na barra de ações.
+- Em cada região (ao passar o mouse ou selecionar): Segmentar, Classificar, Metodologia completa.
+- Bloco de medição na região: método, altura, largura média, diâmetro máx., área projetada, razão H/W,
+  Tmáx da peça, score do SAM 2, classe DINOv2 com barra de confiança.
+- Calibração: campo "Altura ref" (m) + Recalcular, e atalhos Isolador 0,80 · Bucha 1,25 · Trafo 1,60.
+- Camadas do termograma: Térmica, SAM 2 (contornos e cota "H=…m"), DINOv2 (classe e %); ficam
+  guardadas nas preferências.
+- Modelos: o cartão ganhou "Vantagens".
+
+**Dependências.** Extra `segmentacao` no `pyproject.toml` (torch, torchvision, `sam2` do GitHub,
+opencv-headless, scipy); pesos `modelos/sam2/sam2.1_hiera_small.pt` por `ferramentas/baixar_sam2.py`.
+O DINOv2 vem do `torch.hub` (código do GitHub + ~88 MB de pesos na primeira execução). Neste
+notebook: torch presente, `sam2` e pesos ausentes, então segmentação e medição ficam indisponíveis;
+a classificação DINOv2 carrega.
+
+**Correções feitas na integração** (sem tirar rota):
+1. `POST /api/analises` com `sam2-dinov2` sem o SAM 2 instalado dava erro 500; agora 503 com o motivo.
+2. Com `pontos-quentes-sam2` sem SAM 2, a análise inteira falhava (503); agora segue sem segmentação
+   e com aviso. Era a causa da falha de `test_upload_com_sam2_calculo_instantaneo` neste computador.
+3. A interface trocava o detector padrão por `sam2-dinov2` mesmo sem ele instalado (todo envio
+   falhava aqui); agora só troca se `disponivel`. `GET /api/modelos` também não quebra mais se o
+   torch for barrado pelo Controle Inteligente de Aplicativos.
+
+**Observações para a Etapa 1** (inventário e excesso):
+- Textos com emoji (três, no `app.js` e no `index.html`), nomes de modelo na tela ("SAM 2", "DINOv2", "Metodologia Completa"),
+  parágrafo de propaganda na área de soltar arquivo; rótulos fixos no `app.js` fora do `textos.js`.
+- Para o técnico, a medição é **dado da região** (dimensões estimadas, com o método e a escala),
+  não três botões de modelo. A medição é estimativa: mostrar como tal.
+- 525 linhas de regras de componente foram coladas no `tokens.css` (duplicam o `estilo.css`).
+- Três funções `fetch` quase iguais em vez de `api()`; tabela de alturas padrão repetida em 4 lugares.
+- Pastas `src/` e `tests/` paralelas a `nucleo/` e `testes/` (o `pytest -q` roda as duas).
 
 ### Saiu da interface (com motivo, para poder voltar)
 

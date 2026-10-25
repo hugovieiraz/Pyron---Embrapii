@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import base64
 import csv
+import importlib.util
 import io
 import json
 import os
@@ -398,6 +399,8 @@ def _nova_analise(dados: bytes, nome: str, modelo: str | None, fonte: str = "man
             regioes = []  # o modelo lê temperatura, que esta imagem não tem
     except ValueError as erro:
         raise HTTPException(422, f"O modelo {det.nome} falhou: {erro}") from erro
+    except (ImportError, FileNotFoundError) as erro:
+        raise HTTPException(503, f"O modelo {det.nome} não está instalado neste computador: {erro}") from erro
     t2 = perf_counter()
     lo, hi = render.faixa_exibicao(img.temperatura_c)
     resp = _responsavel(None)
@@ -428,9 +431,16 @@ def _nova_analise(dados: bytes, nome: str, modelo: str | None, fonte: str = "man
     # Segmentação automática com SAM 2 se o modelo ativo for pontos-quentes-sam2 ou contiver "sam2"
     modelo_sam2 = det.id == "pontos-quentes-sam2" or "sam2" in (det.id or "").lower()
     t_seg_ms = 0
-    if modelo_sam2 and a["regioes"] and img.tem_temperatura:
+    aviso_sam2 = None
+    segmentador = None
+    if modelo_sam2 and img.tem_temperatura and any(not r.get("segmentacao") for r in a["regioes"]):
+        # Sem o SAM 2 instalado a análise segue sem segmentação, com aviso, em vez de falhar.
+        try:
+            segmentador = _obter_segmentador_sam2()
+        except HTTPException as erro:
+            aviso_sam2 = f"Segmentação SAM 2 não executada: {erro.detail}"
+    if segmentador is not None:
         t_seg_ini = perf_counter()
-        segmentador = _obter_segmentador_sam2()
         imagem_rgb = _imagem_rgb_para_analise(img.temperatura_c, img.exibida_rgb)
         from nucleo.pipeline.pyron_pipeline import analisar_ativo
 
@@ -471,6 +481,8 @@ def _nova_analise(dados: bytes, nome: str, modelo: str | None, fonte: str = "man
     if not img.tem_temperatura and not getattr(det, "precisa_imagem", False):
         a["resumo"]["avisos"].append(f"O modelo {det.nome} procura pelo calor; sem temperatura, ele não identifica componentes. "
                                      "Escolha um modelo que olha a imagem colorida.")
+    if aviso_sam2:
+        a["resumo"]["avisos"].append(aviso_sam2)
     t3 = perf_counter()
     etapas = [
         {"nome": "Leitura da temperatura", "ms": round((t1 - t0) * 1000), **({} if img.tem_temperatura else {"sem_dado": True})},
@@ -1299,11 +1311,18 @@ def analisar_exemplo(nome: str, corpo: dict = Body(default={})) -> dict:
 
 @app.get("/api/modelos")
 def modelos() -> dict:
-    from nucleo.detectores.sam2_dinov2 import SAM2DINOv2Detector
-
     lista = [d.descrever() for d in detectores.listar(PASTA_MODELOS)]
     if not any(m["id"] == "sam2-dinov2" for m in lista):
-        lista.insert(1, SAM2DINOv2Detector().descrever())
+        # O módulo importa o torch, que o Controle Inteligente de Aplicativos pode barrar: sem ele, a lista segue.
+        try:
+            from nucleo.detectores.sam2_dinov2 import SAM2DINOv2Detector
+
+            sam2 = SAM2DINOv2Detector()
+        except (ImportError, OSError):
+            sam2 = None
+        if sam2 is not None:
+            disponivel = importlib.util.find_spec("sam2") is not None and sam2._caminho_pesos.exists()
+            lista.insert(1, {**sam2.descrever(), "disponivel": disponivel})
     return {"ativo": _config()["modelo_ativo"], "modelos": lista}
 
 

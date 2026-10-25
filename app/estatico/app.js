@@ -725,7 +725,7 @@ async function atualizarStatus() {
 async function carregarListaModelos() {
   const d = await api("/api/modelos");
   estado.modelos = d.modelos;
-  const modPrioritario = d.modelos.some((m) => m.id === "sam2-dinov2") ? "sam2-dinov2" : d.ativo;
+  const modPrioritario = d.modelos.some((m) => m.id === "sam2-dinov2" && m.disponivel !== false) ? "sam2-dinov2" : d.ativo;
   estado.ativo = d.ativo === "pontos-quentes" ? modPrioritario : (d.ativo || modPrioritario);
   const ativo = d.modelos.find((m) => m.id === estado.ativo) || d.modelos[0];
   $("#modelo-nome").textContent = ativo ? ativo.nome : T.geral.semValor;
@@ -2913,8 +2913,7 @@ function analisarArquivo(arquivo, destino = null) {
     const dados = new FormData();
     dados.append("arquivo", arquivo);
     const selMod = $("#sel-modelo");
-    const modEscolhido = (selMod && selMod.value) ? selMod.value : (estado.ativo || "sam2-dinov2");
-    dados.append("modelo", modEscolhido || "sam2-dinov2");
+    dados.append("modelo", (selMod && selMod.value) || estado.ativo || "");
     anexarDestino(dados, destino);
     return api("/api/analises", { method: "POST", body: dados });
   };
