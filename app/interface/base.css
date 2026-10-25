@@ -7,7 +7,7 @@ html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body {
   font: var(--p-normal) var(--t-2) / var(--a-2) var(--fonte);
   color: var(--texto);
-  background: var(--fundo);
+  background: var(--fundo-trabalho);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
 }
@@ -37,7 +37,7 @@ table { border-collapse: collapse; }
 .palco :focus-visible, .sobre-palco:focus-visible { outline-color: var(--marca-imagem); }
 
 /* ---------------------------------------------------------------- casca */
-.pular { position: absolute; left: var(--e-4); top: calc(var(--e-2) - var(--topo)); z-index: var(--z-aviso); background: var(--acao); color: var(--acao-texto); padding: var(--e-2) var(--e-4); border-radius: var(--r-m); transition: transform var(--dur-rapida) var(--ease-padrao); }
+.pular { position: absolute; left: var(--e-4); top: calc(var(--e-2) - var(--topo)); z-index: var(--z-aviso); display: inline-flex; align-items: center; min-height: var(--alvo); background: var(--acao); color: var(--acao-texto); padding: 0 var(--e-4); border-radius: var(--r-m); transition: transform var(--dur-rapida) var(--ease-padrao); }
 .pular:focus-visible { transform: translateY(var(--topo)); }
 
 .topo {
@@ -49,9 +49,14 @@ table { border-collapse: collapse; }
 .topo-marca:hover { text-decoration: none; }
 .topo-marca img { width: var(--e-8); height: var(--e-8); }
 .nav { display: flex; align-items: stretch; }
+/* voz de estrutura (Bahnschrift semicondensada): navegação, títulos de seção, cabeçalho de tabela, ferramentas */
+.estrutura { font-family: var(--fonte-estrutura); font-stretch: var(--largura-estrutura); }
+.estrutura-caixa { font-family: var(--fonte-estrutura); font-stretch: var(--largura-estrutura); text-transform: uppercase; letter-spacing: var(--espaco-estrutura); }
+
 .nav a {
   position: relative; display: flex; align-items: center; gap: var(--e-2); padding: 0 var(--e-4);
   color: var(--texto-2); font-size: var(--t-1); font-weight: var(--p-medio);
+  font-family: var(--fonte-estrutura); font-stretch: var(--largura-estrutura); text-transform: uppercase; letter-spacing: var(--espaco-estrutura);
   transition: color var(--dur-rapida) var(--ease-padrao);
 }
 .nav a::after { content: ""; position: absolute; left: var(--e-2); right: var(--e-2); bottom: -1px; height: var(--borda-sel); background: var(--acao); border-radius: var(--r-p); transform: scaleX(0); transition: transform var(--dur-media) var(--ease-entrada); }

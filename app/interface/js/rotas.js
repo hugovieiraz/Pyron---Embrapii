@@ -7,7 +7,7 @@ export const ROTAS = {
   inspecoes: { titulo: T.telas.inspecoes, modulo: "provisoria", atalho: "2", icone: "inspecoes", detalhe: "provisoria" },
   equipamentos: { titulo: T.telas.equipamentos, modulo: "provisoria", atalho: "3", icone: "equipamentos", detalhe: "provisoria" },
   pendencias: { titulo: T.telas.pendencias, modulo: "provisoria", atalho: "4", icone: "pendencias" },
-  captura: { titulo: T.telas.captura, modulo: "provisoria", atalho: "5", icone: "captura" },
+  captura: { titulo: T.telas.captura, modulo: "captura", detalhe: "captura", atalho: "5", icone: "captura" },
   modelos: { titulo: T.telas.modelos, modulo: "provisoria", atalho: "6", icone: "modelos" },
   configuracoes: { titulo: T.telas.configuracoes, modulo: "provisoria", atalho: "0", icone: "config" },
 };

@@ -96,6 +96,30 @@
   --veu: rgba(22, 27, 34, .48);             /* fundo de diálogo */
   --brilho: rgba(255, 255, 255, .6);        /* brilho do esqueleto */
   --marca-brasa: #F06A1A;                   /* só a chama da logo */
+  --fundo-trabalho: var(--n-100);           /* área de trabalho; barras, painéis e tabelas ficam em branco */
+
+  /* paleta ferro (dado térmico: termograma, escala e acento das ilustrações) */
+  --ferro-0: #000000;
+  --ferro-1: #1E046E;
+  --ferro-2: #780696;
+  --ferro-3: #C81E6E;
+  --ferro-4: #F0641E;
+  --ferro-5: #FCB414;
+  --ferro-6: #FFF08C;
+
+  /* ilustrações (docs/interface/2-direcao.md, 6.1): isométrica, luz de cima à esquerda,
+     dois materiais de três faces; o acento é sempre dado (ferro ou severidade), nunca cobalto */
+  --ilu-claro-topo: #EEF1F4;
+  --ilu-claro-esq: #DDE2E8;
+  --ilu-claro-dir: #C3CAD4;
+  --ilu-escuro-topo: #6B7483;
+  --ilu-escuro-esq: #4E5664;
+  --ilu-escuro-dir: #3A414D;
+  --ilu-aresta: rgba(22, 27, 34, .16);   /* linha fina que separa as faces */
+  --ilu-tela: var(--branco);              /* tela do notebook, papel */
+  --ilu-traco: #B4BCC8;                   /* linhas de texto desenhadas, trilhas */
+  --ilu-ponto: #5A6474;                   /* pontilhado de ligação */
+  --ilu-sombra: rgba(22, 27, 34, .10);    /* sombra no chão */
 
   /* ---------------------------------------------------------------- tipografia (proporção 1,2; 2 famílias)
      nada abaixo de 14 px na tela: o projetor apaga o que for menor */
@@ -108,6 +132,11 @@
   --t-4: 24px;  --a-4: 32px;   /* título de página */
   --t-5: 29px;  --a-5: 36px;   /* leitura de destaque, indicador */
   --t-6: 35px;  --a-6: 44px;   /* temperatura da região selecionada */
+  /* voz de estrutura (6.2): Bahnschrift, a DIN do Windows, semicondensada; só navegação, títulos de
+     seção, cabeçalho de tabela e barra de ferramentas. Medido no Edge: 15 % mais estreita que a Segoe */
+  --fonte-estrutura: "Bahnschrift", "DIN Alternate", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --largura-estrutura: semi-condensed;
+  --espaco-estrutura: .06em;
   --p-normal: 400;
   --p-medio: 600;
   --p-forte: 700;
@@ -148,6 +177,9 @@
   --menu-min: 220px;
   --aviso-max: 440px;
   --esqueleto-linha: 14px;
+  --barra: 52px;           /* barra de ferramentas da tela */
+  --trilho: 56px;          /* trilho de ícones do painel de detalhe */
+  --ilu: 320px;            /* largura da ilustração de estado (máximo da regra: 240 a 320 px) */
 
   /* ---------------------------------------------------------------- raio (3 valores, técnico) */
   --r-p: 4px;
@@ -167,6 +199,7 @@
   --escalonar: 30ms;       /* entre itens de lista (no máximo 6) */
   --dur-giro: 700ms;       /* volta do indicador de carregamento (único loop permitido) */
   --dur-brilho: 1400ms;    /* passada do brilho no esqueleto */
+  --dur-procura: 1600ms;   /* pontilhado da ilustração acendendo enquanto procura (indicador) */
   --ease-entrada: cubic-bezier(.16, 1, .3, 1);
   --ease-saida: cubic-bezier(.4, 0, 1, 1);
   --ease-padrao: cubic-bezier(.2, 0, 0, 1);
@@ -221,6 +254,18 @@
   --grafico-grade: #2A313C;
   --veu: rgba(0, 0, 0, .6);
   --brilho: rgba(255, 255, 255, .08);
+  --fundo-trabalho: #0E1116;
+  --ilu-claro-topo: #4A5262;
+  --ilu-claro-esq: #3A4250;
+  --ilu-claro-dir: #2C333F;
+  --ilu-escuro-topo: #8B95A5;
+  --ilu-escuro-esq: #6E7888;
+  --ilu-escuro-dir: #565F6E;
+  --ilu-aresta: rgba(0, 0, 0, .35);
+  --ilu-tela: #1A1F27;
+  --ilu-traco: #4A5262;
+  --ilu-ponto: #8B95A5;
+  --ilu-sombra: rgba(0, 0, 0, .45);
   --sombra-1: 0 1px 2px rgba(0, 0, 0, .4);
   --sombra-2: 0 6px 16px -4px rgba(0, 0, 0, .5);
   --sombra-3: 0 24px 48px -12px rgba(0, 0, 0, .7);

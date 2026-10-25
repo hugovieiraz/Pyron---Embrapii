@@ -1,14 +1,15 @@
 // Casca da interface nova: navegação, roteamento, atalhos, busca, importação por arrastar, conexão e tema.
 import { TEXTOS as T } from "../textos.js";
 import { $, $$, el, icone, api, json, conexao, definirVersaoServidor, VERSAO_INTERFACE } from "./base.js";
-import { esqueleto, estadoVazio, estadoErro, avisar, dialogo } from "./componentes.js";
+import { esqueleto, estadoVazio, estadoErro, estadoSemConexao, avisar, dialogo } from "./componentes.js";
 import { instalarIcones } from "./icones.js";
 import { ROTAS, lerRota, endereco } from "./rotas.js";
 import { abrirBusca } from "./busca.js";
 import { importar, escolherArquivos } from "./importar.js";
 
 // ---------------------------------------------------------------- roteamento
-let geracao = 0;          // descarta a montagem de uma tela se outra foi pedida no meio
+const PARAMS = new URLSearchParams(location.search); // só para testes: ?conferir, ?tema=escuro, ?toque
+let geracao = 0;         // descarta a montagem de uma tela se outra foi pedida no meio
 let limpar = null;        // limpeza devolvida pela tela atual (intervalos, eventos)
 let primeira = true;
 
@@ -42,12 +43,16 @@ async function mostrarRota() {
     conteudo.replaceChildren(pagina);
   } catch (erro) {
     if (minha !== geracao) return;
-    conteudo.replaceChildren(el("div", { class: "pagina entra" }, estadoErro({ titulo: def.titulo, erro, tentar: mostrarRota })));
+    // sem servidor: a API não respondeu ou o módulo da tela não baixou; erro de código continua sendo erro
+    const semServidor = erro.message === T.geral.semResposta || /dynamically imported module|Failed to fetch/i.test(erro.message);
+    conteudo.replaceChildren(el("div", { class: "pagina entra" }, semServidor ? estadoSemConexao({ tentar: mostrarRota }) : estadoErro({ titulo: def.titulo, erro, tentar: mostrarRota })));
   }
   // Depois de navegar pelo teclado, o foco vai para o conteúdo (leitor de tela anuncia a tela nova).
   if (!primeira && document.activeElement && document.activeElement !== document.body && !conteudo.contains(document.activeElement)) conteudo.focus({ preventScroll: true });
   primeira = false;
   scrollTo({ top: 0 });
+  // conferência automática da tela (testes visuais): ?conferir no endereço grava o resultado no <body>
+  if (PARAMS.has("conferir")) setTimeout(() => import("./conferir.js").then((m) => { document.body.dataset.conferencia = JSON.stringify(m.conferir({ toque: PARAMS.has("toque") })); }), 500);
 }
 
 function marcarNavegacao(tela) {
@@ -214,7 +219,9 @@ async function iniciar() {
   ligarConexao();
   ligarSinal();
   addEventListener("hashchange", mostrarRota);
-  api("/api/configuracoes").then((c) => aplicarTema(c.tema)).catch(() => {});
+  if (PARAMS.get("tema")) aplicarTema(PARAMS.get("tema"));
+  else api("/api/configuracoes").then((c) => aplicarTema(c.tema)).catch(() => {});
+  if (PARAMS.has("toque")) document.documentElement.style.setProperty("--alvo-compacto", "var(--alvo)");
   mostrarRota();
   atualizarContadores();
   setInterval(atualizarContadores, 30000);

@@ -5,8 +5,10 @@ import { $, el, icone, temperatura, token } from "./base.js";
 import {
   botao, campo, marcar, segmentado, abas, painelAba, cabecalho, selo, indicador, tabela,
   esqueleto, estadoVazio, estadoErro, avisar, dialogo, confirmar, menu, contador,
+  barraFerramentas, secao as secaoRecolhivel, painelDetalhe,
 } from "./componentes.js";
 import { instalarIcones, NOMES_ICONES } from "./icones.js";
+import { ilustracao, NOMES_ILUSTRACOES } from "./ilustracoes.js";
 import { conferir, razao } from "./conferir.js";
 
 const C = T.catalogo;
@@ -176,11 +178,35 @@ function montar() {
         botao({ texto: C.abrirDialogo, onclick: () => dialogo({ titulo: C.dialogoTitulo, corpo: [campo({ rotulo: C.ordemServico, marcador: "OS 4471" }), campo({ rotulo: C.responsavel, opcoes: C.responsaveis })], acoes: [botao({ texto: C.cancelar, onclick: (ev) => ev.target.closest("dialog").close() }), botao({ texto: C.salvar, variante: "primario", onclick: (ev) => { ev.target.closest("dialog").close(); avisar(C.salvo); } })] }).abrir() }),
         botao({ texto: C.abrirConfirmar, variante: "perigo", icone: "lixo", onclick: async () => { if (await confirmar({ titulo: C.confirmarTitulo, texto: C.confirmarTexto, confirmar: C.apagar, perigo: true })) avisar(C.apagado); } })))),
 
+    secao("acabamento", C.acabamento,
+      exemplo(C.vozEstrutura, el("div", { class: "tipos" },
+        el("div", { class: "tipo" }, el("code", {}, "--fonte-estrutura"), el("span", { class: "estrutura-caixa", style: { fontSize: "var(--t-1)", fontWeight: "var(--p-medio)" } }, C.amostraEstrutura)),
+        el("div", { class: "tipo" }, el("code", {}, "--fonte"), el("span", { style: { fontSize: "var(--t-1)", fontWeight: "var(--p-medio)", textTransform: "uppercase", letterSpacing: "var(--espaco-estrutura)" } }, C.amostraEstrutura)))),
+      exemplo(C.barraT, barraFerramentas({
+        rotulo: C.barraT,
+        grupos: [
+          [{ texto: C.selecionar, icone: "selecionar", pressionado: true }, { texto: C.novaRegiao, icone: "regiao", pressionado: false }, { texto: C.ponto, icone: "ponto", pressionado: false }, { texto: C.linhaT, icone: "linha", pressionado: false }],
+          [{ texto: C.camadas, icone: "camadas" }, { texto: C.foto, icone: "foto", indisponivel: C.semFoto }],
+        ],
+        direita: [{ texto: C.mais, icone: "mais-opcoes", soIcone: true }],
+      })),
+      exemplo(C.painelT, el("div", { class: "cartao", style: { display: "flex", justifyContent: "flex-end", overflow: "hidden", height: "var(--e-24)", minHeight: "calc(var(--e-24) * 4)" } },
+        painelDetalhe({
+          rotulo: C.painelT,
+          itens: [
+            { id: "c-regiao", icone: "info", texto: C.regiaoT, montar: () => [secaoRecolhivel({ titulo: C.leituras, conteudo: [el("dl", { class: "pares" }, el("dt", {}, C.tmax), el("dd", {}, temperatura(96.4)), el("dt", {}, C.criterio), el("dd", {}, "108 % da MTA"))] }), secaoRecolhivel({ titulo: C.dimensoes, aberta: false, conteudo: [el("p", {}, "1,22 × 0,31 m")] })] },
+            { id: "c-alertas", icone: "sino", texto: C.alertas, qtd: 2, montar: () => [secaoRecolhivel({ titulo: C.pendentesT, qtd: 2, conteudo: [el("p", {}, C.doisAlertas)] })] },
+          ],
+        }))),
+      exemplo(C.ilustracoesT, el("div", { class: "grade-ilustracoes" }, NOMES_ILUSTRACOES.map((n) => el("figure", {}, ilustracao(n, { rotulo: C.ilu[n] }), el("figcaption", {}, C.ilu[n]))))),
+      exemplo(C.vazioIlustrado, estadoVazio({ ilustracao: "inspecoes", titulo: C.vazioTitulo, texto: C.vazioTexto, acoes: [botao({ texto: C.importar, icone: "importar", variante: "primario" })] })),
+      exemplo(C.procurandoT, estadoVazio({ ilustracao: "captura", procurando: true, titulo: C.procurando, texto: C.procurandoTexto }))),
+
     secao("icones", C.iconesT, el("div", { class: "icones" }, NOMES_ICONES.map((n) => el("div", {}, icone(n), n)))),
 
     secao("conferencia", C.conferenciaT, el("div", { class: "resultado-conferencia", id: "resultado" }, el("p", {}, C.conferenciaDica))),
   );
-  $("#indice").append(...secoes.filter(([id]) => ["cores", "tipografia", "botoes", "campos", "tabela", "estados", "conferencia"].includes(id)).map(([id, t]) => el("a", { href: `#${id}` }, t)));
+  $("#indice").append(...secoes.filter(([id]) => ["cores", "tipografia", "botoes", "campos", "tabela", "estados", "acabamento", "conferencia"].includes(id)).map(([id, t]) => el("a", { href: `#${id}` }, t)));
   // o índice usa âncoras da própria página; nada de roteamento aqui
   document.querySelectorAll('a[href="#severidade"], a[href="#tabela"]').forEach((a) => a.addEventListener("click", (ev) => ev.preventDefault()));
 }

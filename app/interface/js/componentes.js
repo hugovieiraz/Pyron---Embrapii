@@ -1,6 +1,7 @@
 // Componentes da interface nova. Cada função devolve um nó pronto; o visual está em componentes.css.
 import { TEXTOS as T } from "../textos.js";
 import { el, icone, duracao, token, $ } from "./base.js";
+import { ilustracao } from "./ilustracoes.js";
 
 let sequencia = 0;
 const novoId = (prefixo) => `${prefixo}-${++sequencia}`;
@@ -80,13 +81,17 @@ export function segmentado({ rotulo, opcoes, valor, aoMudar }) {
   return g;
 }
 
-/** Abas com teclado: setas mudam de aba, Home e End vão às pontas (padrão WAI-ARIA). */
-export function abas({ rotulo, itens, ativa, aoMudar }) {
-  const lista = el("div", { class: "abas", role: "tablist", "aria-label": rotulo });
+/**
+ * Abas com teclado: setas mudam de aba, Home e End vão às pontas (padrão WAI-ARIA).
+ * vertical: true vira o trilho de ícones do painel de detalhe (cada item com icone; o texto vai para o nome acessível).
+ */
+export function abas({ rotulo, itens, ativa, aoMudar, vertical = false }) {
+  const lista = el("div", { class: vertical ? "trilho" : "abas", role: "tablist", "aria-label": rotulo, "aria-orientation": vertical ? "vertical" : null });
   const botoes = itens.map((a) => el("button", {
     type: "button", role: "tab", id: `aba-${a.id}`, "aria-controls": `painel-${a.id}`, "aria-selected": String(a.id === ativa), tabindex: a.id === ativa ? "0" : "-1",
     dataset: { aba: a.id }, onclick: () => escolher(a.id, true),
-  }, a.texto, a.qtd != null ? el("span", { class: "qtd" }, String(a.qtd)) : null));
+    "aria-label": vertical ? a.texto : null, title: vertical ? a.texto : null,
+  }, vertical ? icone(a.icone) : a.texto, a.qtd != null ? (vertical ? (a.qtd ? contadorNo(a.qtd) : null) : el("span", { class: "qtd" }, String(a.qtd))) : null));
   function escolher(id, avisarMudanca) {
     for (const b of botoes) {
       const sim = b.dataset.aba === id;
@@ -98,7 +103,8 @@ export function abas({ rotulo, itens, ativa, aoMudar }) {
   lista.addEventListener("keydown", (ev) => {
     const i = botoes.indexOf(document.activeElement);
     if (i < 0) return;
-    const alvo = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: botoes.length - 1 }[ev.key];
+    const teclas = vertical ? { ArrowDown: i + 1, ArrowUp: i - 1 } : { ArrowRight: i + 1, ArrowLeft: i - 1 };
+    const alvo = { ...teclas, Home: 0, End: botoes.length - 1 }[ev.key];
     if (alvo == null) return;
     ev.preventDefault();
     const b = botoes[(alvo + botoes.length) % botoes.length];
@@ -171,10 +177,80 @@ export const esqueleto = {
     esq("titulo"), el("div", { class: "grade" }, Array.from({ length: 4 }, () => esq("bloco"))), esq("cheio")),
 };
 
-/** Vazio: uma frase útil e a ação que resolve. */
-export function estadoVazio({ icone: ic = "inspecoes", titulo, texto, acoes = [], compacto = false }) {
-  return el("div", { class: `vazio${compacto ? " compacto" : ""}` }, icone(ic), el("h2", {}, titulo), texto ? el("p", {}, texto) : null,
+/**
+ * Vazio: uma frase útil e a ação que resolve. Com ilustracao (nome de js/ilustracoes.js), o desenho
+ * da tela entra no lugar do ícone e a moldura tracejada sai (estado de tela inteira).
+ */
+export function estadoVazio({ icone: ic = "inspecoes", ilustracao: ilu, procurando = false, titulo, texto, acoes = [], compacto = false }) {
+  const figura = ilu ? ilustracao(ilu, { rotulo: titulo, procurando }) : icone(ic);
+  return el("div", { class: ["vazio", compacto && "compacto", ilu && "com-ilustracao"].filter(Boolean).join(" ") }, figura, el("h2", {}, titulo), texto ? el("p", {}, texto) : null,
     acoes.length ? el("div", { class: "grupo-btn" }, acoes) : null);
+}
+
+/** Sem conexão com o servidor, em tela inteira (a faixa do topo continua avisando). */
+export function estadoSemConexao({ tentar }) {
+  return estadoVazio({ ilustracao: "sem-conexao", titulo: T.casca.offline, texto: T.casca.offlineDica,
+    acoes: [botao({ texto: T.geral.tentarDeNovo, icone: "refazer", variante: "primario", onclick: tentar })] });
+}
+
+// ---------------------------------------------------------------- barra de ferramentas, seção e painel de detalhe
+/**
+ * barraFerramentas({ rotulo, grupos: [[{ texto, icone, onclick, href, pressionado, indisponivel, soIcone }], ...], direita: [...] })
+ * Ícone + rótulo, divisor entre grupos, indisponível em cinza (continua no Tab, com o motivo na dica).
+ * Setas percorrem as ferramentas (padrão WAI-ARIA de toolbar).
+ */
+export function barraFerramentas({ rotulo, grupos = [], direita = [] }) {
+  const ferramenta = (f) => {
+    const tag = f.href && !f.indisponivel ? "a" : "button";
+    const dica = f.indisponivel ? `${f.texto}: ${f.indisponivel}` : f.soIcone ? f.texto : f.dica || null;
+    return el(tag, {
+      class: `ferramenta${f.soIcone ? " so-icone" : ""}`, type: tag === "button" ? "button" : null, href: tag === "a" ? f.href : null,
+      "aria-pressed": f.pressionado == null ? null : String(f.pressionado), "aria-disabled": f.indisponivel ? "true" : null,
+      "aria-label": f.soIcone ? f.texto : null, title: dica, tabindex: "-1",
+      onclick: (ev) => { if (f.indisponivel) { ev.preventDefault(); return; } f.onclick?.(ev); },
+    }, f.icone ? icone(f.icone) : null, f.soIcone ? null : el("span", { class: "rotulo" }, f.texto));
+  };
+  const partes = [];
+  grupos.forEach((g, i) => { if (i) partes.push(el("span", { class: "divisor", role: "separator", "aria-orientation": "vertical" })); partes.push(...g.map(ferramenta)); });
+  if (direita.length) partes.push(el("span", { class: "empurrar" }), ...direita.map(ferramenta));
+  const barra = el("div", { class: "barra-ferramentas", role: "toolbar", "aria-label": rotulo }, partes);
+  const itens = () => [...barra.querySelectorAll(".ferramenta")];
+  const primeiro = itens()[0];
+  if (primeiro) primeiro.tabIndex = 0;
+  barra.addEventListener("keydown", (ev) => {
+    const lista = itens();
+    const i = lista.indexOf(document.activeElement);
+    const alvo = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: lista.length - 1 }[ev.key];
+    if (i < 0 || alvo == null) return;
+    ev.preventDefault();
+    lista.forEach((n) => { n.tabIndex = -1; });
+    const n = lista[(alvo + lista.length) % lista.length];
+    n.tabIndex = 0;
+    n.focus();
+  });
+  return barra;
+}
+
+/** Seção recolhível com faixa de título (<details> nativo: teclado e leitor de tela sem código extra). */
+export function secao({ titulo, aberta = true, qtd, conteudo = [] }) {
+  return el("details", { class: "secao", open: aberta },
+    el("summary", {}, el("span", {}, titulo), qtd != null ? el("span", { class: "qtd" }, String(qtd)) : null, icone("baixo", "ic p")),
+    el("div", { class: "corpo-secao" }, conteudo));
+}
+
+/**
+ * painelDetalhe({ rotulo, itens: [{ id, icone, texto, qtd, montar: () => nós }], ativa })
+ * Inspetor à direita: trilho de ícones (abas verticais) e o conteúdo da aba com título e seções.
+ */
+export function painelDetalhe({ rotulo, itens, ativa = itens[0].id }) {
+  const conteudo = el("div", { class: "painel-conteudo" });
+  const mostrar = (id) => {
+    const item = itens.find((i) => i.id === id);
+    conteudo.replaceChildren(el("div", { role: "tabpanel", id: `painel-${id}`, "aria-labelledby": `aba-${id}` }, el("h2", {}, item.texto), item.montar()));
+  };
+  const trilho = abas({ rotulo, itens, ativa, vertical: true, aoMudar: mostrar });
+  mostrar(ativa);
+  return el("aside", { class: "painel-detalhe", "aria-label": rotulo }, trilho, conteudo);
 }
 
 /** Erro: o que aconteceu, a mensagem do servidor e "Tentar de novo". */

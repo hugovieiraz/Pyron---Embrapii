@@ -32,3 +32,7 @@
 .aviso-estatico { position: static; animation: none; }
 .faixa-estatica { border-radius: var(--r-m); }
 .menu-estatico { position: static; display: block; box-shadow: var(--sombra-2); max-width: var(--col-g); }
+.grade-ilustracoes { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--e-4); }
+.grade-ilustracoes figure { display: grid; justify-items: center; gap: var(--e-3); margin: 0; padding: var(--e-6) var(--e-4); background: var(--fundo-trabalho); border: 1px solid var(--borda); border-radius: var(--r-m); }
+.grade-ilustracoes figcaption { font-size: var(--t-1); color: var(--texto-3); }
+.grade-ilustracoes .ilustracao { width: calc(var(--ilu) * .75); }

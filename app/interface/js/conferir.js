@@ -70,7 +70,7 @@ export function conferir({ toque = false, raiz = document.body } = {}) {
     if (n.matches("[role='tabpanel']")) continue;
     clicaveis++;
     const r = alvo.getBoundingClientRect();
-    const compacto = !toque && (alvo.matches(".compacto, .menu [role^='menuitem'], .segmentado button, .tabela th button") || alvo.closest(".compacto"));
+    const compacto = !toque && (alvo.matches(".compacto, .menu [role^='menuitem'], .segmentado button, .tabela th button, .secao > summary") || alvo.closest(".compacto"));
     const minimo = compacto ? 36 : 44;
     const menor = Math.min(Math.round(r.width), Math.round(r.height));
     if (menor < minimo) alvos.push({ onde: caminho(alvo), tamanho: `${Math.round(r.width)}×${Math.round(r.height)}`, minimo });
