@@ -432,7 +432,7 @@ Demonstração sem tocar nas inspeções reais:
 | `app/` | Servidor local (FastAPI), laudo em PDF, inspeções e alertas salvos, equipamentos e tendência (`equipamentos.py`), pendências (`pendencias.py`), vídeo (`videos.py`), monitoramento de pasta (`monitoramento.py`) e interface web (`estatico/`) |
 | `lancador/` | `Pyron.exe`: fonte C# e script de construção; `atalho.py` cria o atalho que abre sem o `.exe` |
 | `apresentacao/` | aplicativo separado e enxuto para apresentação (análise, modelo e avaliação) |
-| `marca/` | Logo original e o script que gera símbolo, ícones e favicon (`gerar_marca.py`) |
+| `marca/` | Logo em vetor (`vetor/`) e o script que gera símbolo, logo, ícones e favicon a partir dela (`gerar_marca.py`) |
 | `ml/` | Treino de detectores a partir de rótulos do CVAT, avaliação e exportação ONNX |
 | `modelos/` | Modelos treinados instalados (ver `modelos/LEIA-ME.md`) |
 | `experimentos/` | Inventário do dataset (`e00`) e avaliação da inversão de paleta (`e01`) |

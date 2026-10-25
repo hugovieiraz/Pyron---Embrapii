@@ -110,6 +110,11 @@ da Etapa 4. Os detalhes o Claude decide pelos critérios do plano (não espera e
 
 ## 6. Logo nova (aprovada pelo Hugo em 25/10)
 
+**Aplicada na Etapa 3b (25/10):** itens 1, 2, 4 e 5 feitos; item 3 feito onde a logo vem dos arquivos
+gerados (interface atual, celular, apresentação, tela de abertura, README; o laudo PDF não usa a marca do
+Pyron). Pendente: recompilar o `Pyron.exe` para trocar o ícone embutido nele, e o filete entre as camadas
+da chama na versão de uma cor (`marca/vetor/LEIA-ME.md`).
+
 Os arquivos estão em `marca/vetor/` (ver o `LEIA-ME.md` de lá): símbolo vetorizado da imagem de
 referência, palavra PYRON em Chakra Petch Bold convertida em contornos, versões em cor, escuro,
 preto e branco, e o ícone do aplicativo. Nada foi trocado no aplicativo ainda. Falta:

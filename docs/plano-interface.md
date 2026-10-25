@@ -62,7 +62,8 @@ limite do plano à toa. Cada conversa nova começa só com o CLAUDE.md, a memór
   tipografia de estrutura (Bahnschrift), barra de ferramentas e painel de detalhe com seções,
   superfícies planas com linha fina e sombra só no que flutua. A referência é o FLIR Thermal Studio:
   é o nível de acabamento, não uma tela a copiar.
-- **Marca:** fica a logo original (decisão do usuário, 25/10). Não redesenhar.
+- **Marca:** logo nova em vetor (`marca/vetor/`), aprovada pelo usuário em 25/10 e aplicada na Etapa 3b;
+  os arquivos do aplicativo saem de `marca/gerar_marca.py`. Não redesenhar.
 
 ## Etapa 0 · Integrar a medição de equipamentos do Gabriel
 Modelo: **Sonnet** ou Opus com esforço **médio**.
@@ -108,18 +109,18 @@ Modelo: **Opus**, esforço **alto**.
 
 ## Etapa 3b · Acabamento profissional (antes da tela de referência)
 Modelo: **Opus**, esforço **alto**. Base: `docs/interface/2-direcao.md`, seção 6.
-- [ ] Tokens novos em `app/interface/tokens.css`: `--fonte-estrutura`, `--ilu-*` (três faces, acento,
+- [x] Tokens novos em `app/interface/tokens.css`: `--fonte-estrutura`, `--ilu-*` (três faces, acento,
       sombra do chão), fundo da área de trabalho; atualizar o `CLAUDE.md` (seções 1 e 2: três famílias,
       ilustrações, sombra só no que flutua).
-- [ ] Tipografia de estrutura na casca e nos componentes: navegação, títulos de seção, cabeçalho de
+- [x] Tipografia de estrutura na casca e nos componentes: navegação, títulos de seção, cabeçalho de
       tabela, barra de ferramentas. Conferir no Edge a largura condensada da Bahnschrift.
-- [ ] Componentes novos: barra de ferramentas (ícone + rótulo, divisor, estado indisponível), seção
+- [x] Componentes novos: barra de ferramentas (ícone + rótulo, divisor, estado indisponível), seção
       recolhível com faixa de título, trilho de ícones do painel de detalhe.
-- [ ] Ilustrações: as seis da seção 6.1 em `app/interface/js/ilustracoes.js`; `estadoVazio()` aceita
+- [x] Ilustrações: as seis da seção 6.1 em `app/interface/js/ilustracoes.js`; `estadoVazio()` aceita
       ilustração; nos dois temas.
-- [ ] Verificar se a janela do Edge em modo aplicativo aceita barra de título própria (Window Controls
+- [x] Verificar se a janela do Edge em modo aplicativo aceita barra de título própria (Window Controls
       Overlay) sem mudar o `Pyron.exe`; registrar se dá ou não, sem implementar se exigir mudança no lançador.
-- [ ] Catálogo atualizado; contraste e alvos conferidos de novo nos dois temas.
+- [x] Catálogo atualizado; contraste e alvos conferidos de novo nos dois temas.
 - **Pronto quando:** o catálogo mostra tudo nos dois temas, contraste e alvos com 0 falhas, e a
   captura do estado "Captura sem câmera" ao lado da referência da FLIR mostra o mesmo nível de acabamento.
 
@@ -170,6 +171,7 @@ Modelo: Opus com esforço **médio**.
 | plano | 25/10/2026 | Referência de acabamento do usuário (FLIR Thermal Studio) traduzida em regras: `2-direcao.md` seção 6; Etapa 3b criada | Ilustração vetorial própria nos estados; Bahnschrift como fonte de estrutura (já vem no Windows); barra de ferramentas e seções recolhíveis; sombra só no que flutua; logo original mantida, redesenho descartado | Etapa 3b antes da Etapa 4 |
 | 3b (em andamento) | 25/10/2026 | Tokens (estrutura, ilustração, ferro, fundo de trabalho); Bahnschrift semicondensada na navegação, abas, cabeçalho de tabela e ferramentas (medido: 15 % mais estreita); barra de ferramentas, seção recolhível, painel com trilho; 6 ilustrações isométricas em `js/ilustracoes.js`; `/nova#captura` mostra o estado sem fonte com dados reais; catálogo: 0 falhas em 395 textos e 83 alvos (claro, escuro, toque); Captura: 0 falhas | Barra de título própria (WCO) não dá: na janela `--app` a API existe mas fica desligada (`visible: false`); só funciona instalando como PWA, o que muda o lançador | Falta: revisar a olho as 5 outras ilustrações nos dois temas, CLAUDE.md seções 1 e 2, comparação lado a lado com a FLIR (`saida/`), marcar as caixas |
 | 3b (nuvem) | 25/10/2026 | Ilustrações v2: moldura 4:3 comum, gradiente nas faces, filete de luz, sombra difusa; 6 corrigidas e 4 novas (`analise`, `laudo`, `busca`, `celular`); entrada peça a peça e varredura no `procurando`; 4 tokens `--ilu-*`; capturas em `docs/interface/capturas/etapa3b/`; lista de toques finais em `docs/interface/acabamento.md` | Cada ilustração em até 6 peças (chão, peças, acento por último); loop só em `procurando`; logo nova aprovada em `marca/vetor/` (símbolo vetorizado da referência do Hugo + Chakra Petch Bold), ainda não aplicada | Usar as ilustrações nos estados da tabela de `acabamento.md`; aplicar a logo nova (`acabamento.md`, parte 6); CLAUDE.md seções 1 e 2; comparação com a FLIR; Etapa 3c (`acabamento.md`, parte 5), pedida pelo Hugo |
+| 3b | 25/10/2026 | Pacote da nuvem integrado (3 commits, testes 242/8); 10 ilustrações revisadas no catálogo, claro e escuro; logo nova aplicada: `marca/gerar_marca.py` reescrito (rasteriza os SVG no Edge sem janela, fundo transparente), `simbolo.png`, `logo.png` vertical, `icone-64/192.png`, `pyron.ico` com 10 tamanhos e cópias da apresentação; barra da interface nova com a logo horizontal (claro e escuro); comparação com a FLIR em `saida/capturas/etapa3/comparacao-flir.png`; catálogo 0 falhas em 398 textos e 83 alvos, Captura 0 falhas, nos dois temas e em toque | `logo.png` em montagem vertical (símbolo sobre a palavra, das mesmas peças) para caber na tela de abertura do `Pyron.exe` sem recompilar; o `.exe` não foi recompilado (o ícone embutido só muda ao rodar `lancador/construir.py`); a comparação com a FLIR mostra a mesma estrutura e acabamento, e a diferença restante é a cor (cobalto), que é a Etapa 3c | Etapa 3c (estilo FLIR); recompilar o `Pyron.exe` quando quiser o ícone novo na barra do Windows (conferir o tamanho de ≈100 KB) |
 
 ### Medição de equipamentos (Etapa 0)
 

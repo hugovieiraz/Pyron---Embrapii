@@ -11,6 +11,16 @@ núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Te
   em `docs/interface/3-sistema.md`): cobalto só em ação e seleção, neutros ardósia, palco grafite,
   sem violeta nem índigo (no termograma significam frio), navegação no topo, nada abaixo de 14 px,
   alvo 44 px (compacto 36 px só com mouse).
+- **Três famílias** com papéis separados: Segoe UI Variable (conteúdo), **Bahnschrift semicondensada**
+  (`--fonte-estrutura`: navegação, abas, títulos de seção, cabeçalho de tabela e barra de ferramentas;
+  maiúsculas espaçadas, menos nos rótulos de ferramenta) e Cascadia Mono (caminhos e leituras).
+- **Superfície:** área de trabalho em `--fundo-trabalho`; barras, painéis e tabelas brancos com linha
+  de 1 px. **Sombra só no que flutua** (menu, diálogo, aviso) e no chão das ilustrações; cartão sem sombra.
+- **Estrutura de tela de trabalho:** `barraFerramentas()` (uma por tela) + área + `painelDetalhe()`
+  (trilho de ícones e `secao()` recolhível com faixa de título).
+- **Ilustrações** (`js/ilustracoes.js`, `estadoVazio({ ilustracao })`): isométricas, feitas só com
+  tokens `--ilu-*` e `--ferro-*`, um acento térmico por desenho, nunca cobalto; onde cada uma entra está
+  em `docs/interface/acabamento.md`. Movimento contínuo só no estado `procurando`.
 - Módulos ES sem build: `js/base.js`, `js/componentes.js`, `js/casca.js`, uma tela por arquivo em
   `js/telas/` (mapa em `js/rotas.js`). Textos do JS em `app/interface/textos.js`.
 - Conferir: `testes/test_interface_nova.py` (regra dura do CSS, foco, módulos) e o catálogo
@@ -32,7 +42,11 @@ núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Te
 - **Regra dura:** nenhuma tela usa cor, espaçamento, tamanho, raio, sombra ou duração fora dos
   tokens. Precisou de valor novo? Entra em `tokens.css` primeiro. Cores no canvas vêm dos tokens
   (`corNivel()` em `app.js`).
-- A mão da logo é escura: o símbolo vai sempre sobre fundo claro (ladrilho branco, cartão branco).
+- **Marca** (logo nova de 25/10, vetores em `marca/vetor/`; a raster antiga, `marca/pyron_logo.png`, fica só como registro): mão e texto
+  `#0A0A0A`, chama `#EF5F0C` / `#FEC31F` / `#A70F3C`; em fundo escuro, mão e texto `#E6EAF0`
+  (`*-escuro.svg`). Palavra em Chakra Petch Bold (SIL OFL) convertida em contornos. Os PNG, os SVG da
+  barra e o `pyron.ico` saem de `python marca/gerar_marca.py` (rasteriza no Edge sem janela); não editar
+  os arquivos gerados à mão. O ícone dentro do `Pyron.exe` só muda ao recompilar (`lancador/construir.py`).
   O palco do termograma é índigo profundo (`--palco`), inclusive no tema claro.
 
 ## 2. Hierarquia e estados

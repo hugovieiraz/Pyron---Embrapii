@@ -170,6 +170,8 @@ programa, não imagens coladas. O que produz essa impressão, decomposto em regr
 
 ### 6.4 Marca
 
-Fica a **logo original** (`marca/pyron_logo.png` e os recortes em `app/estatico/marca/`), por decisão
-do usuário em 25/10. O redesenho em vetor foi esboçado e descartado (`esbocos/marca.html`). Continua
-a regra de pôr o símbolo sobre ladrilho branco.
+Atualizado em 25/10, depois: a **logo nova** foi aprovada pelo usuário (`marca/vetor/`, ver o
+`LEIA-ME.md` de lá): o símbolo da referência dele vetorizado sem redesenho, com a palavra em Chakra Petch
+Bold. Ela substitui a logo raster. O esboço anterior (`esbocos/marca.html`) continua descartado.
+Na interface nova a barra do topo usa a logo horizontal (`logo-cor.svg` no claro, `logo-escuro.svg` no
+escuro, 32 px de altura); como há versão para fundo escuro, acabou a regra do ladrilho branco.

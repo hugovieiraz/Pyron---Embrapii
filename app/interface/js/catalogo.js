@@ -229,4 +229,6 @@ instalarIcones();
 montar();
 // a página nasce vazia e é montada aqui: só agora a âncora do endereço existe
 if (location.hash) document.querySelector(location.hash)?.scrollIntoView();
+// ?secao=<id>: só aquela seção (captura de tela de uma parte do catálogo)
+if (params.get("secao")) document.querySelectorAll("#catalogo > section").forEach((s) => { s.hidden = s.id !== params.get("secao"); });
 if (params.has("conferir")) requestAnimationFrame(() => setTimeout(mostrarConferencia, 300));

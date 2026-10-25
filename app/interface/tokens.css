@@ -167,6 +167,7 @@
   --traco: 4px;            /* traço de severidade à esquerda de linha e região */
   --borda-sel: 2px;        /* contorno de seleção e de aba ativa */
   --topo: 56px;
+  --logo-topo: 32px;      /* altura da logo horizontal na barra do topo */
   --linha: 44px;           /* linha de tabela */
   --detalhe: 400px;        /* painel de detalhe à direita */
   --faixa-regioes: 88px;   /* faixa de regiões abaixo do termograma */

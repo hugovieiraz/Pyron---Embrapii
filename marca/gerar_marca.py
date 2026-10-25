@@ -1,99 +1,105 @@
-"""Gera os arquivos da marca Pyron a partir da logo original (marca/pyron_logo.png).
+"""Gera os arquivos da marca Pyron a partir dos vetores de marca/vetor/ (logo nova, aprovada em 25/10/2026).
 
 Saídas:
-    app/estatico/marca/simbolo.png    mão e chama, fundo transparente (para fundos claros)
-    app/estatico/marca/logo.png       logo completa (símbolo, PYRON e slogan), fundo transparente
-    app/estatico/marca/icone-64.png   ladrilho claro com o símbolo: favicon
-    app/estatico/marca/icone-192.png  ladrilho claro com o símbolo: barra lateral e atalhos
-    <destino_ico>                     ícone do Windows multi-tamanho (padrão: lancador/obj/pyron.ico)
+    marca/vetor/pyron-logo-vertical-cor.svg  símbolo sobre a palavra, montado dos vetores (sem redesenho)
+    app/estatico/marca/simbolo.png           símbolo, 512 px, fundo transparente
+    app/estatico/marca/logo.png              logo vertical, 720 px de largura, fundo transparente
+                                             (tela de abertura do Pyron.exe, Sobre e README)
+    app/estatico/marca/logo-cor.svg          logo horizontal para fundo claro (barra da interface nova)
+    app/estatico/marca/logo-escuro.svg       logo horizontal para fundo escuro
+    app/estatico/marca/icone-64.png          ícone do aplicativo: favicon
+    app/estatico/marca/icone-192.png         ícone do aplicativo: atalhos e página do celular
+    marca/pyron.ico e <destino_ico>          ícone do Windows multi-tamanho (atalhos e Pyron.exe)
+    apresentacao/estatico/marca/             cópias usadas pela apresentação
+
+Os SVG viram PNG no Edge sem janela, com fundo transparente: o Edge é assinado pela Microsoft e passa pelo
+Controle Inteligente de Aplicativos, e assim nada precisa ser instalado. Cada tamanho do .ico é desenhado
+no próprio tamanho, para a chama continuar nítida em 16 px.
 
 Uso: python marca/gerar_marca.py [destino.ico]
 """
 
 from __future__ import annotations
 
+import re
+import shutil
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
-import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image
 
 AQUI = Path(__file__).resolve().parent
 PROJETO = AQUI.parent
-ORIGINAL = AQUI / "pyron_logo.png"
+VETOR = AQUI / "vetor"
 ESTATICO = PROJETO / "app" / "estatico" / "marca"
-
-# Caixas na imagem original de 1024 × 1024 (x0, y0, x1, y1).
-CAIXA_SIMBOLO = (303, 152, 725, 670)
-CAIXA_LOGO = (206, 152, 819, 883)
+APRESENTACAO = PROJETO / "apresentacao" / "estatico" / "marca"
 TAMANHOS_ICO = [16, 20, 24, 32, 40, 48, 64, 96, 128, 256]
-BORDA_LADRILHO = (214, 220, 228)
+EDGE = [Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"), Path(r"C:\Program Files\Microsoft\Edge\Application\msedge.exe")]
 
 
-def fundo_estimado(rgb: np.ndarray) -> np.ndarray:
-    """O fundo da logo é um cinza-claro com leve vinheta: ajusta uma superfície quadrática por canal."""
-    satur = rgb.max(2) - rgb.min(2)
-    claro = rgb.mean(2)
-    amostra = (satur < 8) & (claro > 225)
-    ys, xs = np.nonzero(amostra[::8, ::8])
-    ys, xs = ys * 8, xs * 8
-    h, w = claro.shape
-    def termos(x, y):
-        x, y = x / w - 0.5, y / h - 0.5
-        return np.stack([np.ones_like(x), x, y, x * x, y * y, x * y], -1)
-    coef = np.linalg.lstsq(termos(xs.astype(float), ys.astype(float)), rgb[ys, xs], rcond=None)[0]
-    yy, xx = np.mgrid[0:h, 0:w].astype(float)
-    return termos(xx, yy) @ coef
+def _conteudo(svg: Path) -> tuple[str, str]:
+    """viewBox e o desenho de dentro de um SVG de uma peça só."""
+    texto = svg.read_text(encoding="utf-8")
+    caixa = re.search(r'viewBox="([^"]+)"', texto).group(1)
+    miolo = texto[texto.index(">") + 1 : texto.rindex("</svg>")]
+    return caixa, miolo
 
 
-def transparente(original: Image.Image) -> Image.Image:
-    """Tira o fundo claro: opacidade pela saturação ou pelo escurecimento em relação ao fundo local.
-
-    O contorno branco entre a chama e a mão também some (é fundo no desenho original).
-    A cor das bordas é descontaminada do fundo para não deixar halo cinza.
-    """
-    rgb = np.asarray(original.convert("RGB")).astype(float)
-    fundo = fundo_estimado(rgb)
-    satur = rgb.max(2) - rgb.min(2) - (fundo.max(2) - fundo.min(2))
-    escurecimento = fundo.mean(2) - rgb.mean(2)
-    d = np.maximum(satur, escurecimento)
-    alfa = np.clip((d - 8.0) / (90.0 - 8.0), 0.0, 1.0)
-    cor = fundo + (rgb - fundo) / np.maximum(alfa, 1e-3)[..., None]
-    cor = np.clip(np.where(alfa[..., None] > 0, cor, 0), 0, 255)
-    rgba = np.dstack([cor, alfa * 255]).round().astype(np.uint8)
-    return Image.fromarray(rgba, "RGBA")
-
-
-def com_margem(img: Image.Image, caixa: tuple[int, int, int, int], margem: float, quadrado: bool) -> Image.Image:
-    x0, y0, x1, y1 = caixa
-    recorte = img.crop(caixa)
-    w, h = x1 - x0, y1 - y0
-    lado_w = lado_h = None
-    if quadrado:
-        lado_w = lado_h = round(max(w, h) * (1 + 2 * margem))
-    else:
-        lado_w, lado_h = round(w + 2 * margem * max(w, h)), round(h + 2 * margem * max(w, h))
-    tela = Image.new("RGBA", (lado_w, lado_h), (0, 0, 0, 0))
-    tela.paste(recorte, ((lado_w - w) // 2, (lado_h - h) // 2), recorte)
-    return tela
+def montar_vertical() -> Path:
+    """Símbolo centrado sobre a palavra PYRON, na largura da palavra (mesmas peças da logo horizontal)."""
+    caixa_s, simbolo = _conteudo(VETOR / "pyron-simbolo-cor.svg")
+    caixa_p, palavra = _conteudo(VETOR / "pyron-palavra.svg")
+    _, _, sw, sh = (float(v) for v in caixa_s.split())
+    _, _, pw, ph = (float(v) for v in caixa_p.split())
+    alto_s = 220.0
+    largo_s = alto_s * sw / sh
+    vao = 26.0
+    total = alto_s + vao + ph
+    saida = VETOR / "pyron-logo-vertical-cor.svg"
+    saida.write_text(
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {pw:.1f} {total:.1f}" role="img" aria-label="Pyron">'
+        f'<svg x="{(pw - largo_s) / 2:.2f}" y="0" width="{largo_s:.2f}" height="{alto_s:.2f}" viewBox="{caixa_s}">{simbolo}</svg>'
+        f'<svg x="0" y="{alto_s + vao:.2f}" width="{pw:.2f}" height="{ph:.2f}" viewBox="{caixa_p}">{palavra}</svg>'
+        "</svg>\n",
+        encoding="utf-8",
+    )
+    return saida
 
 
-def ladrilho(simbolo: Image.Image, lado: int) -> Image.Image:
-    """Quadrado claro de cantos arredondados com o símbolo: lê bem na barra de tarefas clara ou escura."""
-    k = 8  # desenha grande e reduz, para bordas suaves
-    L = lado * k
-    tela = Image.new("RGBA", (L, L), (0, 0, 0, 0))
-    d = ImageDraw.Draw(tela)
-    raio = L * 0.22
-    borda = max(k, round(L * 0.012)) if lado >= 32 else k
-    d.rounded_rectangle([0, 0, L - 1, L - 1], radius=raio, fill=BORDA_LADRILHO)
-    d.rounded_rectangle([borda, borda, L - 1 - borda, L - 1 - borda], radius=raio - borda, fill=(255, 255, 255))
-    # Tamanhos pequenos: o símbolo ocupa mais do ladrilho para a chama continuar legível.
-    ocupacao = 0.92 if lado <= 24 else 0.86 if lado <= 48 else 0.8
-    s = round(L * ocupacao)
-    simb = simbolo.resize((s, s), Image.LANCZOS)
-    tela.alpha_composite(simb, ((L - s) // 2, (L - s) // 2 + round(L * 0.01)))
-    return tela.resize((lado, lado), Image.LANCZOS)
+def _edge() -> Path:
+    for e in EDGE:
+        if e.exists():
+            return e
+    sys.exit("Edge não encontrado: ele é usado para transformar os SVG da marca em PNG.")
+
+
+def rasterizar(svg: Path, largura: int, altura: int) -> Image.Image:
+    """Desenha o SVG em largura × altura px, com fundo transparente."""
+    with tempfile.TemporaryDirectory() as pasta:
+        pasta = Path(pasta)
+        pagina = pasta / "marca.html"
+        pagina.write_text(
+            "<!doctype html><html><head><style>html,body{margin:0;background:transparent}"
+            f"img{{display:block;width:{largura}px;height:{altura}px}}</style></head>"
+            f'<body><img src="{svg.as_uri()}"></body></html>',
+            encoding="utf-8",
+        )
+        png = pasta / "saida.png"
+        subprocess.run(
+            [str(_edge()), "--headless=new", "--disable-gpu", "--hide-scrollbars", "--allow-file-access-from-files",
+             "--default-background-color=00000000", f"--user-data-dir={pasta / 'perfil'}",
+             f"--window-size={largura},{altura}", f"--screenshot={png}", pagina.as_uri()],
+            check=True, capture_output=True, timeout=120,
+        )
+        with Image.open(png) as im:
+            return im.convert("RGBA").copy()
+
+
+def _proporcao(svg: Path) -> float:
+    _, _, w, h = (float(v) for v in _conteudo(svg)[0].split())
+    return w / h
 
 
 def main() -> None:
@@ -101,19 +107,32 @@ def main() -> None:
     ESTATICO.mkdir(parents=True, exist_ok=True)
     destino_ico.parent.mkdir(parents=True, exist_ok=True)
 
-    sem_fundo = transparente(Image.open(ORIGINAL))
-    simbolo = com_margem(sem_fundo, CAIXA_SIMBOLO, 0.02, quadrado=True)
-    logo = com_margem(sem_fundo, CAIXA_LOGO, 0.03, quadrado=False)
+    vertical = montar_vertical()
+    simbolo = VETOR / "pyron-simbolo-cor.svg"
+    icone = VETOR / "pyron-icone.svg"
 
-    simbolo.resize((512, 512), Image.LANCZOS).save(ESTATICO / "simbolo.png", optimize=True)
-    largura = 720
-    logo.resize((largura, round(logo.height * largura / logo.width)), Image.LANCZOS).save(ESTATICO / "logo.png", optimize=True)
-    ladrilho(simbolo, 64).save(ESTATICO / "icone-64.png", optimize=True)
-    ladrilho(simbolo, 192).save(ESTATICO / "icone-192.png", optimize=True)
+    # símbolo quadrado com o desenho centrado
+    s = rasterizar(simbolo, round(512 * _proporcao(simbolo)), 512)
+    quadro = Image.new("RGBA", (512, 512), (0, 0, 0, 0))
+    quadro.alpha_composite(s, ((512 - s.width) // 2, 0))
+    quadro.save(ESTATICO / "simbolo.png", optimize=True)
 
-    camadas = [ladrilho(simbolo, t) for t in TAMANHOS_ICO]
+    rasterizar(vertical, 720, round(720 / _proporcao(vertical))).save(ESTATICO / "logo.png", optimize=True)
+    for lado in (64, 192):
+        rasterizar(icone, lado, lado).save(ESTATICO / f"icone-{lado}.png", optimize=True)
+    shutil.copyfile(VETOR / "pyron-logo-cor.svg", ESTATICO / "logo-cor.svg")
+    shutil.copyfile(VETOR / "pyron-logo-escuro.svg", ESTATICO / "logo-escuro.svg")
+
+    camadas = [rasterizar(icone, t, t) for t in TAMANHOS_ICO]
     camadas[-1].save(destino_ico, format="ICO", sizes=[(t, t) for t in TAMANHOS_ICO], append_images=camadas[:-1])
-    print("marca gerada em", ESTATICO, "e", destino_ico)
+    if destino_ico.resolve() != (AQUI / "pyron.ico").resolve():
+        shutil.copyfile(destino_ico, AQUI / "pyron.ico")
+
+    APRESENTACAO.mkdir(parents=True, exist_ok=True)
+    for nome in ("icone-64.png", "icone-192.png", "logo.png"):
+        shutil.copyfile(ESTATICO / nome, APRESENTACAO / nome)
+    shutil.copyfile(AQUI / "pyron.ico", APRESENTACAO / "pyron.ico")
+    print("marca gerada em", ESTATICO, ",", AQUI / "pyron.ico", "e", APRESENTACAO)
 
 
 if __name__ == "__main__":
