@@ -48,8 +48,6 @@ body { font: var(--p-normal) var(--t-2) / var(--a-2) var(--fonte); color: var(--
 .palco .tam { color: var(--palco-texto-2); }
 .tam svg, .tam img { display: block; }
 .mono { color: var(--texto); --marca-chama-1: currentColor; --marca-chama-2: currentColor; --marca-chama-3: currentColor; }
-.mono.recorte { --marca-chama-2: var(--superficie); --marca-chama-3: currentColor; }
-
 /* conjunto horizontal: como fica na barra superior da interface nova (56 px) */
 .barra { display: flex; align-items: center; gap: var(--e-6); height: var(--topo); padding: 0 var(--e-5); border: 1px solid var(--borda); border-radius: var(--r-m); background: var(--superficie); }
 .conjunto { display: flex; align-items: center; gap: var(--e-2); }
@@ -94,28 +92,39 @@ body { font: var(--p-normal) var(--t-2) / var(--a-2) var(--fonte); color: var(--
     <path style="fill: var(--marca-chama-3)" d="M24.3 18.2C25.7 20.5 27.4 21.8 27.4 24.2C27.4 26.1 25.9 27.4 24 27.4C22.1 27.4 20.6 26.1 20.6 24.2C20.6 22.2 22.5 20.8 24.3 18.2Z"/>
   </symbol>
 
-  <!-- B · Pixel térmico: a chama feita de pixels de termograma (grade de 3 unidades = 1 px em 16 px) -->
-  <symbol id="simbolo-b" viewBox="0 0 48 48">
+  <!-- contorno base das chamas novas: ponta inclinada e um degrau à esquerda (sem ele, vira gota d'água) -->
+  <defs><path id="gota" d="M24.5 3.5C26 8 31 11.5 32.6 16.5C33.4 19 33.3 21.5 32.4 23.6C31 26.6 27.8 28.5 24 28.5C19.1 28.5 15.2 24.8 15.2 20C15.2 16.8 16.6 14.6 18.4 12.6C18.6 15 19.6 16.6 21 17.4C20.4 12.4 22 7.6 24.5 3.5Z"/></defs>
+
+  <!-- A1 · Corte: chama de uma cor, dividida por um corte curvo (o mesmo recurso do polegar) -->
+  <mask id="corte-chama" maskUnits="userSpaceOnUse" x="0" y="0" width="48" height="48">
+    <rect width="48" height="48" fill="#fff"/>
+    <path d="M23.6 30C20.4 26.6 20.8 22.2 22.9 19C24.2 17 25.1 14.6 24.9 11.6" fill="none" stroke="#000" stroke-width="1.8" stroke-linecap="round"/>
+  </mask>
+  <symbol id="simbolo-a1" viewBox="0 0 48 48">
     <use href="#mao-solida"/>
-    <g id="chama-pixel"></g>
+    <use href="#gota" mask="url(#corte-chama)" style="fill: var(--marca-chama-2)"/>
   </symbol>
 
-  <!-- C · Traço: a mão no mesmo traço dos ícones da interface (1,7 na grade de 24), chama cheia -->
-  <symbol id="simbolo-c" viewBox="0 0 48 48">
-    <g fill="none" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round" style="stroke: var(--marca-mao)">
-      <path d="M7.5 31V42"/>
-      <path d="M14.5 31.2H30.3L39.3 23.6C40.6 22.5 42.6 23.4 42.4 25.1C42.3 25.6 42.2 26 41.9 26.4L35.2 37C33.8 39.3 31.6 41 28.6 41H14.5"/>
-      <path d="M14.5 36.1H24.4C26.3 36.1 27.6 35 28.1 33.4"/>
-    </g>
-    <path style="fill: var(--marca-chama-2)" fill-rule="evenodd" d="M24 3.5C25.5 8.5 33 11.5 33 19.5C33 25 29 28.5 24 28.5C19 28.5 15 25 15 19.5C15 15.5 17.3 12.8 19.3 10.2C19.6 12.6 20.6 14 22 14.6C21.5 10.5 22.3 6.8 24 3.5ZM24.3 16.6C25.9 19.2 27.9 20.9 27.9 23.7C27.9 25.9 26.2 27.4 24 27.4C21.8 27.4 20.1 25.9 20.1 23.7C20.1 21.4 22.3 19.6 24.3 16.6Z"/>
-    <path style="fill: var(--marca-chama-3)" d="M24.3 19.6C25.3 21.2 26.3 22.2 26.3 23.8C26.3 25.1 25.3 26 24 26C22.7 26 21.7 25.1 21.7 23.8C21.7 22.4 23 21.4 24.3 19.6Z"/>
+  <!-- A2 · Isotermas: a chama como as curvas de nível de um termograma, do contorno ao núcleo -->
+  <symbol id="simbolo-a2" viewBox="0 0 48 48">
+    <use href="#mao-solida"/>
+    <use href="#gota" transform="translate(24 20.5) scale(.93) translate(-24 -20.5)" style="fill: none; stroke: var(--marca-chama-1); stroke-width: 2.6px"/>
+    <use href="#gota" transform="translate(24 20.5) scale(.58) translate(-24 -20.5)" style="fill: none; stroke: var(--marca-chama-2); stroke-width: 4.4px"/>
+    <use href="#gota" transform="translate(24 21.5) scale(.26) translate(-24 -21.5)" style="fill: var(--marca-chama-3)"/>
+  </symbol>
+
+  <!-- A3 · Facetada: chama em planos retos, lado de luz e lado de sombra -->
+  <symbol id="simbolo-a3" viewBox="0 0 48 48">
+    <use href="#mao-solida"/>
+    <path style="fill: var(--marca-chama-2)" d="M25.5 3L21.6 15.4L18.6 9.6L15.4 16.4L16 23.6L24 28.5Z"/>
+    <path style="fill: var(--marca-chama-1)" d="M25.5 3L32.8 15.4L31.8 23.6L24 28.5Z"/>
   </symbol>
 </svg>
 
 <header class="cab">
   <div>
-    <h1>Marca do Pyron · três variações do símbolo</h1>
-    <p>A mesma ideia da logo atual (a mão segurando a chama), redesenhada em vetor numa grade de 48 × 48. Cada variação aparece nos tamanhos em que a marca é usada de verdade: barra superior (32 px), favicon (16 px), ícone do Windows, tela de abertura, tema escuro e versão de uma cor.</p>
+    <h1>Marca do Pyron · três chamas para a mão sólida</h1>
+    <p>A mão da variação Sólida, mantida, com três desenhos de chama mais sóbrios no lugar das camadas arredondadas. Cada uma aparece nos tamanhos em que a marca é usada de verdade: barra superior (32 px), favicon (16 px), ícone do Windows, tela de abertura, tema escuro e versão de uma cor.</p>
   </div>
   <button class="btn" type="button" id="tema">Tema escuro</button>
 </header>
@@ -145,69 +154,39 @@ body { font: var(--p-normal) var(--t-2) / var(--a-2) var(--fonte); color: var(--
 </template>
 
 <script>
-// Chama em pixels da variação B: r = borda vermelha, o = brasa, a = núcleo âmbar. Uma linha = 3 unidades.
-const PIXELS = [
-  "...........r....",
-  ".........r......",
-  "........rr......",
-  ".......ror......",
-  "......roorr.....",
-  ".....rooaor.....",
-  "....rooaaoor....",
-  "....roaaaaor....",
-  "....roaaaaor....",
-  ".....roaaor.....",
-];
-const COR = { r: "var(--marca-chama-1)", o: "var(--marca-chama-2)", a: "var(--marca-chama-3)" };
-const NS = "http://www.w3.org/2000/svg";
-const chama = document.getElementById("chama-pixel");
-PIXELS.forEach((linha, y) => [...linha].forEach((c, x) => {
-  if (c === ".") return;
-  const r = document.createElementNS(NS, "rect");
-  Object.entries({ x: x * 3, y: y * 3, width: 3, height: 3 }).forEach(([k, v]) => r.setAttribute(k, v));
-  r.style.fill = COR[c];
-  chama.append(r);
-}));
-
+// A mão é a mesma da variação Sólida em todas; muda só a chama.
 const VARIACOES = [
-  { id: "a", letra: "A", rotulo: "Sólida", desc: "Chama lisa em três camadas, mão cheia com o polegar marcado por um corte. A mais próxima de uma logo corporativa.",
-    notas: ["Lê bem do favicon à tela de abertura", "Cores da chama seguem a paleta ferro: borda vermelha, núcleo âmbar", "Na versão de uma cor, as camadas viram recortes"] },
-  { id: "b", letra: "B", rotulo: "Pixel térmico", desc: "Mantém o pixel da logo atual: a chama é feita de pixels de termograma, como uma imagem térmica ampliada. A mão continua lisa.",
-    notas: ["Grade de pixel casa com 16 px: o favicon fica nítido", "Liga a marca à termografia digital", "Mais informal que a A"] },
-  { id: "c", letra: "C", rotulo: "Traço", desc: "Mão desenhada com o mesmo traço dos ícones da interface, chama cheia. Conversa com o resto da tela.",
-    notas: ["Mais leve; parece da mesma família dos ícones", "Em 16 px o traço afina e perde força", "Bom para a barra; fraco como ícone do Windows"] },
+  { id: "a1", letra: "1", rotulo: "Corte", desc: "Chama de uma cor só, dividida por um corte curvo. É o mesmo recurso que separa o polegar da palma: mão e chama falam a mesma língua.",
+    notas: ["Uma cor: a mais sóbria das três", "O corte sugere duas línguas de fogo sem desenhá-las", "Em 16 px vira uma gota laranja limpa"] },
+  { id: "a2", letra: "2", rotulo: "Isotermas", desc: "A chama desenhada como as curvas de nível de um termograma: contorno, faixa intermediária e núcleo quente.",
+    notas: ["Diz \"termografia\" sem precisar do texto", "Cores da paleta ferro, mas em linhas, não em manchas", "Em 16 px as linhas se juntam numa gota com núcleo claro"] },
+  { id: "a3", letra: "3", rotulo: "Facetada", desc: "Chama em planos retos, com um lado de luz e um lado de sombra. Visual de peça usinada, mais industrial.",
+    notas: ["Duas cores, arestas retas", "Combina com o desenho geométrico da mão", "A língua da esquerda some abaixo de 24 px"] },
+  { id: "a", letra: "×", rotulo: "Sólida anterior (descartada)", desc: "A versão anterior, para comparar: três camadas arredondadas de vermelho, laranja e amarelo, que lembram o emoji de fogo.",
+    notas: ["Línguas onduladas e gradação vermelho-laranja-amarelo = emoji"] },
 ];
 
-const svg = (id, lado, extra = "") => `<svg width="${lado}" height="${lado}" ${extra} aria-hidden="true"><use href="#simbolo-${id}"/></svg>`;
-const img = (lado) => `<img src="../../../app/estatico/marca/simbolo.png" width="${lado}" height="${lado}" alt="">`;
+const svg = (id, lado) => `<svg width="${lado}" height="${lado}" aria-hidden="true"><use href="#simbolo-${id}"/></svg>`;
 const TAMANHOS = [64, 48, 32, 24, 16];
 
-function montar(v, original) {
+function montar(v) {
   const no = document.getElementById("modelo").content.cloneNode(true);
-  const s = original ? img : (lado) => svg(v.id, lado);
-  const sec = no.querySelector(".variacao");
-  if (original) sec.classList.add("original");
+  const s = (lado) => svg(v.id, lado);
+  if (v.id === "a") no.querySelector(".variacao").classList.add("original");
   no.querySelector(".letra").textContent = v.letra;
   no.querySelector(".rotulo").textContent = v.rotulo;
   no.querySelector(".desc").textContent = v.desc;
   no.querySelector(".notas").innerHTML = v.notas.map((n) => `<li>${n}</li>`).join("");
   no.querySelector(".grande").innerHTML = s(160);
   no.querySelectorAll(".tamanhos").forEach((l) => { l.innerHTML = TAMANHOS.map((t) => `<span class="tam">${s(t)}${t}</span>`).join(""); });
-  no.querySelector(".mono-linha").innerHTML = original
-    ? `<span class="tam">não existe: a imagem só tem a versão colorida</span>`
-    : [64, 32, 16].map((t) => `<span class="tam mono">${svg(v.id, t)}${t}</span>`).join("")
-      + [64, 32].map((t) => `<span class="tam mono recorte">${svg(v.id, t)}recorte ${t}</span>`).join("");
+  no.querySelector(".mono-linha").innerHTML = [64, 32, 16].map((t) => `<span class="tam mono">${s(t)}${t}</span>`).join("");
   no.querySelector(".conjunto").innerHTML = s(32) + `<span class="nome">PYRON</span>`;
   no.querySelector(".assinatura").innerHTML = s(64) + `<span class="nome">PYRON<small>Manutenção preditiva por termografia</small></span>`;
-  no.querySelector(".ladrilhos").innerHTML = original
-    ? `<span class="ladrilho">${img(77)}</span>`
-    : `<span class="ladrilho">${svg(v.id, 77)}</span><span class="ladrilho escuro">${svg(v.id, 77)}</span>`;
+  no.querySelector(".ladrilhos").innerHTML = `<span class="ladrilho">${s(77)}</span><span class="ladrilho escuro">${s(77)}</span>`;
   document.getElementById("grade").append(no);
 }
 
-VARIACOES.forEach((v) => montar(v, false));
-montar({ letra: "·", rotulo: "Atual (PNG recortado)", desc: "Para comparar: o simbolo.png de hoje, recortado da imagem original.",
-  notas: ["Em 16 e 24 px a grade da mão e os pixels soltos viram borrão", "Mão escura fixa: some no fundo escuro", "Não tem versão de uma cor"] }, true);
+VARIACOES.forEach(montar);
 
 const botao = document.getElementById("tema");
 botao.addEventListener("click", () => {

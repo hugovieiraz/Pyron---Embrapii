@@ -57,6 +57,12 @@ limite do plano à toa. Cada conversa nova começa só com o CLAUDE.md, a memór
   em 1536 × 816 pela pré-visualização `pyron-demo` (nunca com os dados reais).
 - **Economia:** ler arquivos grandes por partes (o `app.js` tem milhares de linhas); não repetir o que
   já está no Registro.
+- **Acabamento de software de verdade** (pedido do usuário, 25/10): seguir a seção 6 de
+  `docs/interface/2-direcao.md`. Ilustração própria em vetor nos estados vazio e sem conexão,
+  tipografia de estrutura (Bahnschrift), barra de ferramentas e painel de detalhe com seções,
+  superfícies planas com linha fina e sombra só no que flutua. A referência é o FLIR Thermal Studio:
+  é o nível de acabamento, não uma tela a copiar.
+- **Marca:** fica a logo original (decisão do usuário, 25/10). Não redesenhar.
 
 ## Etapa 0 · Integrar a medição de equipamentos do Gabriel
 Modelo: **Sonnet** ou Opus com esforço **médio**.
@@ -100,9 +106,26 @@ Modelo: **Opus**, esforço **alto**.
 - [x] Casca: navegação nova, cabeçalho, roteamento, atalhos; servir em `/nova`.
 - **Pronto quando:** catálogo completo; foco visível, contraste ≥ 4,5:1 e alvos ≥ 44 px conferidos.
 
+## Etapa 3b · Acabamento profissional (antes da tela de referência)
+Modelo: **Opus**, esforço **alto**. Base: `docs/interface/2-direcao.md`, seção 6.
+- [ ] Tokens novos em `app/interface/tokens.css`: `--fonte-estrutura`, `--ilu-*` (três faces, acento,
+      sombra do chão), fundo da área de trabalho; atualizar o `CLAUDE.md` (seções 1 e 2: três famílias,
+      ilustrações, sombra só no que flutua).
+- [ ] Tipografia de estrutura na casca e nos componentes: navegação, títulos de seção, cabeçalho de
+      tabela, barra de ferramentas. Conferir no Edge a largura condensada da Bahnschrift.
+- [ ] Componentes novos: barra de ferramentas (ícone + rótulo, divisor, estado indisponível), seção
+      recolhível com faixa de título, trilho de ícones do painel de detalhe.
+- [ ] Ilustrações: as seis da seção 6.1 em `app/interface/js/ilustracoes.js`; `estadoVazio()` aceita
+      ilustração; nos dois temas.
+- [ ] Verificar se a janela do Edge em modo aplicativo aceita barra de título própria (Window Controls
+      Overlay) sem mudar o `Pyron.exe`; registrar se dá ou não, sem implementar se exigir mudança no lançador.
+- [ ] Catálogo atualizado; contraste e alvos conferidos de novo nos dois temas.
+- **Pronto quando:** o catálogo mostra tudo nos dois temas, contraste e alvos com 0 falhas, e a
+  captura do estado "Captura sem câmera" ao lado da referência da FLIR mostra o mesmo nível de acabamento.
+
 ## Etapa 4 · Tela de referência
 Modelo: **Opus**, esforço **alto**.
-- [ ] Construir a **Análise** completa na interface nova, ligada à API real.
+- [ ] Construir a **Análise** completa na interface nova, ligada à API real, já com o acabamento da Etapa 3b.
 - [ ] Capturas antes/depois; `laws-of-ux-checklist` 12/12; nota ≥ 50/60.
 - **Pronto quando:** os critérios acima passam. Esta tela vira o padrão das outras.
 
@@ -113,7 +136,8 @@ Modelo: **Sonnet** ou Opus com esforço **médio** (o padrão já está decidido
 - [ ] 5b · Equipamentos e Pendências (a medição já entra na Análise, Etapa 4)
 - [ ] 5c · Captura (pasta monitorada, vídeo, celular, alertas)
 - [ ] 5d · Modelos (em uso, treino, avaliação) e Configurações (com Sobre)
-- Em cada grupo: mesmo padrão da Etapa 4, checklist 12/12, capturas antes/depois, testes.
+- Em cada grupo: mesmo padrão da Etapa 4, checklist 12/12, capturas antes/depois, testes; estados
+  vazio e sem conexão com a ilustração da tela.
 
 ## Etapa 6 · Troca e acabamento
 Modelo: Opus com esforço **médio**.
@@ -132,6 +156,7 @@ Modelo: Opus com esforço **médio**.
 | 1 | 25/10/2026 | Inventário de 14 telas, capturas em `saida/capturas/antes/`, arquitetura em `docs/interface/1-diagnostico.md` | Navegação: Painel, Inspeções, Equipamentos, Pendências, Captura, Modelos + Configurações; Nova análise vira ação de Inspeções; Análise é detalhe da inspeção e cabe sem rolar; Monitoramento + Vídeo + Celular = Captura; Modelos + Avaliação; Sobre em Configurações; um primário por tela, sem primário global | Etapa 2: esboços do Painel e da Análise |
 | 2 | 25/10/2026 | Brief, paleta nova, três esboços (A mesa, B cartões, C leitura ampla) com capturas e medidas em 1536 × 816; `docs/interface/2-direcao.md` | Direção C: navegação no topo, corpo 17 px, nada abaixo de 14 px, termograma com 33 % da tela; cor "aço e cobalto" (cobalto para ação, ardósia, palco grafite; violeta e índigo saem porque significam frio no termograma) | Etapa 3: tokens novos em `tokens.css`, `CLAUDE.md` seção 1 atualizada, componentes e casca em `/nova` |
 | 3 | 25/10/2026 | Tokens, base, 13 componentes, casca (rotas, atalhos, busca Ctrl+K, soltar arquivo, sem conexão, sinal de janela, tema), catálogo, conferência automática, 10 testes; `docs/interface/3-sistema.md` | Pasta e tokens próprios para não mexer na interface atual; módulos ES sem build; número aceita vírgula; contraste 0 falhas em 359 textos e alvos 0 falhas em 70, nos dois temas e em toque | Etapa 4: Análise completa na interface nova |
+| plano | 25/10/2026 | Referência de acabamento do usuário (FLIR Thermal Studio) traduzida em regras: `2-direcao.md` seção 6; Etapa 3b criada | Ilustração vetorial própria nos estados; Bahnschrift como fonte de estrutura (já vem no Windows); barra de ferramentas e seções recolhíveis; sombra só no que flutua; logo original mantida, redesenho descartado | Etapa 3b antes da Etapa 4 |
 
 ### Medição de equipamentos (Etapa 0)
 

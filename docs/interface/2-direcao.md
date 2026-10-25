@@ -116,3 +116,60 @@ inspetor de 432 px tira largura da imagem e esconde a 7.ª região.
   faixa de regiões 88 px.
 - **Família:** Segoe UI Variable continua (é a do sistema, nítida em 125 %); Cascadia Mono só para
   caminho, comando e leitura bruta.
+
+## 6. Acabamento: parecer software de verdade (25/10, pedido do usuário)
+
+Referência trazida pelo usuário: o FLIR Thermal Studio (software da câmera), aba Live Stream sem
+câmera conectada. Não é para copiar a tela; é o **nível de acabamento**: os elementos parecem parte do
+programa, não imagens coladas. O que produz essa impressão, decomposto em regras para o Pyron:
+
+| Na referência | Por que parece software de verdade | Regra no Pyron |
+|---|---|---|
+| Ilustração vetorial (câmera, notebook, caminho pontilhado) no estado vazio | Desenhada no estilo e nas cores do próprio programa; mostra a tarefa sem texto longo | Ilustrações próprias em SVG, feitas com os tokens, nos estados vazio, sem conexão e primeira execução (6.1) |
+| Abas e títulos de seção em maiúsculas, fonte condensada, letras espaçadas | Separa a estrutura do programa do conteúdo; lembra painel de instrumento | Segunda voz tipográfica, só na estrutura (6.2) |
+| Barra de ferramentas fina: ícone + rótulo, divisores verticais, ação indisponível em cinza | Ações sempre no mesmo lugar; o estado de cada uma é visível | Componente barra de ferramentas, uma por tela |
+| Painel à direita com trilho de ícones e seções recolhíveis com faixa cinza no título | Inspetor de propriedades, padrão de software técnico (Jakob) | Painel de detalhe com seções recolhíveis e título em faixa |
+| Superfícies planas separadas por linha de 1 px; quase nenhuma sombra | Calmo e plano; a profundidade fica para o que flutua | Sombra só em menu, diálogo, aviso e ilustração (6.3) |
+| Preto, cinzas e um acento | A cor vai para o dado e para o ponto de interesse do desenho | Já é a regra 60-30-10 da seção 2 |
+| Marca, abas, menu do usuário e botões da janela numa barra só | Programa, não página web aberta no navegador | Verificar se a janela do Edge em modo aplicativo aceita barra de título própria (Window Controls Overlay); se não aceitar, a barra superior fica como está |
+
+### 6.1 Ilustrações
+
+- SVG inline desenhado no projeto, num arquivo só (`js/ilustracoes.js`, como `icones.js`). Nada de
+  banco de imagens, captura de tela ou PNG.
+- Projeção isométrica (30°), luz de cima à esquerda: face de cima clara, lateral esquerda média,
+  lateral direita escura. Três tons tirados dos neutros (tokens `--ilu-*`), que trocam no tema escuro.
+- **Um acento por ilustração**, no ponto de interesse: o visor do termovisor com a paleta ferro ou um
+  ponto quente na peça. Cobalto não entra (é cor de ação, não de desenho).
+- Sombra no chão em elipse suave, de opacidade baixa (token). Ligações em linha pontilhada.
+- 240 a 320 px, centrada, acima de no máximo 3 linhas de instrução e de uma ação. Uma por tela.
+- Movimento: entrada de 400 ms (opacidade e deslocamento). Só o estado "procurando câmera" pode ter o
+  pontilhado correndo, porque é indicador de carregamento. `prefers-reduced-motion` desliga tudo.
+- Primeiras seis: Captura sem câmera (termovisor apontado para uma peça de subestação); Inspeções sem
+  imagem (pasta com termogramas); Pendências zeradas (prancheta com verificação); Equipamentos vazio
+  (transformador com etiqueta); sem conexão com o servidor (notebook com o cabo solto); Modelos sem
+  detector (placa de processamento).
+
+### 6.2 Tipografia de estrutura
+
+- **Bahnschrift**, a DIN que vem no Windows 10 e 11 (`C:\Windows\Fonts\bahnschrift.ttf`, conferido
+  neste computador): nada a baixar, sem licença à parte. Fonte variável com largura condensada.
+- Só na estrutura: itens da navegação, títulos de seção dentro de painéis, cabeçalho de tabela,
+  rótulos da barra de ferramentas. Maiúsculas com espaçamento de letra nos três primeiros; botões em
+  caixa normal. Mínimo de 14 px, como o resto.
+- Conteúdo, campos e textos continuam em Segoe UI Variable; leituras e caminhos em Cascadia Mono.
+  Ficam três famílias com papéis separados (o `CLAUDE.md` passa de duas para três na Etapa 3b).
+- Fora do Windows (página do celular), cai para a fonte do sistema: token `--fonte-estrutura` com
+  alternativas.
+
+### 6.3 Superfície e sombra
+
+- Área de trabalho em cinza muito claro; barras, painéis e tabelas em branco, separados por linha de
+  1 px. Hierarquia por plano e linha, não por sombra.
+- Sombra só no que flutua (menu, diálogo, aviso) e no chão das ilustrações. Cartão não tem sombra.
+
+### 6.4 Marca
+
+Fica a **logo original** (`marca/pyron_logo.png` e os recortes em `app/estatico/marca/`), por decisão
+do usuário em 25/10. O redesenho em vetor foi esboçado e descartado (`esbocos/marca.html`). Continua
+a regra de pôr o símbolo sobre ladrilho branco.
