@@ -67,13 +67,14 @@ Modelo: **Sonnet** ou Opus com esforço **médio**.
 
 ## Etapa 1 · Diagnóstico e nova arquitetura (sem mexer em código)
 Modelo: **Opus**, esforço **alto**.
-- [ ] Inventário de todas as telas atuais (Painel, Inspeções, Análise, Equipamentos, Medição,
+- [x] Inventário de todas as telas atuais (Painel, Inspeções, Análise, Equipamentos, Medição,
       Pendências, Monitoramento, Vídeo, Celular, Modelos, Avaliação, Configurações, Sobre): tarefa do
       usuário, dados, ações, frequência de uso e o que é excesso (texto, opção, tela).
-- [ ] `laws-of-ux-review` em cada tela: nota 0–60 e os problemas principais.
-- [ ] `web-design-guidelines` nos arquivos da interface (achados com arquivo:linha).
-- [ ] Capturas atuais em 1536 × 816 em `saida/capturas/antes/`.
-- [ ] **Decidir** a nova arquitetura: telas que ficam, juntam, saem; navegação (no máximo 7 itens no
+- [x] ~~`laws-of-ux-review` em cada tela: nota 0–60~~ Dispensado pelo usuário (25/10): a interface
+      atual é só referência do que existe; as leis entram como restrição da arquitetura.
+- [x] `web-design-guidelines`: só o que vira regra de construção (seção 6 do diagnóstico).
+- [x] Capturas atuais em 1536 × 816 em `saida/capturas/antes/`.
+- [x] **Decidir** a nova arquitetura: telas que ficam, juntam, saem; navegação (no máximo 7 itens no
       primeiro nível); fluxo principal (inspecionar → analisar → pendência → laudo); o que vai para
       Configurações ou para o manual.
 - **Entregável:** `docs/interface/1-diagnostico.md` com as decisões e o motivo de cada uma.
@@ -107,10 +108,10 @@ Modelo: **Opus**, esforço **alto**.
 ## Etapa 5 · Demais telas (uma conversa por grupo)
 Modelo: **Sonnet** ou Opus com esforço **médio** (o padrão já está decidido).
 - Os grupos seguem a arquitetura decidida na Etapa 1 (o agrupamento abaixo é o ponto de partida):
-- [ ] 5a · Painel e Inspeções
-- [ ] 5b · Equipamentos, Medição e Pendências
-- [ ] 5c · Monitoramento, Vídeo e Celular
-- [ ] 5d · Modelos, Avaliação, Configurações e Sobre
+- [ ] 5a · Painel e Inspeções (com a importação)
+- [ ] 5b · Equipamentos e Pendências (a medição já entra na Análise, Etapa 4)
+- [ ] 5c · Captura (pasta monitorada, vídeo, celular, alertas)
+- [ ] 5d · Modelos (em uso, treino, avaliação) e Configurações (com Sobre)
 - Em cada grupo: mesmo padrão da Etapa 4, checklist 12/12, capturas antes/depois, testes.
 
 ## Etapa 6 · Troca e acabamento
@@ -127,6 +128,7 @@ Modelo: Opus com esforço **médio**.
 |---|---|---|---|---|
 | plano | 25/10/2026 | Plano criado | Claude decide produto e design; construir em `/nova`, branch `interface-nova` | Etapa 0 quando o push do Gabriel chegar |
 | 0 | 25/10/2026 | Branch `interface-nova` a partir do `main` em `b41b802` (commit do Gabriel); 3 correções de integração; 232 testes passam, 8 pulados | Medição não é tela própria: entra na Análise, como dado da região | Avisar o Gabriel das 3 correções; observações para a Etapa 1 abaixo |
+| 1 | 25/10/2026 | Inventário de 14 telas, capturas em `saida/capturas/antes/`, arquitetura em `docs/interface/1-diagnostico.md` | Navegação: Painel, Inspeções, Equipamentos, Pendências, Captura, Modelos + Configurações; Nova análise vira ação de Inspeções; Análise é detalhe da inspeção e cabe sem rolar; Monitoramento + Vídeo + Celular = Captura; Modelos + Avaliação; Sobre em Configurações; um primário por tela, sem primário global | Etapa 2: esboços do Painel e da Análise |
 
 ### Medição de equipamentos (Etapa 0)
 
@@ -205,3 +207,4 @@ a classificação DINOv2 carrega.
 
 | Função ou tela | Para onde foi | Motivo |
 |---|---|---|
+| (lista completa com 17 itens) | `docs/interface/1-diagnostico.md`, seção 5 | Decidido na Etapa 1; cada item sai quando a tela nova correspondente for feita |
