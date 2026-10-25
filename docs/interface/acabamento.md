@@ -107,13 +107,33 @@ estrutura. Proposta de uma Etapa 3c antes da Etapa 4:
 - estrutura padrão de tela: barra de ferramentas, área e painel de detalhes à direita com trilho
   de ícones (já existem no catálogo); Configurações como diálogo com categorias à esquerda.
 
-A logo continua a original; o redesenho fica para um designer ou uma ferramenta de vetor.
+## 6. Logo nova (aprovada pelo Hugo em 25/10)
+
+Os arquivos estão em `marca/vetor/` (ver o `LEIA-ME.md` de lá): símbolo vetorizado da imagem de
+referência, palavra PYRON em Chakra Petch Bold convertida em contornos, versões em cor, escuro,
+preto e branco, e o ícone do aplicativo. Nada foi trocado no aplicativo ainda. Falta:
+
+1. **Gerar os arquivos que o aplicativo usa** a partir dos SVG: `app/estatico/marca/simbolo.png`,
+   `logo.png`, `icone-64.png`, `icone-192.png` (fundo transparente) e o `pyron.ico` multi-tamanho.
+   Reescrever `marca/gerar_marca.py` para partir de `marca/vetor/` em vez de recortar o PNG antigo
+   (rasterizar com o Chromium da pré-visualização ou outra ferramenta que funcione com o Controle
+   Inteligente de Aplicativos). Respeitar a regra do `Pyron.exe` no `CLAUDE.md` (≈100 KB).
+2. **Interface nova** (`app/interface/index.html` e `catalogo.html`): na barra do topo, trocar o
+   ícone de 32 px + texto "Pyron" pela logo horizontal em SVG (`pyron-logo-cor.svg` no claro,
+   `pyron-logo-escuro.svg` no escuro), com altura de ~28 px; favicon novo.
+3. **Interface atual, apresentação, laudo PDF e tela de abertura do lançador**: trocar onde aparece a
+   logo antiga (procurar `pyron_logo`, `simbolo.png`, `logo.png`, `icone-`).
+4. **`CLAUDE.md`**: a regra "a mão da logo é escura: o símbolo vai sempre sobre fundo claro" muda; agora
+   há versão para fundo escuro (`*-escuro.svg`). Registrar as cores da marca e a fonte (Chakra Petch,
+   OFL), e que a logo antiga sai. Atualizar também `docs/interface/2-direcao.md`, seção 6.4 (dizia que a
+   logo original ficava).
+5. Conferir em 16, 32 e 64 px, nos dois temas, e na barra do Windows.
 
 ## Pedido para colar na próxima conversa
 
 ```text
 Leia docs/interface/acabamento.md. A parte 1 já está no branch interface-nova: confira o catálogo
 (/nova/catalogo.html, claro e escuro) e use as ilustrações novas nos estados indicados na tabela.
-Depois implemente a parte 2 junto com a Etapa 4 (Análise) e as partes 3 e 4 na Etapa 5.
-Antes, pergunte ao Hugo se aprova a Etapa 3c (parte 5).
+Aplique a logo nova (parte 6). Depois implemente a parte 2 junto com a Etapa 4 (Análise) e as
+partes 3 e 4 na Etapa 5. Antes da Etapa 4, pergunte ao Hugo se aprova a Etapa 3c (parte 5).
 ```
