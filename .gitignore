@@ -27,3 +27,6 @@ apresentacao/.celular/
 
 # Dumps e backups SQL
 *.sql
+
+# configuração pessoal do Claude Code (permissões desta máquina)
+.claude/settings.local.json

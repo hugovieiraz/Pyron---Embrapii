@@ -51,9 +51,41 @@ núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Te
   no navegador (tema claro e escuro). Para demonstração sem tocar nos dados reais:
   `python app/iniciar.py --porta 8790 --sem-navegador --dados <pasta>`.
 - Ao terminar cada etapa, resumir em 3 linhas o que foi feito e o que ficou pendente.
-- Commit e push só quando o usuário pedir. O repositório é https://github.com/hugovieiraz/Pyron---Embrapii.
+- Commit e push: autorizados desde a 0.7 para as mudanças feitas (ver a seção 5). O repositório é
+  https://github.com/hugovieiraz/Pyron---Embrapii.
 - O dataset ScienceDB 10185 é só para estudo (CC BY-NC-SA): as imagens em si não vão para o
   repositório. Capturas de tela que mostram essas imagens (manual) podem ir, com o crédito e a
   licença no README (decisão do usuário: o projeto é compartilhado para estudo).
 - O `Pyron.exe` precisa continuar pequeno (≈100 KB, sem recursos embutidos): o Controle Inteligente
   de Aplicativos do Windows bloqueou uma versão de 390 KB. Nunca mexer nessa proteção.
+
+## 5. Estrutura, comandos e fluxo de trabalho
+
+**Dois aplicativos no mesmo repositório:**
+- `app/` + `nucleo/` + `ml/`: o Pyron completo (inspeções, equipamentos, pendências, laudos, monitor, celular).
+- `apresentacao/`: versão enxuta para apresentações (abas Análise · Avaliação do modelo · Câmera do
+  celular). Código próprio; reaproveita só `app/celular.py`, `app/estatico/celular.*` e
+  `nucleo/enquadrar.py`. Tem os próprios `estatico/tokens.css` e `estilo.css` (tema claro só). Na
+  apresentação o modo celular é **só identificação** (sem leitura da barra de cores).
+
+**Comandos** (na raiz, sempre com o Python do `.venv`):
+- Testes: `.venv/Scripts/python.exe -m pytest testes -q` (≈170 testes, ~40 s).
+- Pyron para testar sem dados reais: pré-visualização `pyron-demo` (`.claude/launch.json`, porta 8790,
+  dados em `saida/dados_demo`). Apresentação: pré-visualização `apresentacao` (porta 8792).
+- Abrir de verdade: atalhos "Abrir Pyron" e "Pyron Apresentação" da área de trabalho (`pythonw.exe -m apresentacao`).
+- Pacote portátil da apresentação (para outro computador): `.venv/Scripts/python.exe -m apresentacao.empacotar`
+  (gera pasta + .zip na Área de Trabalho; apagar os anteriores antes). Nota técnica para o leitor:
+  `apresentacao/LEIA-ME-TECNICO.txt`.
+
+**Git:** trabalhar no branch `melhorias-0.7`; publicar com push do branch e fast-forward do `main`
+(`git push origin melhorias-0.7:main`). Antes de publicar, `git fetch` e conferir
+`git log HEAD..origin/main`: o colaborador GS87 (Gabriel) também envia commits direto ao `main`
+(Postgres, Grafana, BI). Havendo commits dele, integrar com merge (nunca forçar) e rodar os testes.
+
+**Ambiente** (Windows 11 com Controle Inteligente de Aplicativos ligado):
+- Detecção na placa de vídeo pelo `onnxruntime-directml` (DLLs assinadas pela Microsoft). O PyTorch
+  com CUDA e o pacote `onnx` são bloqueados de forma intermitente pelo SAC: não depender deles em
+  tempo de execução (testes que precisam deles se pulam sozinhos).
+- Tela de 1536 × 816 úteis: janelas `--start-maximized`; conferir telas nesse tamanho.
+- A janela do Edge em modo aplicativo guarda arquivos em cache: a página serve os `.js`/`.css` com a
+  data de alteração no endereço (`?v=`); manter isso ao criar arquivos novos.

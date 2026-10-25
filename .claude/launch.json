@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "apresentacao",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "apresentacao.servidor:app", "--host", "127.0.0.1", "--port", "8792"],
+      "port": 8792
+    },
+    {
+      "name": "pyron-demo",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": ["app/iniciar.py", "--porta", "8790", "--sem-navegador", "--dados", "saida/dados_demo"],
+      "port": 8790
+    }
+  ]
+}
