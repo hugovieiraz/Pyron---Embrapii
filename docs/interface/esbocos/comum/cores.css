@@ -1,0 +1,71 @@
+/* Paleta proposta na Etapa 2: "aço e cobalto". Substitui as cores de app/estatico/tokens.css nos esboços.
+   Lógica: o termograma (paleta ferro: preto, violeta, magenta, laranja, amarelo, branco) e a severidade
+   (verde a carmim) já ocupam quase todo o círculo cromático. A interface fica com o que sobra:
+   neutros ardósia (matiz ~218°, croma baixo) e um único azul-cobalto (~214°) para ação.
+   Violeta e índigo saem: no termograma eles significam frio. Regra 60-30-10: branco e ardósia clara
+   na maior área, ardósia média em texto e bordas, cobalto só em ação e seleção. */
+:root {
+  --cobalto-50: #EEF4FF;
+  --cobalto-100: #DCE8FD;
+  --cobalto-200: #B9D0FA;
+  --cobalto-300: #8DB2F4;
+  --cobalto-400: #5C8EEA;
+  --cobalto-500: #3570DB;
+  --cobalto-600: #1F5BC4;
+  --cobalto-700: #194BA3;
+  --cobalto-800: #163D82;
+  --cobalto-900: #122F63;
+
+  --n-100: #F7F8FA;
+  --n-200: #EEF1F4;
+  --n-300: #DDE2E8;
+  --n-400: #B4BCC8;
+  --n-500: #8B95A5;
+  --n-600: #5A6474;
+  --n-700: #424B59;
+  --n-800: #2A313C;
+  --n-900: #161B22;
+
+  --fundo: var(--n-100);
+  --superficie: var(--branco);
+  --superficie-2: var(--n-100);
+  --superficie-3: var(--n-200);
+  --borda: var(--n-300);
+  --borda-forte: var(--n-400);
+  --borda-campo: var(--n-500);     /* contorno de campo e botão secundário: 3,0:1 */
+  --texto: var(--n-900);           /* 17,3:1 */
+  --texto-2: var(--n-700);         /* 8,8:1 */
+  --texto-3: var(--n-600);         /* 6,0:1 */
+  --texto-apagado: var(--n-500);   /* só desabilitado */
+  --acao: var(--cobalto-600);      /* 6,3:1 com branco */
+  --acao-hover: var(--cobalto-700);
+  --acao-texto: var(--branco);
+  --acao-suave: var(--cobalto-50);
+  --acao-suave-2: var(--cobalto-100);
+  --foco: var(--cobalto-500);      /* 4,7:1 */
+  --info: var(--cobalto-600); --info-fundo: var(--cobalto-50); --info-texto: var(--cobalto-800);
+
+  /* severidade: ordem de semáforo (convenção do setor), marca ≥ 3:1 sobre branco, texto ≥ 6:1 no fundo */
+  --normal: #1E9E63;     --normal-fundo: #E3F6EE;     --normal-texto: #0B6645;
+  --atencao: #B58900;    --atencao-fundo: #FBF1D3;    --atencao-texto: #6B4E00;
+  --programar: #E07012;  --programar-fundo: #FDEBDC;  --programar-texto: #8A3B05;
+  --urgente: #D63A22;    --urgente-fundo: #FCE6E1;    --urgente-texto: #93220F;
+  --imediato: #A3123A;   --imediato-fundo: #FAE3EA;   --imediato-texto: #86082A;
+
+  /* barra lateral clara: a navegação não compete com o dado */
+  --lateral-topo: var(--n-100);
+  --lateral-base: var(--n-100);
+  --lateral-marca: var(--n-900);
+  --lateral-texto: var(--n-700);   /* 8,3:1 */
+  --lateral-hover: var(--n-200);
+  --lateral-ativo: var(--cobalto-50);
+  --lateral-ativo-texto: var(--cobalto-700); /* 7,1:1 */
+  --lateral-borda-dir: var(--n-300);
+
+  /* palco do termograma: grafite neutro, sem matiz, para não tingir as cores frias da imagem */
+  --palco: #121418;
+  --palco-2: #1C1F25;
+  --palco-texto: #C8CDD6;          /* 11,6:1 */
+  --palco-texto-2: #8D94A1;        /* 6,0:1 */
+  --rotulo-imagem: rgba(18, 20, 24, .9);
+}

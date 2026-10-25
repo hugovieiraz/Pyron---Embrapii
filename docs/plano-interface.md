@@ -82,10 +82,11 @@ Modelo: **Opus**, esforço **alto**.
 
 ## Etapa 2 · Direção visual
 Modelo: **Opus**, esforço **alto**.
-- [ ] Brief: assunto, público, tarefa principal, tom (técnico, industrial, sóbrio).
-- [ ] Explorar três direções diferentes (estrutura, densidade, hierarquia, tipografia) em esboços
+- [x] Brief: assunto, público, tarefa principal, tom (técnico, industrial, sóbrio).
+- [x] Explorar três direções diferentes (estrutura, densidade, hierarquia, tipografia) em esboços
       HTML do **Painel** e da **Análise**, com dados de demonstração.
-- [ ] **Escolher** uma, pelos critérios: leitura em 1536 × 816 e no projetor, densidade de dados,
+- [x] Cor por teoria das cores, com liberdade dada pelo usuário (25/10): paleta "aço e cobalto".
+- [x] **Escolher** uma, pelos critérios: leitura em 1536 × 816 e no projetor, densidade de dados,
       Leis de UX, consistência com o `CLAUDE.md`. Registrar o motivo.
 - **Entregável:** `docs/interface/2-direcao.md` (escolha + motivo) e os esboços em `docs/interface/esbocos/`.
 - **Pronto quando:** direção escolhida e registrada.
@@ -129,6 +130,7 @@ Modelo: Opus com esforço **médio**.
 | plano | 25/10/2026 | Plano criado | Claude decide produto e design; construir em `/nova`, branch `interface-nova` | Etapa 0 quando o push do Gabriel chegar |
 | 0 | 25/10/2026 | Branch `interface-nova` a partir do `main` em `b41b802` (commit do Gabriel); 3 correções de integração; 232 testes passam, 8 pulados | Medição não é tela própria: entra na Análise, como dado da região | Avisar o Gabriel das 3 correções; observações para a Etapa 1 abaixo |
 | 1 | 25/10/2026 | Inventário de 14 telas, capturas em `saida/capturas/antes/`, arquitetura em `docs/interface/1-diagnostico.md` | Navegação: Painel, Inspeções, Equipamentos, Pendências, Captura, Modelos + Configurações; Nova análise vira ação de Inspeções; Análise é detalhe da inspeção e cabe sem rolar; Monitoramento + Vídeo + Celular = Captura; Modelos + Avaliação; Sobre em Configurações; um primário por tela, sem primário global | Etapa 2: esboços do Painel e da Análise |
+| 2 | 25/10/2026 | Brief, paleta nova, três esboços (A mesa, B cartões, C leitura ampla) com capturas e medidas em 1536 × 816; `docs/interface/2-direcao.md` | Direção C: navegação no topo, corpo 17 px, nada abaixo de 14 px, termograma com 33 % da tela; cor "aço e cobalto" (cobalto para ação, ardósia, palco grafite; violeta e índigo saem porque significam frio no termograma) | Etapa 3: tokens novos em `tokens.css`, `CLAUDE.md` seção 1 atualizada, componentes e casca em `/nova` |
 
 ### Medição de equipamentos (Etapa 0)
 

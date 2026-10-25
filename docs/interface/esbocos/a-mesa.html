@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Esboço A · Mesa de operação</title>
+<link rel="stylesheet" href="../../../app/estatico/tokens.css">
+<link rel="stylesheet" href="comum/cores.css">
+<style>
+/* Direção A: mesa de operação. Densa, sem cartões: painéis de altura total separados por linhas finas,
+   mestre-detalhe em toda tela, tabela como forma principal. */
+:root {
+  /* propostas de token desta direção */
+  --a-lateral: 216px;
+  --a-topo: 48px;
+  --a-linha: 40px;
+  --a-lista: 300px;
+  --a-detalhe: 344px;
+}
+* { box-sizing: border-box; margin: 0; }
+body { font: var(--p-normal) var(--t-2) / var(--a-2) var(--fonte); color: var(--texto); background: var(--superficie); height: 100vh; overflow: hidden; display: grid; grid-template-columns: var(--a-lateral) 1fr; }
+.ic { width: var(--ic); height: var(--ic); fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* barra lateral */
+.lateral { border-right: 1px solid var(--lateral-borda-dir); background: linear-gradient(180deg, var(--lateral-topo), var(--lateral-base)); color: var(--lateral-texto); display: flex; flex-direction: column; padding: var(--e-3) var(--e-2); gap: var(--e-1); }
+.marca { display: flex; align-items: center; gap: var(--e-2); padding: var(--e-1) var(--e-2) var(--e-4); font-weight: var(--p-forte); color: var(--lateral-marca); }
+.marca img { width: var(--e-8); height: var(--e-8); border-radius: var(--r-p); background: var(--branco); border: 1px solid var(--borda); }
+.nav a { display: flex; align-items: center; gap: var(--e-3); height: var(--alvo-sm); padding: 0 var(--e-3); border-radius: var(--r-p); color: inherit; text-decoration: none; font-weight: var(--p-medio); }
+.nav a:hover { background: var(--lateral-hover); }
+.nav a.ativo { background: var(--lateral-ativo); color: var(--lateral-ativo-texto); }
+.nav a .cont { margin-left: auto; font-size: var(--t-1); background: var(--urgente); color: var(--branco); border-radius: var(--r-p); padding: 0 var(--e-2); }
+.lateral .rodape { margin-top: auto; }
+
+/* topo */
+.principal { display: grid; grid-template-rows: var(--a-topo) 1fr; min-width: 0; height: 100vh; }
+.topo { display: flex; align-items: center; gap: var(--e-4); padding: 0 var(--e-5); border-bottom: 1px solid var(--borda); }
+.trilha { color: var(--texto-3); display: flex; gap: var(--e-2); }
+.trilha b { color: var(--texto); font-weight: var(--p-medio); }
+.busca { margin: 0 auto; width: var(--col-g); display: flex; align-items: center; gap: var(--e-2); height: var(--alvo-sm); padding: 0 var(--e-3); border: 1px solid var(--borda); border-radius: var(--r-p); color: var(--texto-3); background: var(--superficie-2); }
+.busca kbd { margin-left: auto; font: var(--t-1) var(--fonte-num); color: var(--texto-3); }
+.sino { width: var(--alvo-sm); height: var(--alvo-sm); display: grid; place-items: center; border-radius: var(--r-p); color: var(--texto-2); }
+
+/* cabeçalho de página */
+.cab { display: flex; align-items: center; gap: var(--e-3); padding: var(--e-3) var(--e-5); border-bottom: 1px solid var(--borda); min-height: var(--e-16); }
+.cab h1 { font-size: var(--t-4); line-height: var(--a-4); font-weight: var(--p-medio); }
+.cab .meta { color: var(--texto-3); display: flex; gap: var(--e-3); align-items: center; }
+.cab .acoes { margin-left: auto; display: flex; gap: var(--e-2); }
+.btn { display: inline-flex; align-items: center; gap: var(--e-2); height: var(--alvo-sm); padding: 0 var(--e-3); border-radius: var(--r-p); border: 1px solid var(--borda-campo); background: var(--superficie); font-weight: var(--p-medio); }
+.btn.pri { background: var(--acao); border-color: var(--acao); color: var(--acao-texto); }
+.btn.fan { border-color: transparent; }
+.selo { display: inline-flex; align-items: center; gap: var(--e-1); font-size: var(--t-1); line-height: var(--a-1); font-weight: var(--p-medio); padding: 2px var(--e-2); border-radius: var(--r-p); }
+.selo::before { content: ""; width: var(--ponto); height: var(--ponto); border-radius: 50%; background: currentColor; opacity: .9; }
+.selo.normal { background: var(--normal-fundo); color: var(--normal-texto); }
+.selo.atencao { background: var(--atencao-fundo); color: var(--atencao-texto); }
+.selo.programar { background: var(--programar-fundo); color: var(--programar-texto); }
+.selo.urgente { background: var(--urgente-fundo); color: var(--urgente-texto); }
+.selo.imediato { background: var(--imediato-fundo); color: var(--imediato-texto); }
+
+/* painel */
+.tela { display: none; min-height: 0; }
+.tela.ativa { display: grid; }
+#t-painel { grid-template-rows: auto auto 1fr; }
+.faixa-ind { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--borda); }
+.ind { padding: var(--e-3) var(--e-5); border-right: 1px solid var(--borda); display: grid; gap: var(--e-1); text-align: left; position: relative; }
+.ind:last-child { border-right: 0; }
+.ind:hover { background: var(--superficie-2); }
+.ind .rot { color: var(--texto-3); }
+.ind .val { font-size: var(--t-5); line-height: var(--a-5); font-weight: var(--p-forte); }
+.ind .nota { color: var(--texto-3); font-size: var(--t-1); }
+.ind[data-sev]::before { content: ""; position: absolute; left: 0; top: var(--e-3); bottom: var(--e-3); width: 3px; border-radius: 2px; background: var(--sev); }
+.corpo-painel { display: grid; grid-template-columns: 1fr var(--a-detalhe); min-height: 0; }
+.coluna { border-right: 1px solid var(--borda); min-height: 0; overflow: auto; }
+.coluna:last-child { border-right: 0; }
+.titulo-sec { display: flex; align-items: baseline; gap: var(--e-2); padding: var(--e-3) var(--e-5) var(--e-2); font-weight: var(--p-medio); }
+.titulo-sec small { color: var(--texto-3); font-weight: var(--p-normal); }
+.titulo-sec a { margin-left: auto; color: var(--acao); text-decoration: none; font-weight: var(--p-medio); }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-size: var(--t-1); font-weight: var(--p-medio); color: var(--texto-3); padding: var(--e-2) var(--e-3); border-bottom: 1px solid var(--borda); background: var(--superficie-2); position: sticky; top: 0; }
+td { padding: 0 var(--e-3); height: var(--a-linha); border-bottom: 1px solid var(--borda); vertical-align: middle; }
+th:first-child, td:first-child { padding-left: var(--e-5); }
+tr.lin { cursor: pointer; }
+tr.lin:hover td { background: var(--acao-suave); }
+td .sub { color: var(--texto-3); font-size: var(--t-1); line-height: var(--a-1); display: block; }
+td.dir, th.dir { text-align: right; }
+td.vencida { color: var(--erro-texto); font-weight: var(--p-medio); }
+.lista-prox li { display: grid; grid-template-columns: 1fr auto; padding: var(--e-2) var(--e-5); border-bottom: 1px solid var(--borda); list-style: none; }
+.lista-prox .q { text-align: right; color: var(--texto-3); font-size: var(--t-1); }
+.lista-prox .q.venc { color: var(--erro-texto); font-weight: var(--p-medio); }
+.lista-prox ul { padding: 0; }
+.barra-estado { display: flex; height: var(--e-2); margin: var(--e-2) var(--e-5); border-radius: var(--r-p); overflow: hidden; gap: 2px; }
+.barra-estado i { background: var(--sev); }
+.leg { padding: 0 var(--e-5) var(--e-4); display: grid; grid-template-columns: 1fr auto; row-gap: var(--e-1); }
+.leg span::before { content: ""; display: inline-block; width: var(--ponto); height: var(--ponto); border-radius: 50%; background: var(--sev); margin-right: var(--e-2); }
+
+/* análise */
+#t-analise { grid-template-rows: auto 1fr; }
+.corpo-analise { display: grid; grid-template-columns: var(--a-lista) 1fr var(--a-detalhe); min-height: 0; }
+.regioes { border-right: 1px solid var(--borda); overflow: auto; }
+.reg { display: grid; grid-template-columns: 3px 1fr auto; gap: var(--e-3); align-items: center; width: 100%; text-align: left; padding: var(--e-2) var(--e-4) var(--e-2) 0; border-bottom: 1px solid var(--borda); min-height: var(--alvo); }
+.reg i { align-self: stretch; background: var(--sev); }
+.reg .n { font-weight: var(--p-medio); }
+.reg .n small { display: block; color: var(--texto-3); font-weight: var(--p-normal); font-size: var(--t-1); line-height: var(--a-1); }
+.reg .t { text-align: right; font-weight: var(--p-medio); }
+.reg .t small { display: block; color: var(--texto-3); font-weight: var(--p-normal); font-size: var(--t-1); line-height: var(--a-1); }
+.reg.sel { background: var(--acao-suave); }
+.reg:hover { background: var(--superficie-2); }
+.palco-area { background: var(--palco); display: grid; grid-template-rows: var(--alvo) 1fr; min-width: 0; min-height: 0; }
+.ferr { display: flex; align-items: center; gap: var(--e-1); padding: 0 var(--e-3); color: var(--palco-texto); border-bottom: 1px solid var(--linha-clara); }
+.ferr button { height: var(--alvo-sm); min-width: var(--alvo-sm); padding: 0 var(--e-2); border-radius: var(--r-p); display: inline-flex; align-items: center; justify-content: center; gap: var(--e-2); color: inherit; }
+.ferr button:hover { background: var(--hover-claro); }
+.ferr button.on { background: var(--palco-2); color: var(--branco); box-shadow: inset 0 0 0 1px var(--linha-clara); }
+.ferr .sep { width: 1px; height: var(--e-5); background: var(--linha-clara); margin: 0 var(--e-2); }
+.ferr .dir { margin-left: auto; }
+.quadro { position: relative; container-type: size; min-height: 0; display: grid; place-items: center; }
+.img { position: relative; width: min(calc(100cqw - var(--e-24)), calc((100cqh - var(--e-8)) * 4 / 3)); aspect-ratio: 4 / 3; }
+.img canvas { width: 100%; height: 100%; display: block; image-rendering: auto; border-radius: var(--r-p); }
+.caixa { position: absolute; border: 2px solid; border-radius: 2px; }
+.caixa.selecionada { box-shadow: 0 0 0 2px var(--branco); }
+.etq { position: absolute; left: -2px; bottom: 100%; margin-bottom: 2px; white-space: nowrap; font-size: var(--t-1); line-height: var(--a-1); padding: 0 var(--e-1); border-radius: 2px; background: var(--rotulo-imagem); color: var(--branco); }
+.escala { position: absolute; right: var(--e-4); top: var(--e-8); bottom: var(--e-8); display: grid; grid-template-rows: auto minmax(0, 1fr) auto; justify-items: center; gap: var(--e-1); color: var(--palco-texto); font-size: var(--t-1); }
+.escala canvas { width: var(--e-3); height: 100%; border-radius: 2px; }
+.detalhe { border-left: 1px solid var(--borda); display: grid; grid-template-rows: auto 1fr; min-height: 0; }
+.abas { display: flex; border-bottom: 1px solid var(--borda); padding: 0 var(--e-3); }
+.abas button { height: var(--alvo); padding: 0 var(--e-3); color: var(--texto-3); font-weight: var(--p-medio); border-bottom: 2px solid transparent; }
+.abas button.on { color: var(--texto); border-bottom-color: var(--acao); }
+.det { overflow: auto; padding: var(--e-4) var(--e-5); display: grid; gap: var(--e-4); align-content: start; }
+.det h2 { font-size: var(--t-3); line-height: var(--a-3); font-weight: var(--p-medio); display: flex; align-items: center; gap: var(--e-2); }
+.leituras { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--borda); border-radius: var(--r-p); }
+.leituras div { padding: var(--e-2) var(--e-3); border-right: 1px solid var(--borda); }
+.leituras div:last-child { border-right: 0; }
+.leituras small { display: block; color: var(--texto-3); font-size: var(--t-1); line-height: var(--a-1); }
+.leituras b { font-size: var(--t-3); line-height: var(--a-3); font-weight: var(--p-forte); }
+.acao { border-left: 3px solid var(--imediato); padding: var(--e-1) 0 var(--e-1) var(--e-3); color: var(--texto-2); }
+.acao b { color: var(--texto); display: block; }
+dl.pares { display: grid; grid-template-columns: auto 1fr; gap: var(--e-1) var(--e-4); }
+dl.pares dt { color: var(--texto-3); }
+dl.pares dd { text-align: right; font-weight: var(--p-medio); }
+.bloco-t { font-weight: var(--p-medio); color: var(--texto-2); border-top: 1px solid var(--borda); padding-top: var(--e-3); display: flex; }
+.bloco-t a { margin-left: auto; color: var(--acao); font-weight: var(--p-medio); text-decoration: none; }
+:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<aside class="lateral">
+  <div class="marca"><img src="../../../app/estatico/marca/icone-192.png" alt="">Pyron</div>
+  <nav class="nav" id="nav"></nav>
+  <nav class="nav rodape"><a href="#"><svg class="ic"><use href="#i-config"/></svg>Configurações</a></nav>
+</aside>
+<div class="principal">
+  <header class="topo">
+    <div class="trilha" id="trilha"></div>
+    <div class="busca"><svg class="ic"><use href="#i-busca"/></svg>Buscar<kbd>Ctrl K</kbd></div>
+    <button class="sino" aria-label="Alertas"><svg class="ic"><use href="#i-sino"/></svg></button>
+  </header>
+
+  <section class="tela" id="t-painel">
+    <div class="cab"><h1>Painel</h1><div class="acoes"><button class="btn pri"><svg class="ic"><use href="#i-importar"/></svg>Importar termogramas</button></div></div>
+    <div class="faixa-ind" id="ind"></div>
+    <div class="corpo-painel">
+      <div class="coluna">
+        <div class="titulo-sec">Atenção agora <small>última inspeção de cada equipamento, da pior para a melhor</small></div>
+        <table><thead><tr><th>Severidade</th><th>Equipamento</th><th>Região</th><th class="dir">Tmáx</th><th>Critério</th><th>Pendência</th><th class="dir">Inspeção</th></tr></thead><tbody id="atencao"></tbody></table>
+      </div>
+      <div class="coluna">
+        <div class="titulo-sec">Próximas inspeções <a href="#">Equipamentos</a></div>
+        <ul class="lista-prox" id="prox" style="padding:0"></ul>
+        <div class="titulo-sec">Estado dos equipamentos <small>18</small></div>
+        <div class="barra-estado" id="barra"></div>
+        <div class="leg" id="leg"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="tela" id="t-analise">
+    <div class="cab" id="cab-analise"></div>
+    <div class="corpo-analise">
+      <div class="regioes" id="regioes"></div>
+      <div class="palco-area">
+        <div class="ferr">
+          <button class="on" aria-label="Selecionar"><svg class="ic"><use href="#i-selecionar"/></svg></button>
+          <button aria-label="Nova região"><svg class="ic"><use href="#i-regiao"/></svg></button>
+          <button aria-label="Ponto"><svg class="ic"><use href="#i-ponto"/></svg></button>
+          <button aria-label="Linha"><svg class="ic"><use href="#i-linha"/></svg></button>
+          <span class="sep"></span>
+          <button>Ferro</button>
+          <button>Escala 22–60 °C</button>
+          <button><svg class="ic"><use href="#i-camadas"/></svg>Camadas</button>
+          <button class="dir"><svg class="ic"><use href="#i-foto"/></svg>Foto</button>
+        </div>
+        <div class="quadro">
+          <div class="img" id="img"><canvas id="termo"></canvas></div>
+          <div class="escala"><span>60</span><canvas id="escala"></canvas><span>22</span></div>
+        </div>
+      </div>
+      <div class="detalhe">
+        <div class="abas"><button class="on">Região</button><button>Condições</button><button>Identificação</button></div>
+        <div class="det" id="det"></div>
+      </div>
+    </div>
+  </section>
+</div>
+<script src="comum/icones.js"></script>
+<script src="comum/dados.js"></script>
+<script src="comum/termograma.js"></script>
+<script src="comum/medir.js"></script>
+<script>
+const $ = (s) => document.querySelector(s);
+const NAV = [["painel", "Painel"], ["inspecoes", "Inspeções"], ["equipamentos", "Equipamentos"], ["pendencias", "Pendências", 3], ["captura", "Captura"], ["modelos", "Modelos"]];
+
+function montar() {
+  const tela = location.hash === "#analise" ? "analise" : "painel";
+  document.querySelectorAll(".tela").forEach((t) => t.classList.toggle("ativa", t.id === `t-${tela}`));
+  const ativo = tela === "analise" ? "inspecoes" : "painel";
+  $("#nav").innerHTML = NAV.map(([id, n, c]) => `<a href="#" class="${id === ativo ? "ativo" : ""}">${ic(id)}${n}${c ? `<span class="cont">${c}</span>` : ""}</a>`).join("");
+  $("#trilha").innerHTML = tela === "analise" ? `Inspeções <span>›</span> <b>${DADOS.analise.arquivo}</b>` : "<b>Painel</b>";
+}
+
+function painel() {
+  const P = DADOS.painel;
+  $("#ind").innerHTML = P.indicadores.map((k) => `<button class="ind" ${k.severidade ? `data-sev style="--sev:var(--${k.severidade})"` : ""}><span class="rot">${k.rotulo}</span><span class="val num">${k.valor}</span><span class="nota">${k.nota}</span></button>`).join("");
+  $("#atencao").innerHTML = P.atencao.map((a) => `<tr class="lin"><td><span class="selo ${a.severidade}">${NIVEIS[a.severidade]}</span></td><td>${a.equipamento}<span class="sub">${a.instalacao}</span></td><td>${a.regiao}</td><td class="dir num"><b>${fmt(a.tmax)} °C</b></td><td>${a.criterio}</td><td class="${a.vencida ? "vencida" : ""}">${a.pendencia}</td><td class="dir num">${a.data}</td></tr>`).join("");
+  $("#prox").innerHTML = P.proximas.map((p) => `<li><span>${p.equipamento}<span class="sub" style="display:block;color:var(--texto-3);font-size:var(--t-1)">${p.instalacao}</span></span><span class="q ${p.atraso.startsWith("vencida") ? "venc" : ""}">${p.data}<br>${p.atraso}</span></li>`).join("");
+  const tot = P.estados.reduce((s, e) => s + e.n, 0);
+  $("#barra").innerHTML = P.estados.map((e) => `<i style="--sev:var(--${e.severidade});flex:${e.n / tot}"></i>`).join("");
+  $("#leg").innerHTML = P.estados.map((e) => `<span style="--sev:var(--${e.severidade})">${NIVEIS[e.severidade]}</span><b class="num">${e.n}</b>`).join("");
+}
+
+function analise() {
+  const A = DADOS.analise;
+  const sel = A.regioes[0];
+  $("#cab-analise").innerHTML = `<button class="btn fan" aria-label="Anterior">${ic("anterior")}</button><div><h1>${A.equipamento}</h1><div class="meta"><span>${A.instalacao}</span><span>${A.data}</span><span>${A.arquivo}</span><span class="selo ${A.severidade}">${NIVEIS[A.severidade]}</span></div></div><button class="btn fan" aria-label="Próxima">${ic("proxima")}</button><span class="meta">${A.posicao[0]} de ${A.posicao[1]}</span><div class="acoes"><button class="btn">${ic("detectar")}Detectar de novo</button><button class="btn" aria-label="Mais">${ic("mais")}</button><button class="btn pri">${ic("laudo")}Gerar laudo</button></div>`;
+  $("#regioes").innerHTML = `<div class="titulo-sec">Regiões <small>${A.regioes.length}</small></div>` + A.regioes.map((r) => `<button class="reg ${r.id === sel.id ? "sel" : ""}" style="--sev:var(--${r.severidade})"><i></i><span class="n">${r.nome}<small>${r.classe}${r.fase ? `, fase ${r.fase}` : ""}</small></span><span class="t num">${fmt(r.tmax)} °C<small>${r.mta} % MTA</small></span></button>`).join("");
+  desenharTermograma($("#termo"));
+  desenharEscala($("#escala"));
+  caixasRegioes($("#img"), A.regioes, { selecionada: sel.id });
+  const bucha = A.regioes[3];
+  $("#det").innerHTML = `<h2>${sel.nome} <span class="selo ${sel.severidade}">${NIVEIS[sel.severidade]}</span></h2>
+    <div class="leituras"><div><small>Tmáx</small><b class="num">${fmt(sel.tmax)} °C</b></div><div><small>ΔT fase</small><b class="num">${fmt(sel.dt)} °C</b></div><div><small>MTA</small><b class="num">${sel.mta} %</b></div></div>
+    <div class="acao"><b>${sel.acao}</b>${sel.criterio}.</div>
+    <dl class="pares"><dt>Classe</dt><dd>${sel.classe}</dd><dt>Fase</dt><dd>${sel.fase}</dd><dt>Ambiente</dt><dd class="num">${fmt(A.ambiente)} °C</dd><dt>Carga</dt><dd class="num">${A.carga} %</dd></dl>
+    <div class="bloco-t">Dimensões estimadas <a href="#">Medir</a></div>
+    <dl class="pares"><dt>${bucha.nome}: altura × largura</dt><dd class="num">${fmt(bucha.dimensoes.altura, 2)} × ${fmt(bucha.dimensoes.largura, 2)} m</dd><dt>Método</dt><dd>${bucha.dimensoes.metodo}, ${bucha.dimensoes.referencia}</dd></dl>
+    <div class="bloco-t">Pendência <a href="#">Abrir</a></div>
+    <dl class="pares"><dt>Situação</dt><dd>Aberta</dd><dt>Prazo</dt><dd class="num" style="color:var(--erro-texto)">13/10/2026</dd></dl>`;
+}
+
+addEventListener("hashchange", montar);
+addEventListener("DOMContentLoaded", () => { montar(); painel(); analise(); });
+</script>
+</body>
+</html>
