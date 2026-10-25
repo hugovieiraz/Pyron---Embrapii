@@ -79,10 +79,11 @@ def listar(pasta_modelos: Path | None = None) -> list[Detector]:
     Assim dá para escolher um, o outro ou os dois: só as peças (modelo), só o calor (regra) ou as peças
     com os pontos quentes ligados a elas (combinado).
     """
-    from nucleo.detectores.pontos_quentes import PontosQuentes
+    from nucleo.detectores.pontos_quentes import PontosQuentes, PontosQuentesComSAM2
 
     pontos = PontosQuentes()
-    detectores: list[Detector] = [pontos]
+    pontos_sam2 = PontosQuentesComSAM2()
+    detectores: list[Detector] = [pontos, pontos_sam2]
     aprendidos: list[Detector] = []
     if pasta_modelos and pasta_modelos.exists():
         for cartao in sorted(pasta_modelos.glob("*/cartao.json")):
@@ -94,6 +95,9 @@ def listar(pasta_modelos: Path | None = None) -> list[Detector]:
 
 
 def obter(id_: str, pasta_modelos: Path | None = None) -> Detector:
+    if id_ == "sam2-dinov2":
+        from nucleo.detectores.sam2_dinov2 import SAM2DINOv2Detector
+        return SAM2DINOv2Detector()
     for d in listar(pasta_modelos):
         if d.id == id_:
             return d

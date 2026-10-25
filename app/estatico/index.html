@@ -63,6 +63,8 @@
   <symbol id="i-video" viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10.5 5-3v9l-5-3z"/></symbol>
   <symbol id="i-grafico" viewBox="0 0 24 24"><path d="M3.5 20.5h17"/><rect x="5" y="11" width="3.5" height="7" rx="1"/><rect x="10.25" y="5.5" width="3.5" height="12.5" rx="1"/><rect x="15.5" y="8.5" width="3.5" height="9.5" rx="1"/></symbol>
   <symbol id="i-offline" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M8.5 16.5a5 5 0 0 1 7 0M5 13a10 10 0 0 1 4.3-2.5M19 13a10 10 0 0 0-2.3-1.6M2 9.5a15 15 0 0 1 4.5-2.8M22 9.5A15 15 0 0 0 11 5.1M12 20v.1"/></symbol>
+  <symbol id="i-tesoura" viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.5 15.5M8.5 8.5 20 20"/></symbol>
+  <symbol id="i-ia" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9h6v6H9zM9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/></symbol>
 </svg>
 
 <dialog class="paleta" id="paleta" aria-label="Busca rápida">
@@ -154,7 +156,11 @@
             <div class="soltar" id="soltar" tabindex="0" role="button" aria-label="Escolher ou arrastar termogramas">
               <div class="soltar-icone"><svg class="ic"><use href="#i-upload"/></svg></div>
               <h2>Solte os termogramas aqui</h2>
-              <p>JPEG radiométrico da câmera FLIR, com temperatura medida, ou imagem colorida com a barra de escala visível, com temperatura estimada.</p>
+              <div class="badge-auto-metrologia-destaque">
+                <span class="icone-ia">✨</span>
+                <span>Auto-Segmentação SAM 2 & Metrologia Monocular Ativas</span>
+              </div>
+              <p>JPEG radiométrico da câmera FLIR ou foto da subestação. Ao anexar, o Pyron segmentará os ativos elétricos, classificará com DINOv2 e calculará as dimensões reais (altura e largura média) automaticamente.</p>
               <div class="soltar-acoes">
                 <button class="btn btn-primaria" id="btn-arquivos" type="button"><svg class="ic"><use href="#i-upload"/></svg>Escolher arquivos</button>
                 <span class="atalho">ou <kbd>Ctrl</kbd> + <kbd>O</kbd></span>
@@ -195,9 +201,11 @@
               <div class="nav-equipamento" id="nav-equipamento"></div>
             </div>
             <div class="acoes" id="a-acoes">
+              <button class="btn btn-anexar-destaque" id="btn-anexar-nova" type="button" data-abrir-arquivos title="Anexar nova imagem térmica ou foto para auto-segmentação e metrologia imediata"><svg class="ic"><use href="#i-upload"/></svg><span>Anexar nova imagem</span></button>
               <div class="grupo-detector">
                 <select id="sel-modelo" aria-label="Detector"></select>
                 <button class="btn" id="btn-detectar" type="button"><svg class="ic"><use href="#i-refazer"/></svg>Detectar</button>
+                <button class="btn btn-destaque-ia" id="btn-auto-identificar" type="button" title="Descobre e segmenta todos os ativos elétricos com SAM 2, classifica com DINOv2 e mede dimensões métricas"><svg class="ic"><use href="#i-ia"/></svg>Auto Identificar (SAM 2 + DINOv2)</button>
               </div>
               <button class="btn btn-icone" id="btn-exportar" type="button" aria-haspopup="menu" aria-label="Exportar" title="Exportar imagem ou temperaturas"><svg class="ic"><use href="#i-baixar"/></svg></button>
               <button class="btn btn-primaria" id="btn-laudo" type="button"><svg class="ic"><use href="#i-laudo"/></svg>Gerar laudo</button>
@@ -236,6 +244,12 @@
                   <button type="button" data-valor="pontos" aria-pressed="false" title="Só os pontos quentes">Pontos quentes</button>
                 </div>
                 <button type="button" class="btn-palco" id="btn-rotulos" aria-pressed="true" title="Nome e temperatura sobre as caixas (R)"><svg class="ic"><use href="#i-etiqueta"/></svg>Rótulos</button>
+                <span class="divisor" id="divisor-camadas-metodologia"></span>
+                <div class="segmentado grupo-toggles-metodologia" role="group" aria-label="Camadas da metodologia" id="grupo-camadas-metodologia">
+                  <button type="button" class="toggle-camada" id="btn-camada-termica" data-camada="termica" aria-pressed="true" title="Térmica: caixas delimitadoras e etiquetas de temperatura"><svg class="ic"><use href="#i-termo"/></svg><span>Térmica</span></button>
+                  <button type="button" class="toggle-camada" id="btn-camada-sam2" data-camada="sam2" aria-pressed="true" title="SAM 2: polígonos e silhuetas de segmentação geométrica"><svg class="ic"><use href="#i-tesoura"/></svg><span>SAM 2</span></button>
+                  <button type="button" class="toggle-camada" id="btn-camada-dinov2" data-camada="dinov2" aria-pressed="true" title="DINOv2: selos e rótulos de classificação de componentes"><svg class="ic"><use href="#i-ia"/></svg><span>DINOv2</span></button>
+                </div>
               </div>
               <div class="isoterma-controle" id="escala-controle" hidden>
                 <svg class="ic"><use href="#i-escala"/></svg>

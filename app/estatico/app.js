@@ -63,6 +63,11 @@ const estado = {
   exibir: lerPreferencia("exibir", "tabela"), abaConfig: "identidade", monitor: null, alertasPendentes: null, vista: null,
   selecao: new Set(), // inspeções marcadas para um relatório com várias imagens
   camada: "tudo", // tudo, pecas ou pontos: o que aparece no termograma e na lista de regiões
+  camadasVisiveis: {
+    termica: lerPreferencia("camada_termica", "sim") !== "nao",
+    sam2: lerPreferencia("camada_sam2", "sim") !== "nao",
+    dinov2: lerPreferencia("camada_dinov2", "sim") !== "nao",
+  },
   rotulos: lerPreferencia("rotulos", "sim") !== "nao",
 };
 
@@ -720,12 +725,13 @@ async function atualizarStatus() {
 async function carregarListaModelos() {
   const d = await api("/api/modelos");
   estado.modelos = d.modelos;
-  estado.ativo = d.ativo;
-  const ativo = d.modelos.find((m) => m.id === d.ativo) || d.modelos[0];
+  const modPrioritario = d.modelos.some((m) => m.id === "sam2-dinov2") ? "sam2-dinov2" : d.ativo;
+  estado.ativo = d.ativo === "pontos-quentes" ? modPrioritario : (d.ativo || modPrioritario);
+  const ativo = d.modelos.find((m) => m.id === estado.ativo) || d.modelos[0];
   $("#modelo-nome").textContent = ativo ? ativo.nome : T.geral.semValor;
   $("#modelo-tipo").textContent = ativo ? (ativo.tipo === "regra" ? T.modelos.regraSemIa : ativo.arquitetura) : "";
   $("#sel-modelo").replaceChildren(...d.modelos.map((m) => new Option(m.nome, m.id)));
-  $("#sel-modelo").value = estado.analise ? estado.analise.modelo.id : d.ativo;
+  $("#sel-modelo").value = estado.analise ? estado.analise.modelo.id : estado.ativo;
 }
 
 async function carregarModelos() {
@@ -771,6 +777,7 @@ async function carregarModelos() {
     if (typeof c.treino === "string") linha(T.modelos.treino, c.treino);
     else if (c.treino) linha(T.modelos.treino, Object.values(c.treino).join(" · "));
     if (c.metricas) linha(T.modelos.desempenho, Object.entries(c.metricas).map(([k, v]) => `${k} ${v ?? T.geral.semValor}`).join(" · "));
+    if (c.vantagens && c.vantagens.length) detalhes.append(el("b", {}, T.modelos.vantagens), el("ul", {}, c.vantagens.map((v) => el("li", {}, v))));
     if (c.limitacoes && c.limitacoes.length) detalhes.append(el("b", {}, T.modelos.limitacoes), el("ul", {}, c.limitacoes.map((l) => el("li", {}, l))));
     const o = rapida && rapida.cartao.otimizacao;
     const faixaRapida = o ? el("div", { class: "modelo-rapido" },
@@ -2905,7 +2912,9 @@ function analisarArquivo(arquivo, destino = null) {
   const tarefa = () => {
     const dados = new FormData();
     dados.append("arquivo", arquivo);
-    dados.append("modelo", estado.ativo || "");
+    const selMod = $("#sel-modelo");
+    const modEscolhido = (selMod && selMod.value) ? selMod.value : (estado.ativo || "sam2-dinov2");
+    dados.append("modelo", modEscolhido || "sam2-dinov2");
     anexarDestino(dados, destino);
     return api("/api/analises", { method: "POST", body: dados });
   };
@@ -3242,22 +3251,113 @@ function desenharCaixas() {
   const { largura: W, altura: H } = estado.matriz;
   const pos = (n, x0, y0, x1, y1) =>
     Object.assign(n.style, { left: `${(x0 / W) * 100}%`, top: `${(y0 / H) * 100}%`, width: `${((x1 - x0) / W) * 100}%`, height: `${((y1 - y0) / H) * 100}%` });
-  for (const r of estado.analise.regioes.filter(naCamada)) {
+
+  const visiveis = estado.analise.regioes.filter(naCamada);
+  const temSam2 = Boolean(estado.camadasVisiveis && estado.camadasVisiveis.sam2);
+  const temTermica = Boolean(estado.camadasVisiveis && estado.camadasVisiveis.termica);
+  const temDinov2 = Boolean(estado.camadasVisiveis && estado.camadasVisiveis.dinov2);
+
+  // Camada SAM 2: polígonos e silhuetas de segmentação
+  const regioesComContorno = visiveis.filter((r) => r.segmentacao && Array.isArray(r.segmentacao.contorno) && r.segmentacao.contorno.length > 2);
+  if (temSam2 && regioesComContorno.length > 0) {
+    const svgSeg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svgSeg.setAttribute("class", "camada-segmentacao");
+    svgSeg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    svgSeg.setAttribute("preserveAspectRatio", "none");
+    svgSeg.setAttribute("aria-hidden", "true");
+    for (const r of regioesComContorno) {
+      const pontos = r.segmentacao.contorno.map(([px, py]) => `${px.toFixed(1)},${py.toFixed(1)}`).join(" ");
+      const poly = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+      poly.setAttribute("points", pontos);
+      const cor = corNivel(r.severidade);
+      poly.setAttribute("fill", cor);
+      poly.setAttribute("fill-opacity", "0.28");
+      poly.setAttribute("stroke", cor);
+      poly.setAttribute("stroke-width", r.id === estado.selecionada ? "2.2" : "1.5");
+      poly.setAttribute("vector-effect", "non-scaling-stroke");
+      poly.setAttribute("class", `poligono-segmentacao${r.id === estado.selecionada ? " selecionado" : ""}`);
+      poly.dataset.id = r.id;
+      svgSeg.append(poly);
+
+      // Cota de dimensão monocular calculada (H = X.XXm)
+      const geom = r.segmentacao.geometria;
+      if (geom && geom.height_meters != null && r.caixa) {
+        const [x0, y0, x1, y1] = r.caixa;
+        const tagM = geom.metodo_metrologia === "telemetria_optica" ? " (Óptico)" : "";
+        const textoH = `H=${fmt(geom.height_meters, 2)}m${tagM}`;
+        const cotaSvg = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        cotaSvg.setAttribute("x", `${(x1 + 4).toFixed(1)}`);
+        cotaSvg.setAttribute("y", `${(((y0 + y1) / 2) + 4).toFixed(1)}`);
+        cotaSvg.setAttribute("class", "cota-svg-dim");
+        cotaSvg.setAttribute("fill", "#ffffff");
+        cotaSvg.textContent = textoH;
+        svgSeg.append(cotaSvg);
+      }
+    }
+    s.append(svgSeg);
+  }
+
+  // Caixas e rótulos (Térmica e DINOv2)
+  for (const r of visiveis) {
     const [x0, y0, x1, y1] = r.caixa;
     const cor = corNivel(r.severidade);
     const temperatura = r.medida ? fmt(r.medida.t_max, 1, " °C") : null;
     const completo = temperatura ? `${r.nome} · ${temperatura}` : r.nome;
-    const etq = el("span", { class: "etq", dataset: { completo, curto: temperatura || r.nome } }, el("i", { style: { background: cor } }), completo);
+
+    const filhosCaixa = [];
+
+    // Classificação DINOv2 real (apenas se DINOv2 executou, com confiança >= 40% e não sendo ponto_quente/fundo)
+    let textoDino = null;
+    if (temDinov2 && r.classificacao_dinov2) {
+      const dino = r.classificacao_dinov2;
+      const conf = dino.confianca != null ? dino.confianca : 0;
+      if (conf >= 0.40 && dino.classe !== "ponto_quente" && dino.classe !== "fundo" && dino.classe !== "estrutura") {
+        const rotulo = dino.nome || nomeClasse(dino.classe);
+        textoDino = `${rotulo} ${fmt(conf * 100, 0)}%`;
+      }
+    }
+
+    // Renderização elegante e unificada: evita poluição ou caixas brancas sobrepostas
+    if (textoDino && temTermica && temperatura) {
+      const icIa = icone("ia");
+      icIa.setAttribute("class", "ic ic-ia-sm");
+      const etqUni = el("span", {
+        class: "etq-unificada",
+        dataset: { completo: `${textoDino} · ${temperatura}` },
+        title: `DINOv2: ${textoDino} · Máx: ${temperatura}`,
+      }, icIa, el("span", {}, textoDino), el("span", { class: "separador-etq" }, "·"), el("span", { class: "temp-destaque" }, temperatura));
+      filhosCaixa.push(etqUni);
+    } else if (textoDino) {
+      const icIa = icone("ia");
+      icIa.setAttribute("class", "ic ic-ia-sm");
+      const etqUni = el("span", {
+        class: "etq-unificada",
+        dataset: { completo: textoDino },
+        title: `DINOv2: ${textoDino}`,
+      }, icIa, el("span", {}, textoDino));
+      filhosCaixa.push(etqUni);
+    } else if (temTermica) {
+      const etq = el("span", { class: "etq", dataset: { completo, curto: temperatura || r.nome } }, el("i", { style: { background: cor } }), completo);
+      filhosCaixa.push(etq);
+    }
+
+    const classesCaixa = [
+      "caixa",
+      r.id === estado.selecionada ? "selecionada" : "",
+      !temTermica ? "sem-termica" : "",
+    ].filter(Boolean).join(" ");
+
     const caixa = el("div", {
-      class: `caixa${r.id === estado.selecionada ? " selecionada" : ""}`,
+      class: classesCaixa,
       dataset: { id: r.id, severidade: r.severidade, area: String((x1 - x0) * (y1 - y0)) },
       title: completo,
-      style: { borderColor: cor },
+      style: { borderColor: temTermica ? cor : "transparent" },
       onmousedown: (ev) => { if (estado.ferramenta === "selecionar") ev.stopPropagation(); },
       onclick: (ev) => { if (estado.ferramenta !== "selecionar") return; ev.stopPropagation(); selecionar(r.id); },
-    }, etq);
+    }, ...filhosCaixa);
     pos(caixa, x0, y0, x1, y1);
-    if (r.medida) {
+
+    if (temTermica && r.medida) {
       const p = el("span", { class: "pico" });
       p.style.left = `${((r.medida.x_max + 0.5 - x0) / (x1 - x0)) * 100}%`;
       p.style.top = `${((r.medida.y_max + 0.5 - y0) / (y1 - y0)) * 100}%`;
@@ -3265,21 +3365,26 @@ function desenharCaixas() {
     }
     s.append(caixa);
   }
+
   if (estado.rascunho) {
     const { x0, y0, x1, y1 } = estado.rascunho;
     const r = el("div", { class: "caixa rascunho" });
     pos(r, Math.min(x0, x1), Math.min(y0, y1), Math.max(x0, x1), Math.max(y0, y1));
     s.append(r);
   }
+
   const pq = estado.analise.resumo && estado.analise.resumo.ponto_mais_quente;
-  if (pq) {
+  if (pq && temTermica) {
     // O ponto mais quente da cena ganha um alvo próprio, maior que o ponto de máxima de cada caixa.
     const alvo = el("span", { class: "alvo-maximo", title: T.analise.pqImagem(fmt(pq.t_max, 1, " °C"), pq.componente && pq.componente.nome) });
     Object.assign(alvo.style, { left: `${((pq.x + 0.5) / W) * 100}%`, top: `${((pq.y + 0.5) / H) * 100}%` });
     s.append(alvo);
   }
+
   desenharMedicoes(s);
-  evitarColisaoDeEtiquetas(s);
+  if (temTermica) {
+    evitarColisaoDeEtiquetas(s);
+  }
 }
 
 function evitarColisaoDeEtiquetas(s) {
@@ -3354,6 +3459,23 @@ function prepararCamadas() {
   if (!ambos) estado.camada = "tudo";
   marcarSegmentado("#seg-camada", estado.camada);
   $("#btn-rotulos").setAttribute("aria-pressed", String(estado.rotulos));
+  atualizarBotoesCamadasMetodologia();
+}
+
+function alternarCamadaMetodologia(camada) {
+  if (!estado.camadasVisiveis || !Object.prototype.hasOwnProperty.call(estado.camadasVisiveis, camada)) return;
+  estado.camadasVisiveis[camada] = !estado.camadasVisiveis[camada];
+  guardarPreferencia(`camada_${camada}`, estado.camadasVisiveis[camada] ? "sim" : "nao");
+  atualizarBotoesCamadasMetodologia();
+  desenharCaixas();
+}
+
+function atualizarBotoesCamadasMetodologia() {
+  if (!estado.camadasVisiveis) return;
+  for (const [camada, ativa] of Object.entries(estado.camadasVisiveis)) {
+    const btn = $(`#btn-camada-${camada}`);
+    if (btn) btn.setAttribute("aria-pressed", String(ativa));
+  }
 }
 
 function trocarCamada(camada) {
@@ -3382,6 +3504,7 @@ function selecionar(id, rolar = true) {
   estado.selecionada = estado.selecionada === id ? null : id;
   desenharCaixas();
   $$(".regiao").forEach((n) => n.classList.toggle("selecionada", n.dataset.id === estado.selecionada));
+  $$(".poligono-segmentacao").forEach((p) => p.classList.toggle("selecionado", p.dataset.id === estado.selecionada));
   if (rolar && estado.selecionada) {
     trocarAba("resultado");
     const n = $(`.regiao[data-id="${estado.selecionada}"]`);
@@ -3392,7 +3515,345 @@ function selecionar(id, rolar = true) {
 function realcar(id, ligar) {
   const c = $(`.caixa[data-id="${id}"]`);
   if (c) c.classList.toggle("realce", ligar);
+  const p = $(`.poligono-segmentacao[data-id="${id}"]`);
+  if (p) p.classList.toggle("realce", ligar);
 }
+
+function renderizarClassificacaoDinov2(x) {
+  const dino = x.classificacao_dinov2;
+  if (!dino) return null;
+  const confPct = Math.round((dino.confianca || 0) * 100);
+  const nomeExibicao = dino.nome || nomeClasse(dino.classe);
+  return el("div", { class: "pilar-dinov2" },
+    el("div", { class: "dinov2-topo" },
+      el("span", { class: "selo-dinov2", title: T.analise.pilarClassificacao },
+        icone("ia"),
+        el("b", {}, nomeExibicao)
+      ),
+      el("span", { class: "dinov2-confianca" }, T.analise.confiancaDinov2(confPct))
+    ),
+    el("div", { class: "barra-confianca", title: T.analise.confiancaDinov2(confPct) },
+      el("i", { style: { width: `${Math.min(100, Math.max(0, confPct))}%` } })
+    )
+  );
+}
+
+function renderizarMetrologiaRegiao(x) {
+  const seg = x.segmentacao;
+  const dino = x.classificacao_dinov2;
+  if (!seg && !dino) return null;
+
+  const blocos = [];
+
+  // Pilar 1: Classificação DINOv2
+  const blocoDino = renderizarClassificacaoDinov2(x);
+  if (blocoDino) blocos.push(blocoDino);
+
+  // Pilares 2 e 3: Metrologia SAM 2 e Pureza Térmica
+  if (seg) {
+    const geom = seg.geometria || {};
+    const term = seg.termica_isolada || {};
+
+    const itensTopo = [];
+    if (seg.score != null) {
+      itensTopo.push(
+        el("span", { class: "selo-sam2", title: T.analise.pilarMetrologia },
+          icone("tesoura"),
+          el("span", {}, T.analise.scoreSam2(fmt(seg.score * 100, 0)))
+        )
+      );
+    }
+    if (term.t_max != null) {
+      itensTopo.push(
+        el("span", { class: "metrologia-tmax", title: T.analise.tMaxIsoladoDica },
+          `${T.analise.tMaxIsoladoRotulo}: `,
+          el("b", {}, fmt(term.t_max, 1, " °C")),
+          " ",
+          el("span", { class: "nota" }, `(${T.analise.fundoDescartado})`)
+        )
+      );
+    }
+
+    const dadosGeom = [];
+    if (geom.height_meters != null && geom.mean_width_meters != null) {
+      if (geom.metodo_metrologia) {
+        const isTelemetria = geom.metodo_metrologia === "telemetria_optica";
+        const iconeMetodo = isTelemetria ? "🎯 " : "📐 ";
+        const rotuloMetodo = isTelemetria ? "Telemetria Óptica (Método 1)" : "Geometria Projetiva (Método 2)";
+        dadosGeom.push(el("div", { class: `badge-metodo-metrologia ${isTelemetria ? "metodo-telemetria" : "metodo-criminisi"}` },
+          el("span", { class: "badge-icone" }, iconeMetodo),
+          el("strong", {}, rotuloMetodo),
+          geom.detalhes_metrologia ? el("span", { class: "badge-detalhe" }, ` · ${geom.detalhes_metrologia}`) : null
+        ));
+      }
+      dadosGeom.push(el("div", { class: "metrologia-monocular-destaque" },
+        el("div", { class: "metrologia-linha-principal" },
+          el("span", { class: "cota-altura" },
+            el("b", {}, "Altura (H): "), `${fmt(geom.height_meters, 2)} m `,
+            el("small", {}, `(${Math.round(geom.height_meters * 100)} cm)`)
+          ),
+          el("span", { class: "cota-largura" },
+            el("b", {}, "Largura média: "), `${fmt(geom.mean_width_meters, 2)} m `,
+            el("small", {}, `(${fmt(geom.mean_width_meters * 100, 1)} cm)`)
+          )
+        ),
+        el("div", { class: "metrologia-linha-secundaria" },
+          geom.max_diameter_meters != null ? el("span", {}, el("b", {}, "Diâm. máx: "), `${fmt(geom.max_diameter_meters * 100, 1)} cm`) : null,
+          geom.projected_area_m2 != null ? el("span", {}, el("b", {}, "Área proj.: "), `${fmt(geom.projected_area_m2, 3)} m²`) : null,
+          geom.aspect_ratio != null ? el("span", {}, el("b", {}, "Razão H/W: "), `${fmt(geom.aspect_ratio, 2)}x`) : null,
+        )
+      ));
+
+      // Controles interativos para ajuste da altura de referência (Href)
+      const hAtual = geom.ref_height_meters != null ? geom.ref_height_meters : geom.height_meters;
+      const inputRef = el("input", {
+        type: "number",
+        id: `href-${x.id}`,
+        class: "input-href-sm",
+        step: "0.05",
+        min: "0.1",
+        max: "10",
+        value: String(hAtual),
+      });
+
+      const btnCalibrar = el("button", {
+        type: "button",
+        class: "btn btn-xs btn-secundario",
+        title: "Recalcular dimensões usando a altura de referência",
+        onclick: (ev) => {
+          ev.stopPropagation();
+          const val = Number($(`#href-${x.id}`).value);
+          segmentarRegiaoComSam2(x.id, ev.currentTarget, val);
+        }
+      }, T.analise.btnRecalcular || "Calibrar");
+
+      const chips = el("div", { class: "chips-href" },
+        el("button", { class: "btn-chip", type: "button", onclick: (ev) => { ev.stopPropagation(); inputRef.value = "0.80"; segmentarRegiaoComSam2(x.id, null, 0.80); } }, "Isolador 0.80m"),
+        el("button", { class: "btn-chip", type: "button", onclick: (ev) => { ev.stopPropagation(); inputRef.value = "1.25"; segmentarRegiaoComSam2(x.id, null, 1.25); } }, "Bucha 1.25m"),
+        el("button", { class: "btn-chip", type: "button", onclick: (ev) => { ev.stopPropagation(); inputRef.value = "1.60"; segmentarRegiaoComSam2(x.id, null, 1.60); } }, "Trafo 1.60m"),
+      );
+
+      dadosGeom.push(el("div", { class: "calibrar-altura-controle", onclick: (e) => e.stopPropagation() },
+        el("label", { for: `href-${x.id}` }, T.analise.calibrarAlturaRotulo || "Altura ref:"),
+        inputRef,
+        el("span", {}, "m"),
+        btnCalibrar,
+        chips,
+      ));
+    } else {
+      const temMetrica = geom.length_metric != null && geom.width_metric != null;
+      const dimTexto = temMetrica
+        ? T.analise.dimensoesMetricas(fmt(geom.length_metric, 1), fmt(geom.width_metric, 1), geom.unit || "mm")
+        : (geom.length_px != null && geom.width_px != null)
+          ? T.analise.dimensoesPx(fmt(geom.length_px, 0), fmt(geom.width_px, 0))
+          : null;
+
+      const anguloTexto = geom.rotation_deg != null
+        ? T.analise.anguloValor(fmt(geom.rotation_deg, 0))
+        : null;
+
+      const areaTexto = geom.area_metric != null
+        ? T.analise.areaMetrica(fmt(geom.area_metric, 1), geom.unit || "mm")
+        : geom.area_px != null
+          ? T.analise.areaPx(fmt(geom.area_px, 0))
+          : null;
+
+      if (dimTexto) dadosGeom.push(el("span", {}, el("b", {}, `${T.analise.dimensoesRotulo}: `), dimTexto));
+      if (anguloTexto) dadosGeom.push(el("span", {}, el("b", {}, `${T.analise.anguloRotulo}: `), anguloTexto));
+      if (areaTexto) dadosGeom.push(el("span", {}, el("b", {}, `${T.analise.areaRotulo}: `), areaTexto));
+    }
+
+    blocos.push(el("div", { class: "pilar-sam2" },
+      el("div", { class: "metrologia-topo" }, ...itensTopo),
+      dadosGeom.length ? el("div", { class: "metrologia-grade" }, ...dadosGeom) : null,
+    ));
+  }
+
+  return el("div", { class: "regiao-metrologia" }, ...blocos);
+}
+
+function renderizarAcoesMetodologia(x) {
+  const rotuloSam2 = x.segmentacao ? T.analise.resegmentarSam2 : T.analise.segmentarSam2;
+  const rotuloDino = x.classificacao_dinov2 ? T.analise.reclassificarDinov2 : T.analise.classificarDinov2;
+
+  return el("div", { class: "regiao-acoes" },
+    el("button", {
+      class: "btn btn-sm btn-secundario",
+      type: "button",
+      dataset: { segmentarId: x.id },
+      title: rotuloSam2,
+      onclick: (ev) => {
+        ev.stopPropagation();
+        segmentarRegiaoComSam2(x.id, ev.currentTarget);
+      },
+    },
+      icone("tesoura"),
+      el("span", {}, rotuloSam2)
+    ),
+    el("button", {
+      class: "btn btn-sm btn-secundario",
+      type: "button",
+      dataset: { classificarId: x.id },
+      title: rotuloDino,
+      onclick: (ev) => {
+        ev.stopPropagation();
+        classificarRegiaoComDinov2(x.id, ev.currentTarget);
+      },
+    },
+      icone("ia"),
+      el("span", {}, rotuloDino)
+    ),
+    el("button", {
+      class: "btn btn-sm btn-secundario btn-metodologia-completa",
+      type: "button",
+      dataset: { metodologiaId: x.id },
+      title: T.analise.metodologiaCompletaDica,
+      onclick: (ev) => {
+        ev.stopPropagation();
+        executarMetodologiaCompleta(x.id, ev.currentTarget);
+      },
+    },
+      icone("refazer"),
+      el("span", {}, T.analise.metodologiaCompleta)
+    )
+  );
+}
+
+async function segmentarRegiaoComSam2(id, botao = null, alturaRef = null) {
+  if (!estado.analise || !id) return;
+  const btn = botao || $(`button[data-segmentar-id="${id}"]`);
+  if (btn) {
+    btn.classList.add("ocupado");
+    btn.setAttribute("aria-busy", "true");
+    btn.setAttribute("disabled", "true");
+  }
+  avisar(T.analise.segmentandoSam2, { duracao: 3000 });
+  try {
+    const corpo = { regiao_id: id };
+    if (alturaRef != null && !isNaN(alturaRef) && alturaRef > 0) {
+      corpo.altura_referencia = Number(alturaRef);
+    }
+    const res = await fetch(`/api/analises/${estado.analise.id}/segmentar`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(corpo),
+    });
+    if (!res.ok) {
+      let detalhe = "";
+      try {
+        const corpo = await res.json();
+        detalhe = corpo.detail || corpo.erro;
+      } catch { /* corpo não JSON */ }
+      throw new Error(detalhe || T.geral.erroServidor(res.status));
+    }
+    const dados = await res.json();
+    if (dados && dados.analise) {
+      estado.analise = dados.analise;
+      estado.selecionada = id;
+      desenharCaixas();
+      preencherResultado();
+      avisar(T.analise.segmentacaoSucesso);
+    }
+  } catch (erro) {
+    falhou(erro);
+  } finally {
+    if (btn) {
+      btn.classList.remove("ocupado");
+      btn.removeAttribute("aria-busy");
+      btn.removeAttribute("disabled");
+    }
+  }
+}
+
+async function classificarRegiaoComDinov2(id, botao = null) {
+  if (!estado.analise || !id) return;
+  const btn = botao || $(`button[data-classificar-id="${id}"]`);
+  if (btn) {
+    btn.classList.add("ocupado");
+    btn.setAttribute("aria-busy", "true");
+    btn.setAttribute("disabled", "true");
+  }
+  avisar(T.analise.classificandoDinov2, { duracao: 3000 });
+  try {
+    const res = await fetch(`/api/analises/${estado.analise.id}/classificar`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ regiao_id: id }),
+    });
+    if (!res.ok) {
+      let detalhe = "";
+      try {
+        const corpo = await res.json();
+        detalhe = corpo.detail || corpo.erro;
+      } catch { /* corpo não JSON */ }
+      throw new Error(detalhe || T.geral.erroServidor(res.status));
+    }
+    const dados = await res.json();
+    if (dados && dados.analise) {
+      estado.analise = dados.analise;
+      estado.selecionada = id;
+      desenharCaixas();
+      preencherResultado();
+      const nomeClasseResp = (dados.classificacao && (dados.classificacao.nome || nomeClasse(dados.classificacao.classe))) || "";
+      avisar(nomeClasseResp ? T.analise.classificacaoSucessoNome(nomeClasseResp) : T.analise.classificacaoSucesso);
+    }
+  } catch (erro) {
+    falhou(erro);
+  } finally {
+    if (btn) {
+      btn.classList.remove("ocupado");
+      btn.removeAttribute("aria-busy");
+      btn.removeAttribute("disabled");
+    }
+  }
+}
+
+async function executarMetodologiaCompleta(id, botao = null, alturaRef = null) {
+  if (!estado.analise || !id) return;
+  const btn = botao || $(`button[data-metodologia-id="${id}"]`);
+  if (btn) {
+    btn.classList.add("ocupado");
+    btn.setAttribute("aria-busy", "true");
+    btn.setAttribute("disabled", "true");
+  }
+  avisar(T.analise.executandoMetodologiaCompleta, { duracao: 4000 });
+  try {
+    const corpo = { regiao_id: id };
+    if (alturaRef != null && !isNaN(alturaRef) && alturaRef > 0) {
+      corpo.altura_referencia = Number(alturaRef);
+    }
+    const res = await fetch(`/api/analises/${estado.analise.id}/metodologia_completa`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(corpo),
+    });
+    if (!res.ok) {
+      let detalhe = "";
+      try {
+        const corpo = await res.json();
+        detalhe = corpo.detail || corpo.erro;
+      } catch { /* corpo não JSON */ }
+      throw new Error(detalhe || T.geral.erroServidor(res.status));
+    }
+    const dados = await res.json();
+    if (dados && dados.analise) {
+      estado.analise = dados.analise;
+      estado.selecionada = id;
+      desenharCaixas();
+      preencherResultado();
+      avisar(T.analise.metodologiaCompletaSucesso);
+    }
+  } catch (erro) {
+    falhou(erro);
+  } finally {
+    if (btn) {
+      btn.classList.remove("ocupado");
+      btn.removeAttribute("aria-busy");
+      btn.removeAttribute("disabled");
+    }
+  }
+}
+
 
 function preencherResultado() {
   const a = estado.analise;
@@ -3461,6 +3922,9 @@ function preencherResultado() {
       const remover = el("button", { class: "btn btn-sm btn-fantasma btn-icone remover", type: "button", title: T.analise.removerTitulo, "aria-label": T.analise.remover(x.nome), onclick: (ev) => { ev.stopPropagation(); removerRegiao(x.id); } }, icone("lixo"));
       const porque = x.criterio_disparo ? T.analise.criterio(x.criterio_disparo.join(" e ")) : "";
       const selo = el("span", { class: `selo ${x.severidade}${x.indicativa ? " indicativa" : ""}`, title: `${x.severidade_rotulo}.${porque} ${x.acao}${x.indicativa ? T.analise.indicativaDica : ""}` }, T.niveis[x.severidade]);
+      const blocoMetrologia = renderizarMetrologiaRegiao(x);
+      const acoesMetodologia = renderizarAcoesMetodologia(x);
+
       return el("div", {
         class: `regiao${x.id === estado.selecionada ? " selecionada" : ""}`,
         dataset: { id: x.id },
@@ -3472,7 +3936,9 @@ function preencherResultado() {
         el("div", { class: "corpo" },
           el("div", { class: "linha1" }, nome, remover),
           el("div", { class: "linha2" }, sel, el("span", { class: "ref" }, partes.join(" · "))),
-          el("div", { class: `termometro${x.pct_mta != null ? " limite" : ""}`, title: tituloBarra }, el("i", { style: { width: `${largura}%`, background: cor } }))),
+          el("div", { class: `termometro${x.pct_mta != null ? " limite" : ""}`, title: tituloBarra }, el("i", { style: { width: `${largura}%`, background: cor } })),
+          blocoMetrologia,
+          acoesMetodologia),
         el("div", { class: "medidas" }, el("span", { class: "tmax" }, fmt(m.t_max, 1, " °C")), el("span", { class: "dt" }, medidaSecundaria), selo));
     }),
   );
@@ -4578,6 +5044,24 @@ function ligarEventos() {
     }
   });
 
+  const btnAutoId = $("#btn-auto-identificar");
+  if (btnAutoId) {
+    btnAutoId.addEventListener("click", async (ev) => {
+      const botao = ev.currentTarget;
+      ocupado(botao, true);
+      try {
+        const a = await api(`/api/analises/${estado.analise.id}/auto_identificar`, json("POST", {}));
+        abrirAnalise(a);
+        const qtd = (a.regioes || []).filter((r) => r.segmentacao).length;
+        avisar(T.analise.autoIdentificarSucesso(qtd));
+      } catch (e) {
+        falhou(e);
+      } finally {
+        ocupado(botao, false);
+      }
+    });
+  }
+
   segmentado("#seg-paleta", (v) => { estado.paleta = v; desenharTermograma(); salvarExibicao(); });
   segmentado("#seg-faixa", trocarFaixa);
   ["#escala-min", "#escala-max"].forEach((id) => $(id).addEventListener("change", lerEscalaManual));
@@ -4597,6 +5081,12 @@ function ligarEventos() {
   $("#btn-parametros-camera").addEventListener("click", (ev) => aplicarParametros({ restaurar: true }, ev.currentTarget, T.analise.parametrosRestaurados));
   segmentado("#seg-ferramenta", definirFerramenta);
   segmentado("#seg-camada", trocarCamada);
+  $$("#grupo-camadas-metodologia .toggle-camada").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      alternarCamadaMetodologia(btn.dataset.camada);
+    });
+  });
+  atualizarBotoesCamadasMetodologia();
   $("#btn-rotulos").addEventListener("click", alternarRotulos);
   $("#btn-nova-regiao").addEventListener("click", () => definirFerramenta("desenhar"));
   $("#btn-isoterma").addEventListener("click", (ev) => {

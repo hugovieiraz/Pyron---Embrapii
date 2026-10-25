@@ -95,3 +95,54 @@ class PontosQuentes(Detector):
             regioes.append((pico, Deteccao("ponto_quente", caixa, round(confianca, 3))))
         regioes.sort(key=lambda r: -r[0])
         return [d for _, d in regioes[: self.maximo]]
+
+
+class PontosQuentesComSAM2(PontosQuentes):
+    """Combina detecção de pontos quentes por contraste térmico com o modelo fundacional SAM 2.
+
+    Localiza os pontos quentes por contraste e segmenta o ativo com o modelo fundacional SAM 2,
+    descartando o fundo frio e extraindo geometria precisa.
+    """
+
+    def __init__(
+        self,
+        delta_min: float = 4.0,
+        janela_frac: float = 0.12,
+        maximo: int = 6,
+        area_max_frac: float = 0.012,
+    ):
+        super().__init__(
+            delta_min=delta_min,
+            janela_frac=janela_frac,
+            maximo=maximo,
+            area_max_frac=area_max_frac,
+        )
+        self.id = "pontos-quentes-sam2"
+        self.nome = "Pontos quentes + SAM 2 (Segmentação Fundacional)"
+        self.tipo = "combinado"
+        self.arquitetura = "Contraste térmico local + Segment Anything 2 (Meta Hiera Small)"
+        self.descricao = (
+            "Localiza os pontos quentes por contraste e segmenta o ativo com o modelo "
+            "fundacional SAM 2, descartando o fundo frio e extraindo geometria precisa."
+        )
+        self.cartao = {
+            "treino": "SAM 2 pré-treinado pela Meta em >50M de máscaras; detecção por contraste térmico",
+            "parametros": {
+                "delta_min_c": delta_min,
+                "janela_fracao_largura": janela_frac,
+                "area_maxima_fracao": area_max_frac,
+                "maximo_regioes": maximo,
+                "modelo_segmentador": "sam2.1_hiera_small",
+            },
+            "vantagens": [
+                "Segmentação pixel-a-pixel precisa do componente que contém o ponto quente.",
+                "Isola o corpo do ativo descartando a interferência do fundo frio (céu e estruturas).",
+                "Extração direta de geometria precisa (dimensões, rotação, área) e métricas térmicas isoladas.",
+            ],
+            "limitacoes": [
+                "Inferência neural pelo SAM 2 demanda processamento adicional por imagem.",
+                "Reflexos intensos do sol podem originar candidatos térmicos na etapa inicial de contraste.",
+                "Requer pacote SAM 2 e pesos pré-treinados disponíveis no ambiente.",
+            ],
+        }
+

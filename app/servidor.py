@@ -17,6 +17,7 @@ import uuid
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
+from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 from time import perf_counter
@@ -218,7 +219,14 @@ def _info_modelo(det: detectores.Detector) -> dict:
 # ---------------------------------------------------------------- análise
 
 
-def _regioes_do_detector(det: detectores.Detector, matriz: np.ndarray, imagem: np.ndarray | None = None) -> list[dict]:
+def _regioes_do_detector(det: detectores.Detector, matriz: np.ndarray, imagem: np.ndarray | None = None, metadados: dict | None = None) -> list[dict]:
+    if hasattr(det, "detectar_com_metrologia"):
+        regioes = det.detectar_com_metrologia(matriz, imagem, metadados=metadados)
+        for r in regioes:
+            if not r.get("id"):
+                r["id"] = uuid.uuid4().hex[:8]
+        return regioes
+
     contagem: dict[str, int] = {}
     regioes = []
     for d in det.detectar(matriz, imagem):
@@ -238,7 +246,7 @@ def _regioes_do_detector(det: detectores.Detector, matriz: np.ndarray, imagem: n
 
 def _calcular(a: dict, matriz: np.ndarray) -> dict:
     cond = a.get("condicoes", {})
-    campos = ("id", "nome", "classe", "caixa", "confianca", "origem")
+    campos = ("id", "nome", "classe", "caixa", "confianca", "origem", "segmentacao", "classificacao_dinov2")
     base = [{k: v for k, v in r.items() if k in campos} for r in a["regioes"]]
     a["regioes"], a["resumo"] = analise.analisar_regioes(
         matriz, base, cond.get("ambiente_c"), cond.get("carga_pct"), criterios=_criterios(), componentes=_componentes()
@@ -279,6 +287,101 @@ def _validar_medicoes(lista, matriz: np.ndarray) -> list[dict]:
     return saida
 
 
+# ---------------------------------------------------------------- segmentação SAM 2
+
+_segmentador_sam2 = None
+_trava_sam2 = threading.Lock()
+
+
+def _obter_segmentador_sam2():
+    """Instancia o SAM2Segmentor sob demanda (singleton), tratando falhas de checkpoint ou pacote."""
+    global _segmentador_sam2
+    if _segmentador_sam2 is not None:
+        return _segmentador_sam2
+    with _trava_sam2:
+        if _segmentador_sam2 is not None:
+            return _segmentador_sam2
+        try:
+            from nucleo.segmentacao.sam2_engine import SAM2Segmentor
+
+            _segmentador_sam2 = SAM2Segmentor()
+        except FileNotFoundError as erro:
+            raise HTTPException(503, f"Modelo SAM 2 não disponível: {erro}") from erro
+        except ImportError as erro:
+            raise HTTPException(503, f"Dependências do SAM 2 ausentes: {erro}") from erro
+        except Exception as erro:
+            raise HTTPException(500, f"Falha ao carregar o modelo SAM 2: {erro}") from erro
+        return _segmentador_sam2
+
+
+# ---------------------------------------------------------------- classificação DINOv2
+
+_classificador_dinov2 = None
+_trava_dinov2 = threading.Lock()
+
+
+def _obter_classificador_dinov2():
+    """Instancia o DINOv2Classifier sob demanda (singleton), tratando falhas de modelo ou pacote."""
+    global _classificador_dinov2
+    if _classificador_dinov2 is not None:
+        return _classificador_dinov2
+    with _trava_dinov2:
+        if _classificador_dinov2 is not None:
+            return _classificador_dinov2
+        try:
+            from nucleo.classificacao.dinov2_engine import DINOv2Classifier
+
+            _classificador_dinov2 = DINOv2Classifier.obter_instancia()
+        except ImportError as erro:
+            raise HTTPException(503, f"Dependências do DINOv2 ausentes: {erro}") from erro
+        except Exception as erro:
+            raise HTTPException(500, f"Falha ao carregar o modelo DINOv2: {erro}") from erro
+        return _classificador_dinov2
+
+
+def _imagem_rgb_para_analise(matriz: np.ndarray, exibida_rgb: np.ndarray | None = None) -> np.ndarray:
+    """Garante que a imagem RGB esteja nas mesmas dimensões da matriz térmica."""
+    if exibida_rgb is not None:
+        rgb = exibida_rgb
+        if rgb.shape[:2] != matriz.shape[:2]:
+            import cv2
+
+            rgb = cv2.resize(rgb, (matriz.shape[1], matriz.shape[0]), interpolation=cv2.INTER_LINEAR)
+        return rgb
+
+    if hasattr(nucleo, "paleta") and hasattr(nucleo.paleta, "termograma"):
+        try:
+            return nucleo.paleta.termograma(matriz, "ferro")
+        except Exception:
+            pass
+    return render.colorir(matriz, nome="ferro")
+
+
+def _obter_imagem_rgb(id_: str, matriz: np.ndarray) -> np.ndarray:
+    """Tenta obter a imagem original exibida ou sintetiza RGB a partir da matriz térmica."""
+    try:
+        original = armazenamento.original(id_)
+        if original:
+            img = entrada.carregar(original, ocr=ocr)
+            return _imagem_rgb_para_analise(matriz, img.exibida_rgb)
+    except Exception:
+        pass
+    return _imagem_rgb_para_analise(matriz, None)
+
+
+def _simplificar_contorno(mascara: np.ndarray, epsilon: float = 1.0) -> list[list[float]]:
+    """Gera um polígono simplificado [[x, y], ...] a partir da máscara binária."""
+    import cv2
+
+    binaria = (np.asarray(mascara) > 0).astype(np.uint8)
+    contornos, _ = cv2.findContours(binaria, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    if not contornos:
+        return []
+    maior = max(contornos, key=cv2.contourArea)
+    aproximado = cv2.approxPolyDP(maior, epsilon=epsilon, closed=True)
+    return [[float(p[0][0]), float(p[0][1])] for p in aproximado]
+
+
 def _nova_analise(dados: bytes, nome: str, modelo: str | None, fonte: str = "manual", identificacao: dict | None = None,
                   limites: tuple[float, float] | None = None, somente_imagem: bool = False) -> dict:
     t0 = perf_counter()
@@ -290,7 +393,7 @@ def _nova_analise(dados: bytes, nome: str, modelo: str | None, fonte: str = "man
     det = _detector(modelo)
     try:
         if img.tem_temperatura or getattr(det, "precisa_imagem", False):
-            regioes = _regioes_do_detector(det, img.temperatura_c, img.exibida_rgb)
+            regioes = _regioes_do_detector(det, img.temperatura_c, img.exibida_rgb, metadados=img.metadados)
         else:
             regioes = []  # o modelo lê temperatura, que esta imagem não tem
     except ValueError as erro:
@@ -321,16 +424,62 @@ def _nova_analise(dados: bytes, nome: str, modelo: str | None, fonte: str = "man
             "faixa_exibicao": [lo, hi],
         },
     }
+
+    # Segmentação automática com SAM 2 se o modelo ativo for pontos-quentes-sam2 ou contiver "sam2"
+    modelo_sam2 = det.id == "pontos-quentes-sam2" or "sam2" in (det.id or "").lower()
+    t_seg_ms = 0
+    if modelo_sam2 and a["regioes"] and img.tem_temperatura:
+        t_seg_ini = perf_counter()
+        segmentador = _obter_segmentador_sam2()
+        imagem_rgb = _imagem_rgb_para_analise(img.temperatura_c, img.exibida_rgb)
+        from nucleo.pipeline.pyron_pipeline import analisar_ativo
+
+        primeiro = True
+        for r in a["regioes"]:
+            if r.get("segmentacao"):
+                continue
+            caixa = r.get("caixa")
+            if not caixa or len(caixa) != 4:
+                continue
+            classe_r = (r.get("classe") or "componente").lower()
+            padroes_h = {"isolador": 0.80, "bucha": 1.25, "para_raio": 1.20, "terminal_superior": 0.65, "transformador": 1.60}
+            h_ref_r = padroes_h.get(classe_r, 0.80)
+            try:
+                res = analisar_ativo(
+                    segmentador=segmentador,
+                    imagem_rgb=imagem_rgb,
+                    matriz_termica=img.temperatura_c,
+                    bbox_xyxy=caixa,
+                    ref_height_meters=h_ref_r,
+                    metadados_camera=a.get("metadados"),
+                    reutilizar_quadro=not primeiro,
+                )
+                primeiro = False
+                contorno_pontos = _simplificar_contorno(res.mascara, epsilon=1.0)
+                r["segmentacao"] = {
+                    "score": float(res.score),
+                    "geometria": res.geometria,
+                    "termica_isolada": asdict(res.termica) if res.termica else None,
+                    "contorno": contorno_pontos,
+                }
+            except Exception:
+                pass
+        t_seg_ms = round((perf_counter() - t_seg_ini) * 1000)
+
+    t_calc_ini = perf_counter()
     _calcular(a, img.temperatura_c)
     if not img.tem_temperatura and not getattr(det, "precisa_imagem", False):
         a["resumo"]["avisos"].append(f"O modelo {det.nome} procura pelo calor; sem temperatura, ele não identifica componentes. "
                                      "Escolha um modelo que olha a imagem colorida.")
     t3 = perf_counter()
-    a["etapas"] = [
+    etapas = [
         {"nome": "Leitura da temperatura", "ms": round((t1 - t0) * 1000), **({} if img.tem_temperatura else {"sem_dado": True})},
         {"nome": "Detecção", "ms": round((t2 - t1) * 1000)},
-        {"nome": "Medição e severidade", "ms": round((t3 - t2) * 1000), **({} if img.tem_temperatura else {"sem_dado": True})},
+        {"nome": "Medição e severidade", "ms": round((t3 - t_calc_ini) * 1000), **({} if img.tem_temperatura else {"sem_dado": True})},
     ]
+    if t_seg_ms > 0:
+        etapas.insert(2, {"nome": "Segmentação SAM 2", "ms": t_seg_ms})
+    a["etapas"] = etapas
     armazenamento.salvar(a, original=dados, matriz=img.temperatura_c)
     if img.foto_visivel:
         armazenamento.salvar_foto(a["id"], img.foto_visivel)
@@ -372,13 +521,15 @@ def saude() -> dict:
 @app.post("/api/analises")
 async def criar(arquivo: UploadFile = File(...), modelo: str | None = Form(None),
                 instalacao: str | None = Form(None), equipamento: str | None = Form(None)) -> dict:
-    """Analisa uma imagem; com instalação e equipamento, ela já entra no histórico dele."""
+    """Analisa uma imagem com auto-segmentação SAM 2, classificação DINOv2 e metrologia monocular imediata."""
     dados = await arquivo.read()
     if not dados:
         raise HTTPException(422, "O arquivo está vazio.")
     ident = {k: v.strip()[:120] for k, v in (("instalacao", instalacao), ("equipamento", equipamento)) if v and v.strip()}
+    # Se o modelo não foi explicitado, assume o modelo fundacional de segmentação e metrologia
+    modelo_analise = modelo if (modelo and modelo.strip()) else _config()["modelo_ativo"]
     with _trava:
-        return _completa(_nova_analise(dados, arquivo.filename or "imagem.jpg", modelo, identificacao=ident))
+        return _completa(_nova_analise(dados, arquivo.filename or "imagem.jpg", modelo_analise, identificacao=ident))
 
 
 def _chave_de(a: dict) -> str:
@@ -410,16 +561,19 @@ def atualizar(id_: str, corpo: dict = Body(...)) -> dict:
             caixa = [float(v) for v in r["caixa"]]
             if caixa[2] - caixa[0] < 1 or caixa[3] - caixa[1] < 1:
                 continue
-            novas.append(
-                {
-                    "id": r.get("id") or uuid.uuid4().hex[:8],
-                    "nome": str(r.get("nome") or "Região")[:60],
-                    "classe": str(r.get("classe") or "componente")[:40],
-                    "caixa": caixa,
-                    "confianca": r.get("confianca"),
-                    "origem": r.get("origem") or "manual",
-                }
-            )
+            item = {
+                "id": r.get("id") or uuid.uuid4().hex[:8],
+                "nome": str(r.get("nome") or "Região")[:60],
+                "classe": str(r.get("classe") or "componente")[:40],
+                "caixa": caixa,
+                "confianca": r.get("confianca"),
+                "origem": r.get("origem") or "manual",
+            }
+            if "segmentacao" in r:
+                item["segmentacao"] = r["segmentacao"]
+            if "classificacao_dinov2" in r:
+                item["classificacao_dinov2"] = r["classificacao_dinov2"]
+            novas.append(item)
         a["regioes"] = novas
     if "condicoes" in corpo:
         c = corpo["condicoes"]
@@ -483,6 +637,340 @@ def detectar_de_novo(id_: str, corpo: dict = Body(default={})) -> dict:
     _calcular(a, m)
     armazenamento.salvar(a)
     return _completa(a)
+
+
+# ---------------------------------------------------------------- rotas: segmentação SAM 2
+
+
+def _normalizar_caixa_se_rgb(id_: str, m: np.ndarray, caixa: list[float]) -> list[float]:
+    """Se a caixa foi informada nas coordenadas de imagem óptica de alta resolução, ajusta para a matriz."""
+    try:
+        original = armazenamento.original(id_)
+        if original:
+            raw_rgb = entrada.exibida(original)
+            if raw_rgb is not None and (raw_rgb.shape[1] > m.shape[1] or raw_rgb.shape[0] > m.shape[0]):
+                if caixa[2] > m.shape[1] or caixa[3] > m.shape[0]:
+                    sx = m.shape[1] / raw_rgb.shape[1]
+                    sy = m.shape[0] / raw_rgb.shape[0]
+                    return [caixa[0] * sx, caixa[1] * sy, caixa[2] * sx, caixa[3] * sy]
+    except Exception:
+        pass
+    return caixa
+
+
+@app.post("/api/analises/{id_}/segmentar")
+def segmentar(id_: str, corpo: dict = Body(default={})) -> dict:
+    """Segmenta o ativo dentro da região com SAM 2, calculando metrologia e térmica isolada."""
+    a, m = _carregar(id_)
+    regiao_id = corpo.get("regiao_id")
+    caixa = corpo.get("caixa")
+    metric_ratio = corpo.get("metric_ratio")
+
+    if metric_ratio is not None:
+        try:
+            metric_ratio = float(metric_ratio)
+            if metric_ratio <= 0:
+                raise ValueError
+        except (ValueError, TypeError):
+            raise HTTPException(422, "O parâmetro 'metric_ratio' deve ser um número positivo.")
+
+    a_regiao = None
+    if regiao_id:
+        for r in a.get("regioes", []):
+            if r.get("id") == regiao_id:
+                a_regiao = r
+                break
+        if a_regiao is None:
+            raise HTTPException(404, f"Região '{regiao_id}' não encontrada na análise.")
+        if caixa is None:
+            caixa = a_regiao.get("caixa")
+
+    if not caixa or len(caixa) != 4:
+        raise HTTPException(422, "Coordenadas da caixa [x0, y0, x1, y1] não fornecidas ou inválidas.")
+
+    try:
+        caixa = [float(v) for v in caixa]
+    except (ValueError, TypeError) as erro:
+        raise HTTPException(422, f"Coordenadas da caixa inválidas: {erro}") from erro
+
+    if caixa[2] <= caixa[0] or caixa[3] <= caixa[1]:
+        raise HTTPException(422, "Caixa inválida: x1 deve ser maior que x0 e y1 maior que y0.")
+
+    caixa = _normalizar_caixa_se_rgb(id_, m, caixa)
+    imagem_rgb = _obter_imagem_rgb(id_, m)
+    segmentador = _obter_segmentador_sam2()
+
+    h_ref = corpo.get("altura_referencia") or corpo.get("ref_height_meters")
+    if h_ref is not None:
+        try:
+            h_ref = float(h_ref)
+        except (ValueError, TypeError):
+            h_ref = None
+    if h_ref is None and metric_ratio is None:
+        classe_atual = (a_regiao.get("classe") if a_regiao else "componente") or "componente"
+        padroes_h = {"isolador": 0.80, "bucha": 1.25, "para_raio": 1.20, "terminal_superior": 0.65, "transformador": 1.60, "conexao": 0.50}
+        h_ref = padroes_h.get(str(classe_atual).lower(), 0.80)
+
+    try:
+        from nucleo.pipeline.pyron_pipeline import analisar_ativo
+        from nucleo.metrologia.dimension_estimator import MascaraVaziaError
+
+        res = analisar_ativo(
+            segmentador=segmentador,
+            imagem_rgb=imagem_rgb,
+            matriz_termica=m,
+            bbox_xyxy=caixa,
+            metric_ratio=metric_ratio,
+            ref_height_meters=h_ref,
+            metadados_camera=a.get("metadados"),
+        )
+    except MascaraVaziaError as erro:
+        raise HTTPException(422, f"Não foi possível segmentar o ativo na caixa informada: {erro}") from erro
+    except Exception as erro:
+        raise HTTPException(500, f"Falha na segmentação do ativo: {erro}") from erro
+
+    contorno_pontos = _simplificar_contorno(res.mascara, epsilon=1.0)
+
+    dados_segmentacao = {
+        "score": float(res.score),
+        "geometria": res.geometria,
+        "termica_isolada": asdict(res.termica) if res.termica else None,
+        "contorno": contorno_pontos,
+    }
+
+    if a_regiao is None:
+        a_regiao = {
+            "id": uuid.uuid4().hex[:8],
+            "nome": "Segmentação",
+            "classe": "componente",
+            "caixa": caixa,
+            "origem": "segmentacao:sam2",
+            "segmentacao": dados_segmentacao,
+        }
+        a.setdefault("regioes", []).append(a_regiao)
+    else:
+        a_regiao["segmentacao"] = dados_segmentacao
+        if "caixa" in corpo:
+            a_regiao["caixa"] = caixa
+
+    with _trava:
+        _calcular(a, m)
+        armazenamento.salvar(a)
+
+    regiao_atualizada = next((r for r in a["regioes"] if r["id"] == a_regiao["id"]), a_regiao)
+
+    return {
+        "ok": True,
+        "segmentacao": regiao_atualizada.get("segmentacao", dados_segmentacao),
+        "analise": _completa(a),
+    }
+
+
+# ---------------------------------------------------------------- classificação DINOv2 e metodologia completa
+
+
+@app.post("/api/analises/{id_}/classificar")
+def classificar(id_: str, corpo: dict = Body(default={})) -> dict:
+    """Classifica o ativo dentro da região com DINOv2 via embeddings fundacionais e galeria de protótipos."""
+    a, m = _carregar(id_)
+    regiao_id = corpo.get("regiao_id")
+    caixa = corpo.get("caixa")
+
+    a_regiao = None
+    if regiao_id:
+        for r in a.get("regioes", []):
+            if r.get("id") == regiao_id:
+                a_regiao = r
+                break
+        if a_regiao is None:
+            raise HTTPException(404, f"Região '{regiao_id}' não encontrada na análise.")
+        if caixa is None:
+            caixa = a_regiao.get("caixa")
+
+    if not caixa or len(caixa) != 4:
+        raise HTTPException(422, "Coordenadas da caixa [x0, y0, x1, y1] não fornecidas ou inválidas.")
+
+    try:
+        caixa = [float(v) for v in caixa]
+    except (ValueError, TypeError) as erro:
+        raise HTTPException(422, f"Coordenadas da caixa inválidas: {erro}") from erro
+
+    if caixa[2] <= caixa[0] or caixa[3] <= caixa[1]:
+        raise HTTPException(422, "Caixa inválida: x1 deve ser maior que x0 e y1 maior que y0.")
+
+    caixa = _normalizar_caixa_se_rgb(id_, m, caixa)
+    imagem_rgb = _obter_imagem_rgb(id_, m)
+    classificador = _obter_classificador_dinov2()
+
+    try:
+        resultado = classificador.classificar(imagem_rgb, bbox=caixa)
+    except Exception as erro:
+        raise HTTPException(500, f"Falha na classificação com DINOv2: {erro}") from erro
+
+    dados_classificacao = {
+        "classe": resultado["classe"],
+        "confianca": float(resultado["confianca"]),
+        "nome": resultado["nome"],
+        "scores": resultado.get("scores", {}),
+    }
+
+    if a_regiao is None:
+        a_regiao = {
+            "id": uuid.uuid4().hex[:8],
+            "nome": f"Classificação ({resultado['nome']})",
+            "classe": resultado["classe"],
+            "caixa": caixa,
+            "origem": "classificacao:dinov2",
+            "classificacao_dinov2": dados_classificacao,
+        }
+        a.setdefault("regioes", []).append(a_regiao)
+    else:
+        a_regiao["classificacao_dinov2"] = dados_classificacao
+        if "caixa" in corpo:
+            a_regiao["caixa"] = caixa
+        if resultado["confianca"] > 0.60:
+            a_regiao["classe"] = resultado["classe"]
+
+    with _trava:
+        _calcular(a, m)
+        armazenamento.salvar(a)
+
+    regiao_atualizada = next((r for r in a["regioes"] if r["id"] == a_regiao["id"]), a_regiao)
+
+    return {
+        "ok": True,
+        "classificacao": regiao_atualizada.get("classificacao_dinov2", dados_classificacao),
+        "analise": _completa(a),
+    }
+
+
+@app.post("/api/analises/{id_}/metodologia_completa")
+def metodologia_completa(id_: str, corpo: dict = Body(default={})) -> dict:
+    """Executa a tríade completa na região: Segmentação SAM 2 + Metrologia/Termometria + Classificação DINOv2."""
+    a, m = _carregar(id_)
+    regiao_id = corpo.get("regiao_id")
+    caixa = corpo.get("caixa")
+    metric_ratio = corpo.get("metric_ratio")
+
+    if metric_ratio is not None:
+        try:
+            metric_ratio = float(metric_ratio)
+            if metric_ratio <= 0:
+                raise ValueError
+        except (ValueError, TypeError):
+            raise HTTPException(422, "O parâmetro 'metric_ratio' deve ser um número positivo.")
+
+    a_regiao = None
+    if regiao_id:
+        for r in a.get("regioes", []):
+            if r.get("id") == regiao_id:
+                a_regiao = r
+                break
+        if a_regiao is None:
+            raise HTTPException(404, f"Região '{regiao_id}' não encontrada na análise.")
+        if caixa is None:
+            caixa = a_regiao.get("caixa")
+
+    if not caixa or len(caixa) != 4:
+        raise HTTPException(422, "Coordenadas da caixa [x0, y0, x1, y1] não fornecidas ou inválidas.")
+
+    try:
+        caixa = [float(v) for v in caixa]
+    except (ValueError, TypeError) as erro:
+        raise HTTPException(422, f"Coordenadas da caixa inválidas: {erro}") from erro
+
+    if caixa[2] <= caixa[0] or caixa[3] <= caixa[1]:
+        raise HTTPException(422, "Caixa inválida: x1 deve ser maior que x0 e y1 maior que y0.")
+
+    caixa = _normalizar_caixa_se_rgb(id_, m, caixa)
+    imagem_rgb = _obter_imagem_rgb(id_, m)
+    segmentador = _obter_segmentador_sam2()
+    classificador = _obter_classificador_dinov2()
+
+    # 1. Segmentação SAM 2 + Metrologia dimensional + Pureza térmica
+    h_ref = corpo.get("altura_referencia") or corpo.get("ref_height_meters")
+    if h_ref is not None:
+        try:
+            h_ref = float(h_ref)
+        except (ValueError, TypeError):
+            h_ref = None
+    if h_ref is None and metric_ratio is None:
+        classe_atual = (a_regiao.get("classe") if a_regiao else "componente") or "componente"
+        padroes_h = {"isolador": 0.80, "bucha": 1.25, "para_raio": 1.20, "terminal_superior": 0.65, "transformador": 1.60, "conexao": 0.50}
+        h_ref = padroes_h.get(str(classe_atual).lower(), 0.80)
+
+    try:
+        from nucleo.pipeline.pyron_pipeline import analisar_ativo
+        from nucleo.metrologia.dimension_estimator import MascaraVaziaError
+
+        res = analisar_ativo(
+            segmentador=segmentador,
+            imagem_rgb=imagem_rgb,
+            matriz_termica=m,
+            bbox_xyxy=caixa,
+            metric_ratio=metric_ratio,
+            ref_height_meters=h_ref,
+            metadados_camera=a.get("metadados"),
+        )
+    except MascaraVaziaError as erro:
+        raise HTTPException(422, f"Não foi possível segmentar o ativo na caixa informada: {erro}") from erro
+    except Exception as erro:
+        raise HTTPException(500, f"Falha na segmentação do ativo: {erro}") from erro
+
+    contorno_pontos = _simplificar_contorno(res.mascara, epsilon=1.0)
+
+    dados_segmentacao = {
+        "score": float(res.score),
+        "geometria": res.geometria,
+        "termica_isolada": asdict(res.termica) if res.termica else None,
+        "contorno": contorno_pontos,
+    }
+
+    # 2. Classificação DINOv2 focada no corpo da peça com máscara SAM 2
+    try:
+        res_dino = classificador.classificar(imagem_rgb, bbox=caixa, mascara=res.mascara)
+    except Exception as erro:
+        raise HTTPException(500, f"Falha na classificação com DINOv2: {erro}") from erro
+
+    dados_classificacao = {
+        "classe": res_dino["classe"],
+        "confianca": float(res_dino["confianca"]),
+        "nome": res_dino["nome"],
+        "scores": res_dino.get("scores", {}),
+    }
+
+    # 3. Consolidação na região
+    if a_regiao is None:
+        a_regiao = {
+            "id": uuid.uuid4().hex[:8],
+            "nome": f"Ativo ({res_dino['nome']})",
+            "classe": res_dino["classe"],
+            "caixa": caixa,
+            "origem": "metodologia_completa",
+            "segmentacao": dados_segmentacao,
+            "classificacao_dinov2": dados_classificacao,
+        }
+        a.setdefault("regioes", []).append(a_regiao)
+    else:
+        a_regiao["segmentacao"] = dados_segmentacao
+        a_regiao["classificacao_dinov2"] = dados_classificacao
+        if "caixa" in corpo:
+            a_regiao["caixa"] = caixa
+        if res_dino["confianca"] > 0.60:
+            a_regiao["classe"] = res_dino["classe"]
+
+    with _trava:
+        _calcular(a, m)
+        armazenamento.salvar(a)
+
+    regiao_atualizada = next((r for r in a["regioes"] if r["id"] == a_regiao["id"]), a_regiao)
+
+    return {
+        "ok": True,
+        "classificacao": regiao_atualizada.get("classificacao_dinov2", dados_classificacao),
+        "segmentacao": regiao_atualizada.get("segmentacao", dados_segmentacao),
+        "analise": _completa(a),
+    }
 
 
 @app.post("/api/analises/{id_}/parametros")
@@ -586,6 +1074,28 @@ def _sem_temperatura(itens: list[dict]) -> None:
 def _nome_exportado(a: dict, sufixo: str) -> str:
     base = re.sub(r"[^\w.-]+", "_", Path(a["arquivo"]).stem, flags=re.UNICODE).strip("_") or "inspecao"
     return f"{base}_{sufixo}"
+
+
+@app.post("/api/analises/{id_}/auto_identificar")
+def auto_identificar_ativos(id_: str) -> dict:
+    """Descobre e segmenta os ativos elétricos automaticamente na cena com SAM 2 + DINOv2 + Criminisi."""
+    a, m = _carregar(id_)
+    imagem_rgb = _obter_imagem_rgb(id_, m)
+    from nucleo.detectores.sam2_dinov2 import SAM2DINOv2Detector
+
+    det = SAM2DINOv2Detector()
+    manuais = [r for r in a["regioes"] if r.get("origem") == "manual"]
+    novas = det.detectar_com_metrologia(m, imagem_rgb, metadados=a.get("metadados"))
+    for r in novas:
+        if not r.get("id"):
+            r["id"] = uuid.uuid4().hex[:8]
+
+    a["regioes"] = manuais + novas
+    a["modelo"] = _info_modelo(det)
+    with _trava:
+        _calcular(a, m)
+        armazenamento.salvar(a)
+    return _completa(a)
 
 
 @app.get("/api/analises/{id_}/imagem.png")
@@ -789,7 +1299,12 @@ def analisar_exemplo(nome: str, corpo: dict = Body(default={})) -> dict:
 
 @app.get("/api/modelos")
 def modelos() -> dict:
-    return {"ativo": _config()["modelo_ativo"], "modelos": [d.descrever() for d in detectores.listar(PASTA_MODELOS)]}
+    from nucleo.detectores.sam2_dinov2 import SAM2DINOv2Detector
+
+    lista = [d.descrever() for d in detectores.listar(PASTA_MODELOS)]
+    if not any(m["id"] == "sam2-dinov2" for m in lista):
+        lista.insert(1, SAM2DINOv2Detector().descrever())
+    return {"ativo": _config()["modelo_ativo"], "modelos": lista}
 
 
 @app.put("/api/modelos/ativo")

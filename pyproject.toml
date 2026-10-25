@@ -12,10 +12,28 @@ placa = ["onnxruntime-directml"]
 # arquivos das inspeções num bucket S3 ou compatível (PYRON_OBJETOS=s3://bucket/prefixo); sem isso, a pasta local
 nuvem = ["boto3"]
 dev = ["pytest", "matplotlib"]
+# segmentação SAM 2 + metrologia (nucleo/segmentacao, nucleo/metrologia, nucleo/pipeline).
+# torch/torchvision com CUDA vêm do índice do PyTorch, instalados ANTES deste extra:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+# o sam2 compila contra o torch instalado: SAM2_BUILD_CUDA=0 pip install --no-build-isolation -e .[segmentacao]
+# (a extensão CUDA do sam2 é opcional; sem ela só o pós-processamento de buracos fica desligado)
+# opencv: se o extra "ocr" já trouxe o opencv-python, ele fornece o mesmo módulo cv2; não instale os dois.
+# pesos: python ferramentas/baixar_sam2.py
+segmentacao = [
+    "torch>=2.5.1",
+    "torchvision>=0.20.1",
+    "sam2 @ git+https://github.com/facebookresearch/sam2.git",
+    "opencv-python-headless",
+    "numpy",
+    "scipy",
+]
 
 [tool.setuptools]
-packages = ["nucleo"]
+packages = [
+    "nucleo", "nucleo.detectores", "nucleo.segmentacao", "nucleo.metrologia", "nucleo.pipeline",
+    "src", "src.geometry", "src.segmentation", "src.pipeline"
+]
 
 [tool.pytest.ini_options]
-testpaths = ["testes"]
-pythonpath = ["."]
+testpaths = ["testes", "tests"]
+pythonpath = [".", "src"]

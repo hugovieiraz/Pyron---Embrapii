@@ -238,3 +238,528 @@
   --sombra-3: 0 28px 56px -16px rgba(0, 0, 0, .7);
   color-scheme: dark;
 }
+
+/* ---------------------------------------------------------------- segmentação SAM 2 e metrologia */
+.camada-segmentacao {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 1;
+}
+
+.poligono-segmentacao {
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  transition: stroke-width var(--dur-rapida) var(--ease-padrao), fill-opacity var(--dur-rapida) var(--ease-padrao);
+}
+
+.poligono-segmentacao.realce,
+.poligono-segmentacao.selecionado {
+  stroke-width: 2.2;
+  fill-opacity: .42;
+  filter: drop-shadow(0 0 2px var(--rotulo-imagem));
+}
+
+.regiao-metrologia {
+  display: grid;
+  gap: var(--e-2);
+  padding: var(--e-2) var(--e-3);
+  border-radius: var(--r-p);
+  background: var(--superficie-2);
+  border: 1px solid var(--borda);
+  font-size: var(--t-1);
+  margin-top: var(--e-1);
+}
+
+.metrologia-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--e-2);
+  flex-wrap: wrap;
+}
+
+.selo-sam2 {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e-1);
+  font-weight: var(--p-medio);
+  font-size: var(--t-1);
+  line-height: var(--a-1);
+  color: var(--acao-hover);
+  background: var(--acao-suave);
+  padding: 1px var(--e-2);
+  border-radius: var(--r-p);
+  border: 1px solid var(--acao-suave-2);
+}
+
+.selo-sam2 .ic {
+  width: var(--e-3);
+  height: var(--e-3);
+  color: var(--acao);
+}
+
+.metrologia-tmax {
+  color: var(--texto-2);
+  font-size: var(--t-1);
+  line-height: var(--a-1);
+}
+
+.metrologia-tmax b {
+  color: var(--texto);
+  font-weight: var(--p-forte);
+  font-variant-numeric: tabular-nums;
+}
+
+.metrologia-grade {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--e-2) var(--e-3);
+  color: var(--texto-3);
+  font-size: var(--t-1);
+  line-height: var(--a-1);
+}
+
+.metrologia-grade span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e-1);
+}
+
+.metrologia-grade span b {
+  color: var(--texto-2);
+  font-weight: var(--p-medio);
+}
+
+.regiao-acoes {
+  display: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--e-2);
+  margin-top: var(--e-2);
+}
+
+.regiao.selecionada .regiao-acoes,
+.regiao:hover .regiao-acoes,
+.regiao:focus-within .regiao-acoes {
+  display: flex;
+}
+
+.regiao-acoes .btn {
+  height: var(--alvo-sm);
+  font-size: var(--t-1);
+  padding: 0 var(--e-2);
+  gap: var(--e-1);
+}
+
+.regiao-acoes .btn .ic {
+  width: var(--ic);
+  height: var(--ic);
+}
+
+.regiao-acoes .btn-metodologia-completa {
+  border-color: var(--azul-300);
+  color: var(--azul-700);
+  background: var(--azul-50);
+}
+
+:root[data-tema="escuro"] .regiao-acoes .btn-metodologia-completa {
+  border-color: var(--azul-700);
+  color: var(--azul-300);
+  background: var(--azul-900);
+}
+
+.regiao-acoes .btn-metodologia-completa:hover {
+  border-color: var(--azul-500);
+  color: var(--azul-800);
+  background: var(--azul-100);
+}
+
+:root[data-tema="escuro"] .regiao-acoes .btn-metodologia-completa:hover {
+  border-color: var(--azul-500);
+  color: var(--azul-200);
+  background: var(--azul-800);
+}
+
+/* ---------------------------------------------------------------- nova metodologia: SAM 2 + DINOv2 */
+.grupo-toggles-metodologia {
+  display: inline-flex;
+  align-items: center;
+}
+
+.toggle-camada {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e-1);
+  height: var(--alvo-sm);
+  padding: 0 var(--e-2);
+  border: 0;
+  border-radius: var(--r-p);
+  background: transparent;
+  color: var(--texto-2);
+  font: var(--p-medio) var(--t-1) / var(--a-1) var(--fonte);
+  cursor: pointer;
+  transition: background var(--dur-rapida) var(--ease-padrao), color var(--dur-rapida) var(--ease-padrao), box-shadow var(--dur-rapida) var(--ease-padrao);
+}
+
+.toggle-camada:hover {
+  color: var(--texto);
+  background: var(--n-300);
+}
+
+.toggle-camada[aria-pressed="true"] {
+  background: var(--superficie);
+  color: var(--acao-hover);
+  box-shadow: var(--sombra-1);
+}
+
+.toggle-camada .ic {
+  width: var(--ic);
+  height: var(--ic);
+}
+
+/* selo DINOv2 (badge de classificação inteligente) */
+.selo-dinov2 {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e-1);
+  font-weight: var(--p-medio);
+  font-size: var(--t-1);
+  line-height: var(--a-1);
+  color: var(--azul-700);
+  background: var(--azul-50);
+  padding: 1px var(--e-2);
+  border-radius: var(--r-p);
+  border: 1px solid var(--azul-200);
+}
+
+:root[data-tema="escuro"] .selo-dinov2 {
+  color: var(--azul-200);
+  background: var(--azul-900);
+  border-color: var(--azul-700);
+}
+
+.selo-dinov2 .ic {
+  width: var(--e-3);
+  height: var(--e-3);
+  color: var(--azul-600);
+}
+
+:root[data-tema="escuro"] .selo-dinov2 .ic {
+  color: var(--azul-400);
+}
+
+/* bloco do pilar DINOv2 no card da região */
+.pilar-dinov2 {
+  display: grid;
+  gap: var(--e-1);
+  padding: var(--e-2) var(--e-3);
+  border-radius: var(--r-p);
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+}
+
+.dinov2-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--e-2);
+}
+
+.dinov2-confianca {
+  font: var(--p-medio) var(--t-1) / var(--a-1) var(--fonte-num);
+  color: var(--texto-2);
+}
+
+.barra-confianca {
+  position: relative;
+  height: var(--e-1);
+  background: var(--superficie-3);
+  border-radius: var(--r-p);
+  overflow: hidden;
+}
+
+.barra-confianca i {
+  display: block;
+  height: 100%;
+  background: var(--acao);
+  border-radius: var(--r-p);
+  transition: width var(--dur-rapida) var(--ease-padrao);
+}
+
+/* pilar SAM 2 no card da região */
+.pilar-sam2 {
+  display: grid;
+  gap: var(--e-2);
+}
+
+/* etiqueta DINOv2 e unificada sobre a caixa no termograma */
+.etq-unificada,
+.etq-dinov2 {
+  position: absolute;
+  left: -2px;
+  bottom: 100%;
+  margin-bottom: var(--e-1);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  font-size: 11px;
+  line-height: 15px;
+  font-weight: 600;
+  color: #f8fafc !important;
+  background: rgba(15, 23, 42, 0.88) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(56, 189, 248, 0.5) !important;
+  padding: 1px 7px;
+  border-radius: var(--r-p);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+  pointer-events: auto;
+  z-index: 3;
+}
+
+.etq-unificada .ic-ia-sm,
+.etq-dinov2 .ic {
+  width: 12px;
+  height: 12px;
+  color: #38bdf8;
+  flex: none;
+}
+
+.etq-unificada .separador-etq {
+  opacity: 0.45;
+  margin: 0 1px;
+}
+
+.etq-unificada .temp-destaque {
+  color: #fef08a;
+  font-family: var(--fonte-num);
+}
+
+/* botão de auto-identificação no cabeçalho */
+.btn-destaque-ia {
+  background: linear-gradient(135deg, #1e3a8a, #0284c7) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(56, 189, 248, 0.6) !important;
+  font-weight: 600 !important;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35);
+  transition: all 0.2s ease;
+}
+
+.btn-destaque-ia:hover {
+  background: linear-gradient(135deg, #1d4ed8, #0369a1) !important;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.5);
+  transform: translateY(-1px);
+}
+
+/* caixa com borda térmica desligada */
+.caixa.sem-termica {
+  border-color: transparent !important;
+}
+
+.caixa.sem-termica:hover,
+.caixa.sem-termica.realce {
+  box-shadow: 0 0 0 1.5px var(--realce-imagem);
+}
+
+.caixa.sem-termica.selecionada {
+  box-shadow: 0 0 0 2px var(--azul-400);
+}
+
+.caixa.sem-termica .pico {
+  display: none;
+}
+
+.caixa.sem-termica .etq {
+  display: none;
+}
+
+
+
+/* ---------------------------------------------------------------- metrologia monocular SAM 2 */
+.metrologia-monocular-destaque {
+  display: grid;
+  gap: var(--e-1);
+  background: var(--superficie-2);
+  border: 1px solid var(--superficie-3);
+  border-radius: var(--r-p);
+  padding: var(--e-2);
+  font-size: var(--t-1);
+}
+
+.metrologia-linha-principal {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--e-2);
+  font-weight: var(--p-medio);
+}
+
+.cota-altura b {
+  color: #f59e0b;
+}
+
+.cota-largura b {
+  color: #38bdf8;
+}
+
+.metrologia-linha-secundaria {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--e-2);
+  color: var(--texto-2);
+  font-size: calc(var(--t-1) * 0.95);
+  border-top: 1px dashed var(--superficie-3);
+  padding-top: var(--e-1);
+}
+
+.calibrar-altura-controle {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--e-1);
+  margin-top: var(--e-1);
+  font-size: var(--t-1);
+  color: var(--texto-2);
+}
+
+.input-href-sm {
+  width: 4rem;
+  padding: 2px var(--e-1);
+  font-size: var(--t-1);
+  font-family: var(--fonte-num);
+  border: 1px solid var(--superficie-3);
+  border-radius: var(--r-p);
+  background: var(--superficie-1);
+  color: var(--texto-1);
+  text-align: right;
+}
+
+.chips-href {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+
+.btn-chip {
+  padding: 1px 5px;
+  font-size: 10px;
+  border-radius: var(--r-p);
+  border: 1px solid var(--superficie-3);
+  background: var(--superficie-2);
+  color: var(--texto-2);
+  cursor: pointer;
+}
+
+.btn-chip:hover {
+  background: var(--superficie-3);
+  color: var(--texto-1);
+}
+
+.cota-svg-dim {
+  font-family: var(--fonte-num, sans-serif);
+  font-size: 11px;
+  paint-order: stroke;
+  stroke: #0f172a;
+  stroke-width: 3px;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+
+/* Badge de Metodologia Monocular Inteligente */
+.badge-metodo-metrologia {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e-1);
+  padding: 3px var(--e-2);
+  border-radius: var(--r-p);
+  font-size: 11px;
+  line-height: 15px;
+  margin-bottom: var(--e-1);
+}
+
+.badge-metodo-metrologia.metodo-telemetria {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #059669;
+}
+
+:root[data-tema="escuro"] .badge-metodo-metrologia.metodo-telemetria {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: rgba(52, 211, 153, 0.5);
+  color: #34d399;
+}
+
+.badge-metodo-metrologia.metodo-criminisi {
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  color: #4f46e5;
+}
+
+:root[data-tema="escuro"] .badge-metodo-metrologia.metodo-criminisi {
+  background: rgba(99, 102, 241, 0.18);
+  border-color: rgba(129, 140, 248, 0.5);
+  color: #a5b4fc;
+}
+
+.badge-metodo-metrologia .badge-icone {
+  font-size: 12px;
+}
+
+.badge-metodo-metrologia .badge-detalhe {
+  opacity: 0.85;
+  font-weight: normal;
+  font-family: var(--fonte-num, sans-serif);
+}
+
+
+/* Botão de destaque 'Anexar nova imagem' no cabeçalho */
+.btn-anexar-destaque {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e-1);
+  background: var(--superficie-2);
+  border: 1px solid var(--superficie-3);
+  color: var(--texto-1);
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: var(--r-p);
+  transition: all var(--dur-rapida) var(--ease-padrao);
+}
+
+.btn-anexar-destaque:hover {
+  background: var(--superficie-3);
+  border-color: rgba(56, 189, 248, 0.5);
+  color: #38bdf8;
+  transform: translateY(-1px);
+}
+
+/* Badge de metodologia na dropzone inicial */
+.badge-auto-metrologia-destaque {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  color: #0284c7;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  margin: var(--e-2) auto;
+}
+
+:root[data-tema="escuro"] .badge-auto-metrologia-destaque {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: rgba(56, 189, 248, 0.6);
+  color: #38bdf8;
+}
+
+.badge-auto-metrologia-destaque .icone-ia {
+  font-size: 14px;
+}

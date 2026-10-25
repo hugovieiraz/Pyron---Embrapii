@@ -172,7 +172,7 @@ def test_modelo_instalado_e_reconhecido_e_usado(tmp_path: Path) -> None:
     _modelo_onnx_minimo(pasta)
 
     ids = [d.id for d in detectores.listar(tmp_path)]
-    assert ids == ["pontos-quentes", "teste-minimo", "teste-minimo+pontos-quentes"]  # um, outro ou os dois
+    assert ids == ["pontos-quentes", "pontos-quentes-sam2", "teste-minimo", "teste-minimo+pontos-quentes"]  # um, outro ou os dois
     det = detectores.obter("teste-minimo", tmp_path)
     assert det.tipo == "aprendizado"
     dets = det.detectar(np.full((120, 160), 20.0))
@@ -189,3 +189,31 @@ def test_modelo_com_arquivo_faltando_aparece_com_erro(tmp_path: Path) -> None:
     assert lista[-1].nome.endswith("(com erro)")
     with pytest.raises(ValueError):
         lista[-1].detectar(np.zeros((4, 4)))
+
+
+def test_detector_pontos_quentes_sam2() -> None:
+    from nucleo.detectores.pontos_quentes import PontosQuentesComSAM2
+
+    det = PontosQuentesComSAM2()
+    assert det.id == "pontos-quentes-sam2"
+    assert det.tipo == "combinado"
+    assert "SAM 2" in det.nome
+    assert "Hiera" in det.arquitetura
+    assert "vantagens" in det.cartao
+    assert "limitacoes" in det.cartao
+    assert det.classes == ["ponto_quente"]
+
+    # Deve detectar os pontos quentes com contraste térmico
+    dets = det.detectar(_cena_com_ponto_quente())
+    assert len(dets) == 1
+    assert dets[0].classe == "ponto_quente"
+    x0, y0, x1, y1 = dets[0].caixa
+    assert x0 <= 78 and x1 >= 82 and y0 <= 60 and y1 >= 64
+
+    # Deve estar presente em detectores.listar()
+    todos = detectores.listar()
+    ids = [d.id for d in todos]
+    assert "pontos-quentes-sam2" in ids
+    obtido = detectores.obter("pontos-quentes-sam2")
+    assert obtido.id == "pontos-quentes-sam2"
+

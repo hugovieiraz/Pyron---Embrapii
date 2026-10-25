@@ -67,7 +67,7 @@ def test_lista_oferece_um_outro_ou_os_dois(tmp_path) -> None:
     (pasta / "cartao.json").write_text(json.dumps(_cartao()), encoding="utf-8")
     (pasta / "modelo.onnx").write_bytes(b"onnx falso")
     lista = detectores.listar(tmp_path / "modelos")
-    assert [d.id for d in lista] == ["pontos-quentes", "para-raios-rfdetr-teste", "para-raios-rfdetr-teste+pontos-quentes"]
+    assert [d.id for d in lista] == ["pontos-quentes", "pontos-quentes-sam2", "para-raios-rfdetr-teste", "para-raios-rfdetr-teste+pontos-quentes"]
     combinado = lista[-1]
     assert combinado.tipo == "combinado" and combinado.precisa_imagem
     assert "ponto_quente" in combinado.classes and "aletas_isoladoras" in combinado.classes
