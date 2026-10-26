@@ -304,23 +304,19 @@ def test_sem_openssl_reaproveita_o_certificado_que_ja_existe(tmp_path, monkeypat
         celular.certificado(tmp_path / "vazio", "10.0.0.7")
 
 
-def test_medir_pelo_celular_guarda_o_original_e_mede(tmp_path) -> None:
-    """Medir objeto: a foto chega byte por byte (sem recomprimir), o toque vai para o medidor do computador e o
-    estado de medição mostra a foto nova para a tela do computador abrir."""
+def test_foto_para_medir_chega_inteira(tmp_path) -> None:
+    """Fotos para medir: o celular só tira e envia; a foto chega byte por byte (sem recomprimir) e o estado de
+    medição mostra a foto nova para a tela do computador abrir (a medida é lá)."""
     from fastapi.testclient import TestClient
 
-    guardadas, pedidos = {}, []
+    guardadas = {}
 
     def guardar(dados):
         codigo = f"f{len(guardadas)}"
         guardadas[codigo] = dados
         return codigo
 
-    def medir(codigo, pista, referencia):
-        pedidos.append((codigo, pista, referencia))
-        return {"resultados": {"da3": {"sem_referencia": {"comprimento_cm": 17.0}}}, "id": "r1"}
-
-    modo = celular.ModoCelular(tmp_path, detectar=None, capturar=None, modelo=None, guardar_foto=guardar, medir=medir,
+    modo = celular.ModoCelular(tmp_path, detectar=None, capturar=None, modelo=None, guardar_foto=guardar,
                                previa=lambda codigo: b"jpeg-previa")
     modo.token = "codigo-certo"
     c = TestClient(celular.criar_app(modo))
@@ -333,19 +329,13 @@ def test_medir_pelo_celular_guarda_o_original_e_mede(tmp_path) -> None:
     codigo = r.json()["id"]
     assert guardadas[codigo] == foto  # os bytes exatos
     assert modo.estado_medicao()["fotos"][0]["id"] == codigo
-    versao = modo.versao_medicao
-
-    r = c.post(f"/c/codigo-certo/medir/{codigo}", json={"pista": {"ponto": [10, 20]}, "referencia": {"auto": "postit_rosa"}})
-    assert r.status_code == 200 and r.json()["id"] == "r1"
-    assert pedidos == [(codigo, {"ponto": [10, 20]}, {"auto": "postit_rosa"})]
-    assert modo.versao_medicao == versao + 1
+    assert modo.versao_medicao == 1
     assert c.get(f"/c/codigo-certo/medir/{codigo}/previa").content == b"jpeg-previa"
-    assert c.post("/c/codigo-certo/medir/nao-existe", json={"pista": {"ponto": [1, 1]}}).status_code == 404
-    assert c.post(f"/c/codigo-certo/medir/{codigo}", json={"sem": "pista"}).status_code == 422
+    assert c.get("/c/codigo-certo/medir/nao-existe/previa").status_code == 404
     assert c.post("/c/codigo-certo/medir/foto", content=b"").status_code == 422
 
 
-def test_medir_pelo_celular_sem_medidor(tmp_path) -> None:
+def test_foto_para_medir_sem_medicao(tmp_path) -> None:
     from fastapi.testclient import TestClient
 
     modo = celular.ModoCelular(tmp_path, detectar=None, capturar=None, modelo=None)

@@ -91,6 +91,7 @@
   --palco-texto-2: #8D94A1;         /* 6,0:1 */
   --palco-linha: rgba(255, 255, 255, .14);
   --palco-hover: rgba(255, 255, 255, .08);
+  --varredura: rgba(255, 255, 255, .28);     /* faixa de luz sobre a foto enquanto mede */
   --rotulo-imagem: rgba(18, 20, 24, .9);    /* etiqueta e leitura sobre o termograma */
   --contorno-imagem: rgba(0, 0, 0, .6);     /* contorno de marca branca sobre a imagem */
   --marca-imagem: var(--branco);            /* seleção e ponto sobre a imagem */
@@ -206,6 +207,7 @@
   --dur-giro: 700ms;       /* volta do indicador de carregamento (único loop permitido) */
   --dur-brilho: 1400ms;    /* passada do brilho no esqueleto */
   --dur-procura: 1600ms;   /* pontilhado da ilustração acendendo enquanto procura (indicador) */
+  --dur-varredura: 1800ms; /* faixa de luz varrendo a foto enquanto mede (indicador) */
   --ease-entrada: cubic-bezier(.16, 1, .3, 1);
   --ease-saida: cubic-bezier(.4, 0, 1, 1);
   --ease-padrao: cubic-bezier(.2, 0, 0, 1);

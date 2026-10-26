@@ -2095,7 +2095,7 @@ def _registro_medicao():
 _registro_med = None
 
 
-def comparar_e_registrar(dados: bytes, pista: dict, referencia: dict | None, origem: str = "tela") -> dict:
+def comparar_e_registrar(dados: bytes, pista: dict, referencia: dict | None, origem: str = "tela", como: str = "ambos") -> dict:
     """Guarda a foto como chegou, mede com os dois modelos (sem e com referência) e registra."""
     from nucleo import medicao as medicao_mod
 
@@ -2103,12 +2103,13 @@ def comparar_e_registrar(dados: bytes, pista: dict, referencia: dict | None, ori
     foto = reg.guardar_foto(dados)
     with _trava_medicao:
         r = medicao_mod.comparar(dados, pista, referencia)
-    entrada = reg.adicionar(foto, pista, referencia, r["resultados"], origem=origem)
+    entrada = reg.adicionar(foto, pista, referencia, r["resultados"], origem=origem, como=como)
     return {**r, "id": entrada["id"], "foto": foto, "erros": entrada["erros"]}
 
 
 @app.post("/api/medicao/comparar")
-async def medicao_comparar(arquivo: UploadFile = File(...), pista: str = Form(...), referencia: str | None = Form(None)) -> dict:
+async def medicao_comparar(arquivo: UploadFile = File(...), pista: str = Form(...), referencia: str | None = Form(None),
+                           como: str = Form("ambos")) -> dict:
     """A mesma pista nos dois modelos (DA3 e MoGe-2), sem e com referência, lado a lado; fica no registro."""
     dados = await arquivo.read()
     if not dados:
@@ -2127,7 +2128,7 @@ async def medicao_comparar(arquivo: UploadFile = File(...), pista: str = Form(..
     from starlette.concurrency import run_in_threadpool
 
     try:
-        return await run_in_threadpool(comparar_e_registrar, dados, p, ref)
+        return await run_in_threadpool(comparar_e_registrar, dados, p, ref, "tela", como if como in ("ambos", "com", "sem") else "ambos")
     except (ImportError, OSError) as e:
         raise HTTPException(503, f"Os modelos da medição não estão instalados ({type(e).__name__}: {e}).")
     except ValueError as e:
@@ -2143,12 +2144,12 @@ def medicao_registro(limite: int = 50) -> dict:
 
 @app.put("/api/medicao/registro/{codigo}")
 def medicao_real(codigo: str, corpo: dict = Body(...)) -> dict:
-    """Informa a medida real (cm) de uma medição: o registro calcula o erro de cada modelo."""
-    real = corpo.get("real")
-    if not isinstance(real, dict):
-        raise HTTPException(422, "Informe as medidas reais, em cm.")
+    """Informa a medida real (cm) e/ou o nome do objeto de uma medição: o registro calcula o erro de cada modelo."""
+    real, nome = corpo.get("real"), corpo.get("nome")
+    if real is not None and not isinstance(real, dict) or real is None and not isinstance(nome, str):
+        raise HTTPException(422, "Informe as medidas reais, em cm, ou o nome do objeto.")
     try:
-        return _registro_medicao().informar_real(codigo, real)
+        return _registro_medicao().atualizar(codigo, real=real, nome=nome)
     except KeyError:
         raise HTTPException(404, "Medição não encontrada.")
     except (TypeError, ValueError):
@@ -2169,6 +2170,43 @@ async def medicao_previa(arquivo: UploadFile = File(...)) -> Response:
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=88)
     return Response(buf.getvalue(), media_type="image/jpeg")
+
+
+@app.get("/api/medicao/registro.csv")
+def medicao_registro_csv() -> Response:
+    """Todas as medições guardadas, para analisar numa planilha (separador ;, vírgula decimal)."""
+    return Response("\ufeff" + _registro_medicao().csv(), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": 'attachment; filename="medicoes_pyron.csv"'})
+
+
+@app.get("/api/medicao/fotos")
+def medicao_fotos(limite: int = 200) -> dict:
+    """As fotos guardadas para medir (da tela e do celular), da mais nova para a mais antiga."""
+    return {"fotos": _registro_medicao().fotos(max(1, min(limite, 1000)))}
+
+
+@app.post("/api/medicao/fotos")
+async def medicao_guardar_foto(arquivo: UploadFile = File(...)) -> dict:
+    """Guarda a foto aberta na tela como chegou (bytes originais), para ela ficar na faixa de fotos."""
+    dados = await arquivo.read()
+    if not dados or len(dados) > LIMITE_FOTO_MEDICAO:
+        raise HTTPException(422, "Foto vazia ou maior que 40 MB.")
+    return {"codigo": _registro_medicao().guardar_foto(dados)}
+
+
+@app.get("/api/medicao/fotos/{codigo}/miniatura")
+def medicao_miniatura(codigo: str) -> Response:
+    """JPEG pequeno da foto guardada (também de HEIC), para a lista de medições."""
+    from nucleo.medicao.profundidade import abrir
+
+    caminho = _registro_medicao().caminho_foto(codigo)
+    if caminho is None:
+        raise HTTPException(404, "Foto não encontrada.")
+    img = abrir(caminho)
+    img.thumbnail((240, 240))
+    saida = io.BytesIO()
+    img.save(saida, "JPEG", quality=82)
+    return Response(saida.getvalue(), media_type="image/jpeg", headers={"Cache-Control": "max-age=86400"})
 
 
 @app.get("/api/medicao/fotos/{codigo}")
@@ -2551,16 +2589,6 @@ def _celular_guardar_foto(dados: bytes) -> str:
     return _registro_medicao().guardar_foto(dados)
 
 
-def _celular_medir(codigo: str, pista: dict, referencia: dict | None) -> dict:
-    """Mede no computador, nos dois modelos, a pista que o celular marcou na foto que ele mandou."""
-    p = _validar_pista_medicao(pista, "a pista")
-    ref = _validar_pista_medicao(referencia, "a referência", exige_tamanho=True) if referencia else None
-    caminho = _registro_medicao().caminho_foto(codigo)
-    if caminho is None:
-        raise KeyError(codigo)
-    return comparar_e_registrar(caminho.read_bytes(), p, ref, origem="celular")
-
-
 def _celular_previa(codigo: str) -> bytes:
     """JPEG do mesmo tamanho da foto (para o navegador do celular mostrar HEIC); os toques valem no original."""
     from nucleo.medicao.profundidade import abrir
@@ -2572,7 +2600,7 @@ def _celular_previa(codigo: str) -> bytes:
 
 
 celular_modo = celular.ModoCelular(PASTA_DADOS / "celular", _celular_detectar, _celular_capturar, _celular_modelo,
-                                   guardar_foto=_celular_guardar_foto, medir=_celular_medir, previa=_celular_previa)
+                                   guardar_foto=_celular_guardar_foto, previa=_celular_previa)
 INTERVALO_ESPELHO_S = 1 / 30  # o espelho confere se chegou quadro novo até 30 vezes por segundo
 
 

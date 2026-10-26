@@ -224,12 +224,12 @@ class ModoCelular:
     """
 
     def __init__(self, pasta: Path, detectar: Callable, capturar: Callable, modelo: Callable,
-                 guardar_foto: Callable | None = None, medir: Callable | None = None, previa: Callable | None = None):
+                 guardar_foto: Callable | None = None, previa: Callable | None = None):
         self.pasta = pasta
         self._detectar, self._capturar, self._modelo = detectar, capturar, modelo
-        # medir objetos em foto (nucleo/medicao): guardar_foto(bytes) -> código; medir(código, pista, referência) -> dict;
-        # previa(código) -> JPEG para mostrar foto que o navegador do celular não abre (HEIC)
-        self._guardar_foto, self._medir, self._previa = guardar_foto, medir, previa
+        # fotos para medir no computador (nucleo/medicao): o celular só tira e envia. guardar_foto(bytes) -> código;
+        # previa(código) -> JPEG para mostrar a foto que o navegador do celular não abre (HEIC)
+        self._guardar_foto, self._previa = guardar_foto, previa
         self.fotos_medicao: OrderedDict[str, float] = OrderedDict()  # código -> quando chegou (as últimas)
         self.versao_medicao = 0
         self.host = "0.0.0.0"  # toda a rede local; os testes usam 127.0.0.1
@@ -281,15 +281,6 @@ class ModoCelular:
             self.fotos_medicao.popitem(last=False)
         self.versao_medicao += 1
         return codigo
-
-    def medir_foto(self, codigo: str, pista: dict, referencia: dict | None) -> dict:
-        if self._medir is None:
-            raise RuntimeError("A medição não está disponível neste Pyron.")
-        if codigo not in self.fotos_medicao:
-            raise KeyError(codigo)
-        r = self._medir(codigo, pista, referencia)
-        self.versao_medicao += 1
-        return r
 
     def estado_medicao(self) -> dict:
         return {"ligado": self.ligado, "url": self.url_medir, "versao": self.versao_medicao,
@@ -590,7 +581,7 @@ def criar_app(modo: ModoCelular) -> FastAPI:
 
     @app.get("/c/{token}/medir")
     def pagina_medir(token: str):
-        """Medir objeto: foto da câmera do celular, um toque no objeto, a medida volta do computador."""
+        """Fotos para medir: o celular tira (ou escolhe da galeria) e envia o original; a medida é no computador."""
         if not modo.token or not secrets.compare_digest(token, modo.token):
             return pagina(token)
         return FileResponse(ESTATICO / "medir_celular.html", headers={"Cache-Control": "no-store"})
@@ -613,24 +604,6 @@ def criar_app(modo: ModoCelular) -> FastAPI:
         from fastapi.responses import Response
 
         return Response(await _em_fio(modo._previa, codigo), media_type="image/jpeg")
-
-    @app.post("/c/{token}/medir/{codigo}")
-    async def medir(token: str, codigo: str, request: Request) -> dict:
-        conferir(token)
-        try:
-            corpo = await request.json()
-        except ValueError as erro:
-            raise HTTPException(422, "Pista inválida.") from erro
-        if not isinstance(corpo, dict) or not isinstance(corpo.get("pista"), dict):
-            raise HTTPException(422, "Pista inválida.")
-        try:
-            return await _em_fio(modo.medir_foto, codigo, corpo["pista"], corpo.get("referencia"))
-        except KeyError as erro:
-            raise HTTPException(404, "Foto não encontrada. Tire de novo.") from erro
-        except ValueError as erro:
-            raise HTTPException(422, str(erro)) from erro
-        except (RuntimeError, ImportError, OSError) as erro:
-            raise HTTPException(503, str(erro)) from erro
 
     @app.post("/c/{token}/capturar")
     async def capturar(token: str, request: Request) -> dict:

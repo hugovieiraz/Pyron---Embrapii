@@ -56,6 +56,14 @@ class Registro:
         achados = list((self.pasta / "fotos").glob(f"{codigo}.*"))
         return achados[0] if achados else None
 
+    def fotos(self, limite: int = 200) -> list[dict]:
+        """As fotos guardadas, da mais nova para a mais antiga (a faixa de fotos de Medir foto)."""
+        pasta = self.pasta / "fotos"
+        if not pasta.exists():
+            return []
+        arquivos = sorted(pasta.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)[:limite]
+        return [{"codigo": p.stem, "quando": p.stat().st_mtime} for p in arquivos if p.is_file()]
+
     # ------------------------------------------------------------ medições
     def _todas(self) -> dict[str, dict]:
         if not self.arquivo.exists():
@@ -74,17 +82,49 @@ class Registro:
             self.versao += 1
         return entrada
 
-    def adicionar(self, foto: str, pista: dict, referencia: dict | None, resultados: dict, origem: str = "tela") -> dict:
+    def adicionar(self, foto: str, pista: dict, referencia: dict | None, resultados: dict, origem: str = "tela",
+                  como: str = "ambos") -> dict:
+        """``como``: o que quem mediu escolheu ver (``ambos``, ``com`` ou ``sem`` referência)."""
         entrada = {"id": f"{int(time.time() * 1000):x}", "quando": time.time(), "origem": origem, "foto": foto,
-                   "pista": pista, "referencia": referencia, "resultados": resultados, "real": {}}
+                   "pista": pista, "referencia": referencia, "como": como, "nome": "", "resultados": resultados, "real": {}}
         return self._gravar(com_erros(entrada))
 
     def informar_real(self, codigo: str, real: dict) -> dict:
+        return self.atualizar(codigo, real=real)
+
+    def atualizar(self, codigo: str, real: dict | None = None, nome: str | None = None) -> dict:
+        """Valor real (cm, por medida) e/ou o nome do objeto ("Kindle"), para comparar e agrupar depois."""
         e = self._todas().get(codigo)
         if e is None:
             raise KeyError(codigo)
-        e["real"] = {k: float(v) for k, v in real.items() if k in MEDIDAS and v is not None and float(v) > 0}
+        if real is not None:
+            e["real"] = {k: float(v) for k, v in real.items() if k in MEDIDAS and v is not None and float(v) > 0}
+        if nome is not None:
+            e["nome"] = str(nome).strip()[:80]
         return self._gravar(com_erros(e))
+
+    def csv(self) -> str:
+        """Todas as medições numa tabela: uma linha por medida (altura, comprimento…), uma coluna por modelo e modo."""
+        import csv
+        import io
+
+        colunas = [f"{m}_{modo}" for m in ("da3", "moge") for modo in MODOS]
+        saida = io.StringIO()
+        w = csv.writer(saida, delimiter=";")
+        w.writerow(["id", "quando", "origem", "objeto", "foto", "medida", *colunas, "real_cm",
+                    *[f"erro_{c}" for c in colunas]])
+        for e in sorted(self._todas().values(), key=lambda e: e["quando"]):
+            res = e.get("resultados", {})
+            for medida in MEDIDAS:
+                valores = [(res.get(m) or {}).get(modo, {}) or {} for m in ("da3", "moge") for modo in MODOS]
+                if not any(v.get(f"{medida}_cm") is not None for v in valores):
+                    continue
+                erros = [e.get("erros", {}).get(m, {}).get(modo, {}).get(medida) for m in ("da3", "moge") for modo in MODOS]
+                w.writerow([e["id"], time.strftime("%Y-%m-%d %H:%M", time.localtime(e["quando"])), e.get("origem", ""),
+                            e.get("nome", ""), e.get("foto", ""), medida,
+                            *[_num(v.get(f"{medida}_cm")) for v in valores], _num(e.get("real", {}).get(medida)),
+                            *[_num(x) for x in erros]])
+        return saida.getvalue()
 
     def entradas(self, limite: int = 200) -> list[dict]:
         return sorted(self._todas().values(), key=lambda e: e["quando"], reverse=True)[:limite]
@@ -101,6 +141,10 @@ class Registro:
                             "erro_maximo_pct": round(float(np.max(v)) * 100, 1)} for modo, v in modos.items() if v}
             for modelo, modos in erros.items()
         }
+
+
+def _num(v) -> str:
+    return "" if v is None else f"{v:.4g}".replace(".", ",")
 
 
 def com_erros(entrada: dict) -> dict:
