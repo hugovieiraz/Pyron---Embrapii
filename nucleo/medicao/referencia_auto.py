@@ -1,4 +1,4 @@
-"""Referência achada sozinha na foto: um quadrado de cor forte e tamanho conhecido (post-it rosa de 7,6 cm).
+"""Referência achada sozinha na foto: um quadrado de cor forte e tamanho conhecido (post-it rosa; o do Hugo tem 8 cm).
 
 Sem modelo: cor em HSV → maior mancha que vira um quadrilátero convexo → uma reta ajustada em cada lado com
 todos os pixels da borda (precisão de fração de pixel) → os 4 cantos são os cruzamentos das retas. Os
@@ -19,7 +19,7 @@ CORES = {
     "postit_amarelo": {"h": (20, 35), "s_min": 90, "v_min": 120},
 }
 REFERENCIAS_AUTO = {
-    "postit_rosa": {"nome": "post-it rosa", "cor": "postit_rosa", "lado_cm": 7.6},
+    "postit_rosa": {"nome": "post-it rosa", "cor": "postit_rosa", "lado_cm": 8.0},  # medido pelo Hugo (8 × 8)
     "postit_amarelo": {"nome": "post-it amarelo", "cor": "postit_amarelo", "lado_cm": 7.6},
 }
 

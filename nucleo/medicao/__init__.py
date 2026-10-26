@@ -35,6 +35,9 @@ ERRO_ESCALA_SEM_REFERENCIA = 0.20
 # profundidade do objeto (±33 %) é ignorado e a medida sai sem referência, com aviso. Com essa regra: Hugo na sala
 # 7 % (com o post-it na mão: 77 %), objetos na cama 5 % (docs/medicao/relatorio_postit.md)
 LADO_MINIMO_REFERENCIA_PX = 100
+# erro relativo mínimo com referência: o erro mediano medido com o post-it nas fotos do Hugo (DA3 5,1 %, MoGe-2 8,1 %);
+# a incerteza da própria referência (pixels) sozinha dava ± 0,1 cm, otimista demais
+ERRO_ESCALA_COM_REFERENCIA = 0.05
 FAIXA_PROFUNDIDADE_REFERENCIA = (0.75, 1.33)
 
 REFERENCIAS_PRONTAS = {
@@ -144,16 +147,12 @@ def medir_geometria(pontos: np.ndarray, mascara: np.ndarray) -> dict:
             medidas["altura"] = g.altura(projetados, mascara, para_cima)
         return {"forma": "plano", "vertical": origem, "medidas": medidas}
     ext = g.extensoes(pontos, mascara)
-    return {
-        "forma": "volume",
-        "vertical": origem,
-        "medidas": {
-            "comprimento": ext.comprimento,
-            "largura": ext.largura,
-            "espessura": ext.espessura,
-            "altura": g.altura(pontos, mascara, para_cima),
-        },
-    }
+    medidas = {"comprimento": ext.comprimento, "largura": ext.largura, "espessura": ext.espessura}
+    # objeto achatado (Kindle, livro) sem apoio achado: visto de cima, a "altura" pelo eixo da câmera seria o
+    # comprimento de novo; só vale quando o apoio (mesa, chão) dá a vertical ou o objeto não é achatado
+    if origem == "apoio" or ext.espessura.valor > 0.15 * ext.comprimento.valor:
+        medidas["altura"] = g.altura(pontos, mascara, para_cima)
+    return {"forma": "volume", "vertical": origem, "medidas": medidas}
 
 
 class Medidor:
@@ -301,7 +300,7 @@ class Medidor:
             real_m = float(referencia["tamanho_cm"]) / 100.0
             fator = g.fator_escala(ext_ref.valor, real_m)
             # o erro que sobra é o da própria referência medida (pixels e ruído), relativo
-            erro_escala = ext_ref.incerteza() / ext_ref.valor
+            erro_escala = max(ext_ref.incerteza() / ext_ref.valor, ERRO_ESCALA_COM_REFERENCIA)
             tamanho = f"{referencia['tamanho_cm']:g}".replace(".", ",")
             metodo = f"referência: {referencia.get('nome') or 'informada'} ({tamanho} cm)"
             if ignorada:

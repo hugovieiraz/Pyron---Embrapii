@@ -2117,6 +2117,22 @@ def medicao_real(codigo: str, corpo: dict = Body(...)) -> dict:
         raise HTTPException(422, "Medida real inválida.")
 
 
+@app.post("/api/medicao/previa")
+async def medicao_previa(arquivo: UploadFile = File(...)) -> Response:
+    """JPEG do mesmo tamanho (orientação do EXIF aplicada) para a tela mostrar foto que o navegador não abre (HEIC).
+    Só para ver: a medida usa sempre o arquivo original."""
+    from nucleo.medicao.profundidade import abrir
+
+    dados = await arquivo.read()
+    try:
+        img = abrir(dados)
+    except Exception:
+        raise HTTPException(422, "Não consegui abrir a foto.")
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=88)
+    return Response(buf.getvalue(), media_type="image/jpeg")
+
+
 @app.get("/api/medicao/fotos/{codigo}")
 def medicao_foto(codigo: str) -> Response:
     """A foto original, como chegou (para a tela abrir as fotos que vieram do celular)."""

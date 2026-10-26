@@ -59,7 +59,7 @@ def test_postit_corrige_a_escala_da_profundidade():
     """Quadro de 60 × 40 cm a 1,2 m, profundidade 10 % maior: o post-it (≈ 69 px) corrige."""
     cena = _cena(1.2, (0.40, 0.60))
     assert _medir(cena).comprimento_cm == pytest.approx(60 * 1.10, rel=0.01)
-    com = _medir(cena, referencia={"auto": "postit_rosa"})
+    com = _medir(cena, referencia={"auto": "postit_rosa", "tamanho_cm": 7.6})  # o post-it da cena tem 7,6 cm
     assert com.metodo == "referência: post-it rosa (7,6 cm)"
     assert com.comprimento_cm == pytest.approx(60, rel=0.03)
     assert com.largura_cm == pytest.approx(40, rel=0.03)
@@ -76,7 +76,7 @@ def test_porta_longe_com_postit_pequeno():
     """Porta de 2,10 m a 3 m numa imagem de 1000 px: o post-it tem só ≈ 25 px e meio pixel já é 2 % da escala.
     Pela profundidade ainda dá, com a margem cobrindo o erro; só pelo plano dele, não (na foto do celular, com
     4000 px, o mesmo post-it a 3 m tem ≈ 70 px)."""
-    com = _medir(_cena(3.0, (0.90, 2.10)), referencia={"auto": "postit_rosa"})
+    com = _medir(_cena(3.0, (0.90, 2.10)), referencia={"auto": "postit_rosa", "tamanho_cm": 7.6})
     assert com.comprimento_cm == pytest.approx(210, rel=0.08)
     assert abs(com.comprimento_cm - 210) <= com.incerteza_cm["comprimento"]
     p = com.no_plano_da_referencia
@@ -108,7 +108,7 @@ def test_referencia_retangular_por_cantos():
 
 def test_regra_ignora_postit_pequeno_e_avisa():
     """Post-it de ≈ 69 px (menos que 100): a medida sai sem referência, com o motivo."""
-    com = _medir(_cena(1.2, (0.40, 0.60)), referencia={"auto": "postit_rosa"}, checar=True)
+    com = _medir(_cena(1.2, (0.40, 0.60)), referencia={"auto": "postit_rosa", "tamanho_cm": 7.6}, checar=True)
     assert com.metodo == "sem referência"
     assert "px de lado" in com.referencia_ignorada
     assert com.comprimento_cm == pytest.approx(60 * 1.10, rel=0.01)  # a escala do modelo, sem correção

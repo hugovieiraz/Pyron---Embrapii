@@ -43,7 +43,7 @@ núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Te
 - **Medir foto** (Captura › Medir foto, `js/captura/medir.js`; roteiro em `docs/07_roteiro_medicao_geral.md`): medida
   de objeto qualquer em foto comum. Núcleo em `nucleo/medicao/` (`medir()` no `__init__`; `geometria.py` só NumPy;
   `profundidade.py` Depth Anything 3 Metric (padrão, Apache 2.0) e MoGe-2 (reserva); `segmentar.py` SAM 2.1 pelo `transformers`; `plano_ref.py` sem modelo, por homografia;
-  `referencia_auto.py` acha o post-it rosa de 7,6 cm pela cor;
+  `referencia_auto.py` acha o post-it rosa (8 cm) pela cor;
   `modelos.py` pesos em `modelos/medicao/`). API `/api/medicao`, `/api/medicao/estado`, `/api/medicao/plano` e `/api/medicao/referencia`.
   Licenças: só MIT e Apache 2.0 (nada CC BY-NC, AGPL, GPL; Depth Pro fora). Sem os pesos, a aba abre no modo
   "Retângulo de referência".

@@ -149,7 +149,7 @@ def test_referencia_automatica_e_por_cantos_validadas(cliente):
     from app import servidor
 
     v = servidor._validar_pista_medicao({"auto": "postit_rosa"}, "a referência", exige_tamanho=True)
-    assert v == {"auto": "postit_rosa", "tamanho_cm": 7.6, "medida": "lado", "nome": ""}
+    assert v == {"auto": "postit_rosa", "tamanho_cm": 8.0, "medida": "lado", "nome": ""}  # o post-it do Hugo
     v = servidor._validar_pista_medicao({"auto": "postit_rosa", "tamanho_cm": 7.5}, "a referência", exige_tamanho=True)
     assert v["tamanho_cm"] == 7.5
     v = servidor._validar_pista_medicao({"cantos": [[0, 0], [10, 0], [10, 7], [0, 7]], "tamanho_cm": 29.7, "outro_lado_cm": 21},
