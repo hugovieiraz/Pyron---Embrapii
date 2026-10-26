@@ -31,6 +31,12 @@ from nucleo.medicao import geometria as g
 # forro, pote contra a parede) errou de 40 a 190 %: ali só a referência na foto resolve.
 ERRO_ESCALA_SEM_REFERENCIA = 0.20
 
+# referência que atrapalha mais que ajuda (fotos do Hugo, 26/10): post-it com menos de 100 px de lado ou fora da
+# profundidade do objeto (±33 %) é ignorado e a medida sai sem referência, com aviso. Com essa regra: Hugo na sala
+# 7 % (com o post-it na mão: 77 %), objetos na cama 5 % (docs/medicao/relatorio_postit.md)
+LADO_MINIMO_REFERENCIA_PX = 100
+FAIXA_PROFUNDIDADE_REFERENCIA = (0.75, 1.33)
+
 REFERENCIAS_PRONTAS = {
     "folha_a4": {"nome": "folha A4", "comprimento": 29.7, "largura": 21.0},
     "cartao": {"nome": "cartão (ID-1)", "comprimento": 8.56, "largura": 5.40},
@@ -57,6 +63,7 @@ class Medida:
     contorno: list = field(default_factory=list)  # polígonos [[x, y], ...] em pixels
     contorno_referencia: list = field(default_factory=list)
     no_plano_da_referencia: dict = field(default_factory=dict)  # comprimento e largura pela homografia
+    referencia_ignorada: str = ""  # por que a referência pedida não foi usada (pequena ou longe do objeto)
     tempos_ms: dict = field(default_factory=dict)
     modelos: dict = field(default_factory=dict)
 
@@ -234,7 +241,28 @@ class Medidor:
         tempos[f"geometria{rotulo}"] = round((time.perf_counter() - t0) * 1000, 1)
         return r, m, nota
 
-    def medir(self, imagem, pista: dict, referencia: dict | None = None) -> Medida:
+    def _referencia_ruim(self, geo, rr, mascara_ref, mascara_obj, pista) -> str:
+        """Motivo para ignorar a referência (vazio se ela serve): pequena na foto ou em outra profundidade."""
+        if "cantos" in rr:
+            c = np.asarray(rr["cantos"], dtype=float)
+            lado = float(np.median(np.linalg.norm(np.roll(c, -1, axis=0) - c, axis=1)))
+            if lado < LADO_MINIMO_REFERENCIA_PX:
+                return f"a referência tem só {lado:.0f} px de lado na foto (mínimo {LADO_MINIMO_REFERENCIA_PX})"
+        z = geo.pontos[..., 2]
+        if mascara_obj is not None:
+            z_obj = float(np.median(z[mascara_obj & geo.validos]))
+        else:  # dois pontos: a profundidade das pontas
+            z_obj = float(np.mean([g.ponto_robusto(geo.pontos, p)[2] for p in pista["pontos"]]))
+        if mascara_ref is None or not (mascara_ref & geo.validos).any() or z_obj <= 0:
+            return ""
+        razao = float(np.median(z[mascara_ref & geo.validos])) / z_obj
+        lo, hi = FAIXA_PROFUNDIDADE_REFERENCIA
+        if not lo <= razao <= hi:
+            mais = "mais longe" if razao > 1 else "mais perto"
+            return f"a referência está {abs(razao - 1) * 100:.0f} % {mais} que o objeto"
+        return ""
+
+    def medir(self, imagem, pista: dict, referencia: dict | None = None, checar_referencia: bool = True) -> Medida:
         from nucleo.medicao.profundidade import abrir
 
         tempos: dict = {}
@@ -249,6 +277,7 @@ class Medidor:
         mascara_ref = None
         if referencia:
             rr, mascara_ref, _ = self._medir_pista(img, geo, referencia, chave, tempos, rotulo="_referencia")
+            ignorada = self._referencia_ruim(geo, rr, mascara_ref, mascara, pista) if checar_referencia else ""
             if "auto" in referencia:
                 from nucleo.medicao.referencia_auto import REFERENCIAS_AUTO
 
@@ -275,9 +304,12 @@ class Medidor:
             erro_escala = ext_ref.incerteza() / ext_ref.valor
             tamanho = f"{referencia['tamanho_cm']:g}".replace(".", ",")
             metodo = f"referência: {referencia.get('nome') or 'informada'} ({tamanho} cm)"
+            if ignorada:
+                fator, erro_escala, metodo = 1.0, ERRO_ESCALA_SEM_REFERENCIA, "sem referência"
 
         no_plano = {}
-        if referencia and mascara is not None and "cantos" in rr:
+        ignorada = ignorada if referencia else ""
+        if referencia and not ignorada and mascara is not None and "cantos" in rr:
             from nucleo.medicao import plano_ref
 
             lado = float(referencia["tamanho_cm"])
@@ -299,6 +331,7 @@ class Medidor:
             nota_contorno=None if nota is None else round(nota, 3),
             contorno=[] if mascara is None else contorno(mascara),
             contorno_referencia=[] if mascara_ref is None else contorno(mascara_ref),
+            referencia_ignorada=ignorada,
             no_plano_da_referencia=no_plano,
             modelos={"profundidade": geo.modelo, "contorno": getattr(self._segmentador, "nome", "")},
         )
@@ -311,15 +344,61 @@ class Medidor:
 
 
 _padrao: Medidor | None = None
+_por_modelo: dict[str, Medidor] = {}
 
 
-def medidor() -> Medidor:
+def medidor(modelo: str | None = None) -> Medidor:
+    """O medidor do modelo de profundidade pedido (``da3`` ou ``moge``; ``None``: o padrão). O SAM é um só."""
     global _padrao
     if _padrao is None:
         _padrao = Medidor()
-    return _padrao
+    if modelo is None:
+        return _padrao
+    if modelo not in _por_modelo:
+        from nucleo.medicao.modelos import profundidade_por_id
+
+        _por_modelo[modelo] = Medidor(profundidade_por_id(modelo), _padrao.segmentador)
+    return _por_modelo[modelo]
 
 
-def medir(imagem, pista: dict, referencia: dict | None = None) -> Medida:
+def medir(imagem, pista: dict, referencia: dict | None = None, modelo: str | None = None) -> Medida:
     """Mede o objeto da ``pista`` na foto (caminho, bytes ou PIL). Ver o cabeçalho do módulo."""
-    return medidor().medir(imagem, pista, referencia)
+    return medidor(modelo).medir(imagem, pista, referencia)
+
+
+CAMPOS_COMPARACAO = ("comprimento_cm", "largura_cm", "espessura_cm", "altura_cm", "distancia_cm", "incerteza_cm", "metodo",
+                     "forma", "vertical", "lente", "fator_escala", "referencia_ignorada", "no_plano_da_referencia", "tempos_ms")
+
+
+def comparar(imagem, pista: dict, referencia: dict | None = None, modelos: list[str] | None = None) -> dict:
+    """Mede a mesma pista com cada modelo de profundidade instalado, sem e com a referência (se pedida).
+
+    Devolve ``{"resultados": {modelo: {"sem_referencia": {...}, "com_referencia": {...} | None, "erro"?}},
+    "contorno", "contorno_referencia", "tamanho_imagem"}``: a comparação que a tela mostra lado a lado.
+    """
+    from nucleo.medicao.modelos import disponiveis
+    from nucleo.medicao.profundidade import abrir
+
+    img = abrir(imagem)
+    ids = modelos or [m["id"] for m in disponiveis() if m["instalado"]]
+    if not ids:
+        raise ImportError("nenhum modelo de profundidade instalado (python -m nucleo.medicao.modelos --baixar da3 small)")
+    saida: dict = {"resultados": {}, "contorno": [], "contorno_referencia": [], "tamanho_imagem": [img.width, img.height]}
+    compacto = lambda m: {k: getattr(m, k) for k in CAMPOS_COMPARACAO}  # noqa: E731
+    for modelo in ids:
+        r: dict = {"sem_referencia": None, "com_referencia": None}
+        try:
+            sem = medidor(modelo).medir(img, pista)
+            r["sem_referencia"] = compacto(sem)
+            r["modelo"] = sem.modelos.get("profundidade", modelo)
+            saida["contorno"] = saida["contorno"] or sem.contorno
+            if referencia:
+                com = medidor(modelo).medir(img, pista, referencia)
+                r["com_referencia"] = compacto(com)
+                saida["contorno_referencia"] = saida["contorno_referencia"] or com.contorno_referencia
+        except ValueError as e:  # pista sem objeto, referência não achada: vale para este modelo
+            r["erro"] = str(e)
+        saida["resultados"][modelo] = r
+    if all("erro" in r and r["sem_referencia"] is None for r in saida["resultados"].values()):
+        raise ValueError(next(iter(saida["resultados"].values()))["erro"])
+    return saida

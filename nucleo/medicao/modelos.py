@@ -61,6 +61,28 @@ def profundidade_padrao():
     return ProfundidadeDA3() if da3_instalado() else Profundidade()
 
 
+MODELOS_PROFUNDIDADE = {
+    "da3": "Depth Anything 3 Metric (melhor com referência e em foto de perto; 2 s na CPU)",
+    "moge": "MoGe-2 ViT-L (estima a lente; bom em cena ampla sem referência; 20 s na CPU)",
+}
+
+
+def profundidade_por_id(modelo: str):
+    """``da3`` ou ``moge``: o estimador de profundidade escolhido na tela."""
+    from nucleo.medicao.profundidade import Profundidade, ProfundidadeDA3
+
+    if modelo == "da3":
+        return ProfundidadeDA3()
+    if modelo == "moge":
+        return Profundidade(MOGE_PADRAO)
+    raise ValueError(f"modelo de profundidade desconhecido: {modelo} (use da3 ou moge)")
+
+
+def disponiveis() -> list[dict]:
+    instalado = {"da3": da3_instalado(), "moge": pacote("moge") and caminho_moge(MOGE_PADRAO).exists()}
+    return [{"id": k, "nome": v, "instalado": instalado[k]} for k, v in MODELOS_PROFUNDIDADE.items()]
+
+
 def sam_instalado(variante: str = SAM_PADRAO) -> bool:
     p = caminho_sam(variante)
     return (p / "config.json").exists() and any(p.glob("*.safetensors"))
@@ -87,6 +109,8 @@ def estado() -> dict:
         "dispositivo": dispositivo() if pacotes["torch"] else None,
         "profundidade": {**{v: caminho_moge(v).exists() for v in MOGE}, "da3": da3_instalado()},
         "contorno": {v: sam_instalado(v) for v in SAM},
+        "modelos": disponiveis(),
+        "modelo_padrao": "da3" if da3_instalado() else "moge",
         "pasta": str(pasta()),
         "pronto": pacotes["torch"]
         and pacotes["transformers"]

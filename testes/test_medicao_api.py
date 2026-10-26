@@ -181,3 +181,57 @@ def test_achar_referencia_na_foto(cliente):
     assert r.status_code == 422
     r = cli.post("/api/medicao/referencia", files={"arquivo": ("f.png", foto, "image/png")}, data={"tipo": "outro"})
     assert r.status_code == 422
+
+
+@pytest.fixture()
+def comparacao(cliente, monkeypatch):
+    """Dois modelos falsos: o "da3" vê a cena 5 % maior; o "moge", 10 % menor."""
+    import nucleo.medicao as medicao
+    from nucleo.medicao import modelos
+
+    porta = s.Objeto("porta", (-0.6, 0.0, 3.0), (0.90, 2.10, 0.0))
+    regua = s.Objeto("regua", (0.5, 0.3, 2.9), (0.30, 0.035, 0.0))
+    cena = s.cena([porta, regua], largura=W, altura=H, focal=FOCAL)
+    seg = s.SegmentadorSintetico(cena)
+    monkeypatch.setattr(medicao, "_por_modelo", {"da3": medicao.Medidor(s.ProfundidadeSintetica(cena, 1.05), seg),
+                                                  "moge": medicao.Medidor(s.ProfundidadeSintetica(cena, 0.90), seg)})
+    monkeypatch.setattr(modelos, "disponiveis", lambda: [{"id": "da3", "nome": "DA3", "instalado": True},
+                                                         {"id": "moge", "nome": "MoGe", "instalado": True}])
+    return cliente
+
+
+def test_comparar_os_dois_modelos_e_registrar(comparacao):
+    cli, foto = comparacao
+    ref = {"ponto": _px(0.5, 0.3, 2.9), "tamanho_cm": 30, "nome": "régua"}
+    r = cli.post("/api/medicao/comparar", files={"arquivo": ("f.png", foto, "image/png")},
+                 data={"pista": json.dumps({"ponto": _px(-0.6, 0.0, 3.0)}), "referencia": json.dumps(ref)})
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["resultados"]["da3"]["sem_referencia"]["comprimento_cm"] == pytest.approx(210 * 1.05, rel=0.005)
+    assert d["resultados"]["moge"]["sem_referencia"]["comprimento_cm"] == pytest.approx(210 * 0.90, rel=0.005)
+    for modelo in ("da3", "moge"):  # com a régua, os dois corrigem a escala
+        assert d["resultados"][modelo]["com_referencia"]["comprimento_cm"] == pytest.approx(210, rel=0.01)
+    assert d["contorno"] and d["contorno_referencia"] and d["id"] and d["foto"]
+
+    # a foto fica guardada sem nenhuma alteração
+    assert cli.get(f"/api/medicao/fotos/{d['foto']}").content == foto
+
+    # valor real informado: o registro calcula o erro de cada modelo e o resumo
+    r = cli.put(f"/api/medicao/registro/{d['id']}", json={"real": {"comprimento": 210}})
+    assert r.status_code == 200, r.text
+    assert r.json()["erros"]["moge"]["sem_referencia"]["comprimento"] == pytest.approx(-0.10, abs=0.005)
+    reg = cli.get("/api/medicao/registro").json()
+    assert reg["entradas"][0]["id"] == d["id"] and reg["entradas"][0]["real"] == {"comprimento": 210.0}
+    assert reg["resumo"]["da3"]["sem_referencia"]["erro_mediano_pct"] == pytest.approx(5.0, abs=0.5)
+    assert reg["resumo"]["moge"]["com_referencia"]["n"] == 1
+    assert cli.put("/api/medicao/registro/nao-existe", json={"real": {"comprimento": 1}}).status_code == 404
+
+
+def test_comparar_dois_pontos_sem_referencia(comparacao):
+    cli, foto = comparacao
+    r = cli.post("/api/medicao/comparar", files={"arquivo": ("f.png", foto, "image/png")},
+                 data={"pista": json.dumps({"pontos": [_px(-0.6, -1.0, 3.0), _px(-0.6, 1.0, 3.0)]})})
+    assert r.status_code == 200, r.text
+    res = r.json()["resultados"]
+    assert res["da3"]["sem_referencia"]["distancia_cm"] == pytest.approx(200 * 1.05, rel=0.01)
+    assert res["moge"]["com_referencia"] is None

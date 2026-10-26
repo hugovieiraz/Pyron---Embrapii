@@ -2045,6 +2045,89 @@ async def medicao(arquivo: UploadFile = File(...), pista: str = Form(...), refer
         raise HTTPException(422, str(e))
 
 
+def _registro_medicao():
+    from nucleo.medicao.registro import Registro
+
+    global _registro_med
+    if _registro_med is None or _registro_med.pasta != PASTA_DADOS / "medicao":
+        _registro_med = Registro(PASTA_DADOS / "medicao")
+    return _registro_med
+
+
+_registro_med = None
+
+
+def comparar_e_registrar(dados: bytes, pista: dict, referencia: dict | None, origem: str = "tela") -> dict:
+    """Guarda a foto como chegou, mede com os dois modelos (sem e com referência) e registra."""
+    from nucleo import medicao as medicao_mod
+
+    reg = _registro_medicao()
+    foto = reg.guardar_foto(dados)
+    with _trava_medicao:
+        r = medicao_mod.comparar(dados, pista, referencia)
+    entrada = reg.adicionar(foto, pista, referencia, r["resultados"], origem=origem)
+    return {**r, "id": entrada["id"], "foto": foto, "erros": entrada["erros"]}
+
+
+@app.post("/api/medicao/comparar")
+async def medicao_comparar(arquivo: UploadFile = File(...), pista: str = Form(...), referencia: str | None = Form(None)) -> dict:
+    """A mesma pista nos dois modelos (DA3 e MoGe-2), sem e com referência, lado a lado; fica no registro."""
+    dados = await arquivo.read()
+    if not dados:
+        raise HTTPException(422, "O arquivo está vazio.")
+    if len(dados) > LIMITE_FOTO_MEDICAO:
+        raise HTTPException(413, "A foto passa de 40 MB.")
+    p = _validar_pista_medicao(_json_form(pista, "pista"), "a pista")
+    ref_bruta = _json_form(referencia, "referencia")
+    ref = _validar_pista_medicao(ref_bruta, "a referência", exige_tamanho=True) if ref_bruta else None
+    from nucleo.medicao.profundidade import abrir
+
+    try:
+        abrir(dados)
+    except Exception:
+        raise HTTPException(422, "Não consegui abrir a foto.")
+    from starlette.concurrency import run_in_threadpool
+
+    try:
+        return await run_in_threadpool(comparar_e_registrar, dados, p, ref)
+    except (ImportError, OSError) as e:
+        raise HTTPException(503, f"Os modelos da medição não estão instalados ({type(e).__name__}: {e}).")
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+
+@app.get("/api/medicao/registro")
+def medicao_registro(limite: int = 50) -> dict:
+    """As últimas medições (da tela e do celular) e o erro mediano de cada modelo onde há valor real."""
+    reg = _registro_medicao()
+    return {"versao": reg.versao, "entradas": reg.entradas(max(1, min(limite, 500))), "resumo": reg.resumo()}
+
+
+@app.put("/api/medicao/registro/{codigo}")
+def medicao_real(codigo: str, corpo: dict = Body(...)) -> dict:
+    """Informa a medida real (cm) de uma medição: o registro calcula o erro de cada modelo."""
+    real = corpo.get("real")
+    if not isinstance(real, dict):
+        raise HTTPException(422, "Informe as medidas reais, em cm.")
+    try:
+        return _registro_medicao().informar_real(codigo, real)
+    except KeyError:
+        raise HTTPException(404, "Medição não encontrada.")
+    except (TypeError, ValueError):
+        raise HTTPException(422, "Medida real inválida.")
+
+
+@app.get("/api/medicao/fotos/{codigo}")
+def medicao_foto(codigo: str) -> Response:
+    """A foto original, como chegou (para a tela abrir as fotos que vieram do celular)."""
+    from fastapi.responses import FileResponse
+
+    caminho = _registro_medicao().caminho_foto(codigo)
+    if caminho is None:
+        raise HTTPException(404, "Foto não encontrada.")
+    return FileResponse(caminho)
+
+
 @app.post("/api/medicao/referencia")
 async def medicao_referencia(arquivo: UploadFile = File(...), tipo: str = Form("postit_rosa")) -> dict:
     """Acha sozinho, pela cor, a referência quadrada (post-it) na foto e devolve os 4 cantos. Sem modelo."""

@@ -47,11 +47,12 @@ def _cena(z, tamanho):
     return s.cena([obj, postit], largura=W, altura=H, focal=F)
 
 
-def _medir(cena, escala=1.10, referencia=None):
+def _medir(cena, escala=1.10, referencia=None, checar=False):
+    """``checar=False``: a conta da escala sem a regra que ignora post-it pequeno (aqui ele tem ≈ 25 a 69 px)."""
     med = Medidor(s.ProfundidadeSintetica(cena, escala), s.SegmentadorSintetico(cena))
     ys, xs = np.nonzero(cena.mascaras["quadro"])
     pista = {"ponto": (float(np.median(xs)), float(np.median(ys)))}
-    return med.medir(s.imagem_da_cena(cena, {"postit": ROSA}), pista, referencia)
+    return med.medir(s.imagem_da_cena(cena, {"postit": ROSA}), pista, referencia, checar_referencia=checar)
 
 
 def test_postit_corrige_a_escala_da_profundidade():
@@ -103,3 +104,25 @@ def test_referencia_retangular_por_cantos():
     com = _medir(cena, referencia=ref)
     assert com.comprimento_cm == pytest.approx(60, rel=0.02)
     assert com.no_plano_da_referencia["comprimento_cm"] == pytest.approx(60, rel=0.02)
+
+
+def test_regra_ignora_postit_pequeno_e_avisa():
+    """Post-it de ≈ 69 px (menos que 100): a medida sai sem referência, com o motivo."""
+    com = _medir(_cena(1.2, (0.40, 0.60)), referencia={"auto": "postit_rosa"}, checar=True)
+    assert com.metodo == "sem referência"
+    assert "px de lado" in com.referencia_ignorada
+    assert com.comprimento_cm == pytest.approx(60 * 1.10, rel=0.01)  # a escala do modelo, sem correção
+    assert com.no_plano_da_referencia == {}
+
+
+def test_regra_ignora_referencia_em_outra_profundidade():
+    """Quadro a 1,2 m e post-it grande colado numa parede a 2,4 m: 100 % mais longe que o objeto."""
+    rot = s.rotacao("y", 0)
+    quadro = s.Objeto("quadro", (-0.2, 0.0, 1.2), (0.40, 0.60, 0.0), rot)
+    postit = s.Objeto("postit", (0.5, -0.1, 2.4), (0.30, 0.30, 0.0), rot)  # post-it grande: passa no tamanho
+    cena = s.cena([quadro, postit], largura=W, altura=H, focal=F, fundo=3.0)
+    com = _medir(cena, referencia={"auto": "postit_rosa", "tamanho_cm": 30}, checar=True)
+    assert "mais longe que o objeto" in com.referencia_ignorada
+    assert com.metodo == "sem referência"
+    ok = _medir(cena, referencia={"auto": "postit_rosa", "tamanho_cm": 30}, checar=False)
+    assert ok.metodo.startswith("referência")
