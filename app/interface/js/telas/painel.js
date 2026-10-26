@@ -69,9 +69,9 @@ function linhaAtencao(it) {
     el("span", { class: "leitura" }, el("b", { class: "num" }, temperatura(d.t_max ?? it.resumo?.t_max_cena)), selo(sev, { indicativa: Boolean(it.resumo?.conferir) }))));
 }
 
-/** As cinco últimas importadas: o caminho de volta para o que acabou de entrar. */
+/** As três últimas importadas: o caminho de volta para o que acabou de entrar (o resto da altura fica para "Atenção agora"). */
 function recentes({ lista }) {
-  const ultimas = [...lista].sort((a, b) => String(b.criado_em).localeCompare(String(a.criado_em))).slice(0, 5);
+  const ultimas = [...lista].sort((a, b) => String(b.criado_em).localeCompare(String(a.criado_em))).slice(0, 3);
   return el("section", { class: "bloco-recentes", "aria-label": P.recentes },
     el("div", { class: "titulo-bloco" }, el("h2", {}, P.recentes), el("a", { href: endereco("inspecoes") }, P.verInspecoes(lista.length))),
     el("ul", { class: "lista-recentes" }, ultimas.map((it) => {

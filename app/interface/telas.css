@@ -196,18 +196,21 @@ body.com-selecao .avisos { bottom: calc(var(--e-6) + var(--alvo) + var(--e-8)); 
 .titulo-bloco { justify-content: space-between; }
 .titulo-bloco .nota, .titulo-bloco a { font-size: var(--t-1); line-height: var(--a-1); }
 .titulo-bloco a { display: inline-flex; align-items: center; min-height: var(--alvo); margin: calc((var(--alvo) - var(--a-1)) / -2) 0; } /* alvo de 44 px sem mudar a altura da faixa */
-.lista-atencao { list-style: none; margin: 0; padding: 0; overflow: auto; min-height: 0; }
+.lista-atencao { list-style: none; margin: 0; padding: 0; overflow: auto; min-height: 0; display: grid; grid-template-columns: var(--traco) minmax(0, 1fr) auto auto; column-gap: var(--e-5); align-content: start; }
+.lista-atencao > li { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; } /* temperatura e selo em coluna, alinhados entre as linhas */
 .linha-atencao {
-  display: grid; grid-template-columns: var(--traco) minmax(0, 1fr) auto; align-items: center; gap: var(--e-5);
+  display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: center; column-gap: var(--e-5);
   padding: var(--e-3) var(--e-4) var(--e-3) 0; border-bottom: 1px solid var(--borda); color: var(--texto);
   transition: background-color var(--dur-rapida) var(--ease-padrao);
 }
 .linha-atencao:hover { background: var(--superficie-2); text-decoration: none; }
 .linha-atencao .eq { display: grid; min-width: 0; }
-.linha-atencao .eq b { font-size: var(--t-4); line-height: var(--a-4); font-weight: var(--p-medio); }
-.linha-atencao .eq span { color: var(--texto-3); font-size: var(--t-2); line-height: var(--a-2); }
-.linha-atencao .leitura { display: grid; justify-items: end; gap: var(--e-1); }
-.linha-atencao .leitura b { font-size: var(--t-6); line-height: var(--a-6); font-weight: var(--p-forte); white-space: nowrap; }
+.linha-atencao .eq b { font-size: var(--t-2); line-height: var(--a-2); font-weight: var(--p-forte); }
+.linha-atencao .eq span { color: var(--texto-3); font-size: var(--t-1); line-height: var(--a-1); }
+.linha-atencao .leitura { display: contents; } /* selo ao lado da temperatura: linha mais baixa */
+.linha-atencao .leitura b { justify-self: end; }
+.linha-atencao .leitura .selo { justify-self: start; }
+.linha-atencao .leitura b { font-size: var(--t-4); line-height: var(--a-4); font-weight: var(--p-forte); white-space: nowrap; } /* abaixo do título da página, acima do nome */
 .coluna-atencao > .vazio { flex: 1; }
 
 .coluna-lado { display: grid; align-content: start; gap: var(--e-6); min-height: 0; overflow: auto; padding-bottom: var(--e-2); }
