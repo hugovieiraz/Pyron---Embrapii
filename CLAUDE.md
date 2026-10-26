@@ -124,7 +124,7 @@ núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Te
 - Pyron para testar sem dados reais: pré-visualização `pyron-demo` (`.claude/launch.json`, porta 8790,
   dados em `saida/dados_demo`). Apresentação: pré-visualização `apresentacao` (porta 8792).
 - Medição em foto: instalar `.venv/Scripts/pip install --no-deps git+https://github.com/microsoft/MoGe.git` (mais o
-  extra `[medicao]` do `pyproject.toml`), pesos `python -m nucleo.medicao.modelos --baixar vitb small`, avaliação no
+  extra `[medicao]` do `pyproject.toml`), pesos `python -m nucleo.medicao.modelos --baixar vitl small`, avaliação no
   gabarito `python -m ml.avaliar_medicao` (fotos e medidas reais em `testes/gabarito/`).
 - Abrir de verdade: atalhos "Abrir Pyron" e "Pyron Apresentação" da área de trabalho (`pythonw.exe -m apresentacao`).
 - Pacote portátil da apresentação (para outro computador): `.venv/Scripts/python.exe -m apresentacao.empacotar`

@@ -31,7 +31,7 @@ segmentacao = [
 # medição em foto comum (nucleo/medicao): MoGe-2 (MIT) + SAM 2.1 pelo transformers (Apache 2.0).
 # O pacote moge (github.com/microsoft/MoGe) traz o MoGe-3, que pede FlexGEMM/Triton e Gradio; o MoGe-2 não
 # precisa deles, então ele entra sem dependências:  pip install --no-deps git+https://github.com/microsoft/MoGe.git
-# pesos: python -m nucleo.medicao.modelos --baixar vitb small
+# pesos: python -m nucleo.medicao.modelos --baixar vitl small
 medicao = [
     "torch>=2.4",
     "transformers>=4.56",

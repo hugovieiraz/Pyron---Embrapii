@@ -224,7 +224,7 @@ export const TEXTOS = {
     palco: "Foto. Clique no objeto para medir; com o teclado, as setas movem a mira e Enter marca.",
     vazioTitulo: "Medir um objeto numa foto",
     vazioTexto: "Abra uma foto comum, do celular ou de uma câmera, e clique no objeto. A medida sai em centímetros, com a margem de erro.",
-    comandoInstalar: "python -m nucleo.medicao.modelos --baixar vitb small",
+    comandoInstalar: "python -m nucleo.medicao.modelos --baixar vitl small",
     dicaModo: {
       ponto: "Clique no objeto.",
       caixa: "Arraste uma caixa em volta do objeto.",
@@ -243,7 +243,7 @@ export const TEXTOS = {
     mais: (v) => `± ${v} cm`,
     forma: { plano: "Objeto plano", volume: "Objeto com volume", "distância": "Distância entre dois pontos" },
     vertical: { apoio: "altura pela mesa ou pelo chão", "câmera": "altura pelo eixo da câmera" },
-    semReferencia: "Escala do modelo, sem referência: a margem é larga. Marque um objeto de tamanho conhecido para corrigir.",
+    semReferencia: "Escala do modelo, sem referência: erro típico de 20 %, e bem mais em foto de perto sobre fundo liso. Marque um objeto de tamanho conhecido para corrigir.",
     comReferencia: (metodo) => `Escala pela ${metodo}.`,
     referenciaTitulo: "Referência",
     referenciaTexto: "Opcional: um objeto de tamanho conhecido na mesma foto corrige a escala de tudo.",

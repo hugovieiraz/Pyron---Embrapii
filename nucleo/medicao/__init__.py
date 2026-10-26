@@ -23,8 +23,10 @@ import numpy as np
 
 from nucleo.medicao import geometria as g
 
-# erro relativo da escala sem referência: provisório, até o gabarito medir o do MoGe-2 (fase 3)
-ERRO_ESCALA_SEM_REFERENCIA = 0.10
+# erro relativo da escala sem referência: o erro mediano do MoGe-2 ViT-L no gabarito do Hugo (26/10/2026, 6 fotos,
+# docs/medicao/relatorio_gabarito.md). Vale para foto com o ambiente em volta; close-up sobre fundo liso (régua no
+# forro, pote contra a parede) errou de 40 a 190 %: ali só a referência na foto resolve.
+ERRO_ESCALA_SEM_REFERENCIA = 0.20
 
 REFERENCIAS_PRONTAS = {
     "folha_a4": {"nome": "folha A4", "comprimento": 29.7, "largura": 21.0},

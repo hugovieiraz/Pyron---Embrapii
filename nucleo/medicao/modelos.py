@@ -5,7 +5,7 @@ do repositório do Hugging Face. ``PYRON_MODELOS_MEDICAO`` troca a pasta.
 
 Baixar (só os modelos da lista do roteiro, licenças MIT e Apache 2.0)::
 
-    python -m nucleo.medicao.modelos --baixar vitb small
+    python -m nucleo.medicao.modelos --baixar vitl small
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ SAM = {
     "small": "facebook/sam2.1-hiera-small",
     "base-plus": "facebook/sam2.1-hiera-base-plus",
 }
-MOGE_PADRAO = "vitb"
+MOGE_PADRAO = "vitl"  # no gabarito: erro mediano 19 % (ViT-L), 28 % (ViT-B), 47 % (ViT-S)
 SAM_PADRAO = "small"
 
 
