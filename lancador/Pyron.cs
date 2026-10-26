@@ -1,8 +1,9 @@
 // Lançador do Pyron: o executável da área de trabalho.
 //
 // Sobe o servidor local (pythonw -m app.iniciar ... --auto-encerrar) sem console, mostra uma tela de
-// abertura com a logo enquanto ele carrega e abre a interface numa janela própria do Edge (modo
-// aplicativo). Se o servidor já estiver no ar, só abre outra janela. O servidor se desliga sozinho
+// abertura com a logo enquanto ele carrega e abre a interface numa janela própria, sem a barra de título
+// do Windows (WebView2, ver Janela.cs; sem ele, a janela do Edge em modo aplicativo). Se o servidor já
+// estiver no ar, só abre outra janela. O servidor se desliga sozinho
 // quando a última janela é fechada, então não há nada para encerrar à mão.
 //
 // Compilado pelo csc.exe do .NET Framework que vem com o Windows (ver construir.py). C# 5: sem
@@ -15,6 +16,7 @@ using System.Drawing.Drawing2D;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -31,6 +33,10 @@ namespace Pyron
 
         public static string Projeto;
         public static string PastaDados;
+        /// <summary>Laço de mensagens: começa com a abertura e passa para a janela quando ela carrega.</summary>
+        public static ApplicationContext Contexto;
+        static Mutex trava;
+        static bool dono;
 
         [STAThread]
         static int Main(string[] argumentos)
@@ -46,12 +52,13 @@ namespace Pyron
                 return 1;
             }
             PastaDados = Path.Combine(Projeto, "app", "dados_app");
+            PrepararDllsWebView2();
 
-            // Dois cliques seguidos não podem subir dois servidores.
+            // Dois cliques seguidos não podem subir dois servidores. A trava sai assim que o servidor responde
+            // (LiberarTrava), para um segundo clique com a janela aberta não ficar esperando.
             bool criado;
-            using (var trava = new Mutex(false, "Local\\Pyron.Lancador", out criado))
+            using (trava = new Mutex(false, "Local\\Pyron.Lancador", out criado))
             {
-                bool dono = false;
                 try
                 {
                     try { dono = trava.WaitOne(TimeSpan.FromSeconds(EsperaMaximaSegundos)); }
@@ -61,9 +68,59 @@ namespace Pyron
                 }
                 finally
                 {
-                    if (dono) trava.ReleaseMutex();
+                    LiberarTrava();
                 }
             }
+        }
+
+        public static void LiberarTrava()
+        {
+            if (!dono) return;
+            dono = false;
+            try { trava.ReleaseMutex(); } catch (Exception) { }
+        }
+
+        /// <summary>Onde o .NET acha as DLLs do WebView2 (lancador\webview2). Antes de qualquer uso da Janela.</summary>
+        static void PrepararDllsWebView2()
+        {
+            string pasta = Path.Combine(Projeto, "lancador", "webview2");
+            AppDomain.CurrentDomain.AssemblyResolve += delegate (object s, ResolveEventArgs a)
+            {
+                string arquivo = Path.Combine(pasta, new System.Reflection.AssemblyName(a.Name).Name + ".dll");
+                return File.Exists(arquivo) ? System.Reflection.Assembly.LoadFrom(arquivo) : null;
+            };
+        }
+
+        /// <summary>A janela própria (WebView2) pode ser usada? Qualquer falha ao carregar as DLLs dá false.</summary>
+        public static bool JanelaPropriaDisponivel()
+        {
+            try { return WebView2Instalado(); } catch (Exception) { return false; }
+        }
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static bool WebView2Instalado() { return Janela.Disponivel(); }
+
+        /// <summary>
+        /// Abre a interface na janela própria. Ela carrega escondida e aparece pronta; então a abertura sai.
+        /// Se o WebView2 falhar, cai na janela do Edge.
+        /// </summary>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static void AbrirJanelaPropria(int porta, Form abertura)
+        {
+            var janela = new Janela(porta);
+            janela.Pronta += delegate
+            {
+                janela.Mostrar();
+                Contexto.MainForm = janela;
+                if (abertura != null) abertura.Close();
+            };
+            janela.Falhou += delegate
+            {
+                try { AbrirJanela(porta); } catch (Exception) { }
+                if (abertura != null) abertura.Close(); else Contexto.ExitThread();
+                janela.Dispose();
+            };
+            janela.Carregar();
         }
 
         static int Executar()
@@ -76,7 +133,14 @@ namespace Pyron
                 if (doProjeto == null || noAr == doProjeto)
                 {
                     Avisar(porta);  // zera o relógio de desligamento enquanto a nova janela carrega
-                    AbrirJanela(porta);
+                    LiberarTrava();
+                    if (JanelaPropriaDisponivel())
+                    {
+                        Contexto = new ApplicationContext();
+                        AbrirJanelaPropria(porta, null);
+                        Application.Run(Contexto);
+                    }
+                    else AbrirJanela(porta);
                     return 0;
                 }
                 // O Pyron foi atualizado, mas um servidor antigo continua na memória: ele sai e o novo sobe.
@@ -106,7 +170,8 @@ namespace Pyron
             SalvarPorta(porta);
 
             var abertura = new Abertura(porta, servidor);
-            Application.Run(abertura);
+            Contexto = new ApplicationContext(abertura);
+            Application.Run(Contexto);
             if (!abertura.Pronto)
             {
                 if (!abertura.Cancelado)
@@ -142,6 +207,7 @@ namespace Pyron
                 string python = Path.Combine(Projeto, ".venv", "Scripts", "pythonw.exe");
                 relatorio.AppendLine("python: " + python + (File.Exists(python) ? "" : " (NÃO ENCONTRADO)"));
                 relatorio.AppendLine("edge: " + (LocalizarEdge() ?? "(não encontrado; usaria o navegador padrão)"));
+                relatorio.AppendLine("janela própria (WebView2): " + (JanelaPropriaDisponivel() ? "sim" : "não; usaria a janela do Edge"));
                 relatorio.AppendLine("porta: " + porta);
                 servidor = IniciarServidor(python, porta);
                 while (relogio.Elapsed.TotalSeconds < EsperaMaximaSegundos && !servidor.HasExited && !Responde(porta))
@@ -489,6 +555,12 @@ namespace Pyron
         {
             Pronto = true;
             estado = "Abrindo a janela…";
+            Programa.LiberarTrava();
+            if (Programa.JanelaPropriaDisponivel())
+            {
+                Programa.AbrirJanelaPropria(porta, this);  // a abertura sai quando a janela estiver pronta
+                return;
+            }
             try { Programa.AbrirJanela(porta); }
             catch (Exception e) { Pronto = false; Motivo = "Não consegui abrir a janela do aplicativo.\n\n" + e.Message; }
             // Fica um instante na tela para não haver um vazio entre a abertura e a janela do app.

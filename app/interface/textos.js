@@ -26,6 +26,7 @@ export const TEXTOS = {
     alertas: (n) => (n ? `Alertas: ${n} não ${n === 1 ? "lido" : "lidos"}` : "Alertas"),
     vencidas: (n) => `${n} ${n === 1 ? "pendência vencida" : "pendências vencidas"}`,
     rotaInexistente: "Tela não encontrada",
+    janela: { grupo: "Janela", minimizar: "Minimizar", maximizar: "Maximizar", restaurar: "Restaurar", fechar: "Fechar" },
     rotaInexistenteTexto: (nome) => `O endereço #${nome} não leva a nenhuma tela do Pyron.`,
     soltarTitulo: "Soltar para importar",
     soltarDica: "JPEG radiométrico, PNG, WebP ou BMP",

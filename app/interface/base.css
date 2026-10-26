@@ -67,6 +67,20 @@ table { border-collapse: collapse; }
 .nav a[aria-current="page"]::after { transform: scaleX(1); }
 .topo-dir { margin-left: auto; display: flex; align-items: center; gap: var(--e-2); }
 
+/* janela própria (Pyron.exe com WebView2): o topo é a barra de título; arrastar move a janela e os
+   botões de minimizar, maximizar e fechar ficam na ponta direita, como no Windows */
+.janela-propria .topo { -webkit-app-region: drag; app-region: drag; padding-right: 0; }
+.janela-propria .topo a, .janela-propria .topo button, .janela-propria .topo input { -webkit-app-region: no-drag; app-region: no-drag; }
+.controles-janela { display: flex; align-items: stretch; margin-left: var(--e-2); }
+.controles-janela button {
+  width: calc(var(--alvo) + var(--e-1)); display: grid; place-items: center; padding: 0; border: 0;
+  background: transparent; color: var(--texto-2); cursor: default;
+  transition: background-color var(--dur-rapida) var(--ease-padrao), color var(--dur-rapida) var(--ease-padrao);
+}
+.controles-janela button:hover { background: var(--hover); color: var(--texto); }
+.controles-janela button.fechar:hover { background: var(--fechar-janela); color: var(--branco); }
+.controles-janela .ic { width: var(--ic-p); height: var(--ic-p); }
+
 .conteudo { min-height: calc(100vh - var(--topo)); display: flex; flex-direction: column; }
 .conteudo:focus { outline: none; }
 .pagina { flex: 1; display: flex; flex-direction: column; min-height: 0; width: 100%; max-width: var(--conteudo-max); margin: 0 auto; padding: 0 var(--e-6) var(--e-6); }

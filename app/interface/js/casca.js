@@ -1,6 +1,6 @@
 // Casca da interface nova: navegação, roteamento, atalhos, busca, importação por arrastar, conexão e tema.
 import { TEXTOS as T } from "../textos.js";
-import { $, $$, el, api, json, conexao, definirVersaoServidor, VERSAO_INTERFACE } from "./base.js";
+import { $, $$, el, icone, api, json, conexao, definirVersaoServidor, VERSAO_INTERFACE } from "./base.js";
 import { esqueleto, estadoVazio, estadoErro, estadoSemConexao, avisar, dialogo, podeSair } from "./componentes.js";
 import { instalarIcones } from "./icones.js";
 import { ilustracao } from "./ilustracoes.js";
@@ -204,6 +204,34 @@ async function atualizarContadores() {
   } catch { /* a faixa de conexão já avisa */ }
 }
 
+// ---------------------------------------------------------------- janela própria (Pyron.exe com WebView2)
+// Sem a barra de título do Windows: o topo arrasta a janela (CSS app-region) e estes botões pedem ao Pyron.exe
+// minimizar, maximizar ou fechar. Fora dela (navegador, janela do Edge) nada muda.
+function ligarJanela() {
+  const hospede = window.chrome && window.chrome.webview;
+  if (!hospede) return;
+  document.documentElement.classList.add("janela-propria");
+  const J = T.casca.janela;
+  const botao = (acao, ic, rotulo, classe = null) => el("button", { type: "button", class: classe, "aria-label": rotulo, title: rotulo,
+    onclick: () => hospede.postMessage(`janela:${acao}`) }, icone(ic));
+  const maximizar = botao("maximizar", "restaurar", J.restaurar);
+  $(".topo").append(el("div", { class: "controles-janela", role: "group", "aria-label": J.grupo },
+    botao("minimizar", "minimizar", J.minimizar), maximizar, botao("fechar", "x", J.fechar, "fechar")));
+  hospede.addEventListener("message", (ev) => {
+    if (ev.data !== "janela:maximizada" && ev.data !== "janela:normal") return;
+    const max = ev.data === "janela:maximizada";
+    maximizar.replaceChildren(icone(max ? "restaurar" : "maximizar"));
+    maximizar.setAttribute("aria-label", max ? J.restaurar : J.maximizar);
+    maximizar.title = max ? J.restaurar : J.maximizar;
+  });
+  hospede.postMessage("janela:estado");
+  // Ao abrir, a janela entrega o foco à página como se fosse pelo teclado, e o link "Pular para o conteúdo"
+  // aparecia sobre a logo. Ele só fica quando o foco chega por uma tecla de verdade.
+  let teclou = false;
+  addEventListener("keydown", () => { teclou = true; }, { capture: true, once: true });
+  $("#pular").addEventListener("focus", (ev) => { if (!teclou) ev.target.blur(); });
+}
+
 // ---------------------------------------------------------------- tema (Configurações › Aparência; padrão claro)
 const escuroDoSistema = matchMedia("(prefers-color-scheme: dark)");
 function aplicarTema(tema = "claro") {
@@ -220,6 +248,7 @@ escuroDoSistema.addEventListener("change", () => { if (document.documentElement.
 // ---------------------------------------------------------------- início
 async function iniciar() {
   instalarIcones();
+  ligarJanela();
   for (const a of $$("#nav a")) a.dataset.nome = a.textContent.trim();
   ligarAtalhos();
   ligarSoltar();

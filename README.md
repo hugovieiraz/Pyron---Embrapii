@@ -20,6 +20,9 @@ Todas as funcionalidades, tela por tela: [`docs/Pyron_Funcionalidades.pdf`](docs
 > ([ScienceDB 10185](https://doi.org/10.57760/sciencedb.10185)), licença
 > [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/): uso não comercial, para estudo.
 
+> A janela do `Pyron.exe` usa o Microsoft Edge WebView2 SDK (`lancador/webview2`, versão 1.0.4314.35),
+> © Microsoft Corporation, redistribuído sob a licença BSD em [`lancador/webview2/LICENSE.txt`](lancador/webview2/LICENSE.txt).
+
 ## Aplicativo de apresentação
 
 Para apresentar só a identificação de para-raios (análise das fotos com o ponto mais quente, o modelo

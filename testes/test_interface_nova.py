@@ -175,3 +175,19 @@ def test_salvar_explicito_pergunta_antes_de_sair_e_versoes_iguais():
     versao = f'VERSAO_INTERFACE = "{servidor.VERSAO}"'
     assert versao in (js / "base.js").read_text(encoding="utf-8")
     assert versao in (Path(servidor.PASTA_APP) / "estatico" / "app.js").read_text(encoding="utf-8")
+
+
+def test_janela_propria_sem_barra_do_windows():
+    """A janela do Pyron.exe (WebView2) não tem a barra do Windows: o topo da interface arrasta a janela e tem os
+    botões; as DLLs da Microsoft ficam no projeto com a licença; fora da janela própria nada muda."""
+    raiz = Path(servidor.PASTA_APP).parent
+    for nome in ("Microsoft.Web.WebView2.Core.dll", "Microsoft.Web.WebView2.WinForms.dll", "WebView2Loader.dll", "LICENSE.txt"):
+        assert (raiz / "lancador" / "webview2" / nome).exists(), nome
+    janela = (raiz / "lancador" / "Janela.cs").read_text(encoding="utf-8")
+    assert "IsNonClientRegionSupportEnabled = true" in janela and "0x0083" in janela  # app-region e WM_NCCALCSIZE
+    casca = (PASTA / "js" / "casca.js").read_text(encoding="utf-8")
+    assert "window.chrome && window.chrome.webview" in casca
+    for acao in ("minimizar", "maximizar", "fechar"):
+        assert f'botao("{acao}"' in casca, acao
+    css = (PASTA / "base.css").read_text(encoding="utf-8")
+    assert ".janela-propria .topo { -webkit-app-region: drag; app-region: drag;" in css

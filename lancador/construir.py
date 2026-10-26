@@ -4,6 +4,7 @@ O .exe é compilado com o csc.exe do .NET Framework 4, que já vem com o Windows
 Ele guarda o caminho desta pasta do projeto; se o projeto mudar de lugar, rode de novo.
 O ícone vem de marca/gerar_marca.py. A logo da tela de abertura é lida da pasta do projeto: com a
 imagem embutida o .exe ficou grande e o Controle Inteligente de Aplicativos do Windows o bloqueou.
+A janela sem a barra do Windows usa o WebView2: as DLLs ficam em lancador/webview2 (versão 1.0.4314.35).
 
 Uso (na pasta do projeto):
 
@@ -23,6 +24,9 @@ from pathlib import Path
 AQUI = Path(__file__).resolve().parent
 PROJETO = AQUI.parent
 DIST = AQUI / "dist"
+# DLLs do WebView2 (NuGet Microsoft.Web.WebView2, assinadas pela Microsoft, licença em webview2/LICENSE.txt):
+# o .exe as carrega desta pasta, não as embute.
+WEBVIEW2 = AQUI / "webview2"
 
 MANIFESTO = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
@@ -86,7 +90,8 @@ def construir() -> Path:
         str(compilador()), "/nologo", "/target:winexe", "/optimize+", "/codepage:65001",
         f"/win32icon:{icone}", f"/win32manifest:{manifesto}", f"/out:{saida}",
         "/r:System.dll", "/r:System.Drawing.dll", "/r:System.Windows.Forms.dll",
-        str(AQUI / "Pyron.cs"), str(local),
+        f"/r:{WEBVIEW2 / 'Microsoft.Web.WebView2.Core.dll'}", f"/r:{WEBVIEW2 / 'Microsoft.Web.WebView2.WinForms.dll'}",
+        str(AQUI / "Pyron.cs"), str(AQUI / "Janela.cs"), str(local),
     ]
     r = subprocess.run(comando, capture_output=True, text=True, encoding="oem", errors="replace")
     if r.returncode != 0:

@@ -81,6 +81,7 @@
   --acao-linha: var(--cobalto-200);
   --foco: var(--cobalto-500);       /* 4,7:1 */
   --hover: var(--n-200);
+  --fechar-janela: #C42B1C;          /* fundo do botão fechar da janela ao passar o mouse: convenção do Windows */
 
   /* palco do termograma: grafite neutro, sem matiz */
   --palco: #121418;
