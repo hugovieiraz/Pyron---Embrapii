@@ -29,6 +29,12 @@ núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Te
   `telas.css`. **Tela de referência: a Análise** (`js/telas/analise.js` + `js/analise/`, `docs/interface/4-analise.md`):
   contexto com `ouvir()/mudou()`, salvamento automático com "Salvo", Desfazer em vez de confirmar; as
   outras telas seguem esse padrão. Testes visuais: `?conferir`, `?tema=escuro`, `?toque` no endereço.
+- **Telas de lista** (padrão de Inspeções, `docs/interface/5a-painel-inspecoes.md`): filtro segmentado com a
+  contagem dentro, busca sem acento, filtros e ordem no endereço (`history.replaceState`), `tabela()` com
+  `marcar` e `aoMenu`, barra de seleção flutuante embaixo (anexada ao `body`), a tabela rola por dentro.
+  Regras de leitura da lista (situação atual, severidade) em `js/situacao.js`; laudo só por `js/laudo.js`;
+  importação só por `js/importar.js`. Estado vazio sem dados: pré-visualização `pyron-vazio` (porta 8791,
+  `saida/dados_vazio`, apagar pela Lixeira depois).
 - Conferir: `testes/test_interface_nova.py` (regra dura do CSS, foco, módulos) e o catálogo
   `/nova/catalogo.html` com "Conferir acessibilidade" (claro, `?tema=escuro`, `?toque`).
 
@@ -102,7 +108,7 @@ núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Te
   apresentação o modo celular é **só identificação** (sem leitura da barra de cores).
 
 **Comandos** (na raiz, sempre com o Python do `.venv`):
-- Testes: `.venv/Scripts/python.exe -m pytest -q` (pastas `testes` e `tests`, ≈240 testes, ~40 s).
+- Testes: `.venv/Scripts/python.exe -m pytest -q` (pastas `testes` e `tests`, ≈245 testes, ~40 s).
 - Pyron para testar sem dados reais: pré-visualização `pyron-demo` (`.claude/launch.json`, porta 8790,
   dados em `saida/dados_demo`). Apresentação: pré-visualização `apresentacao` (porta 8792).
 - Abrir de verdade: atalhos "Abrir Pyron" e "Pyron Apresentação" da área de trabalho (`pythonw.exe -m apresentacao`).

@@ -12,7 +12,7 @@ export function el(tag, props = {}, ...filhos) {
   for (const [k, v] of Object.entries(props)) {
     if (v == null || v === false) continue;
     if (k === "class") n.className = v;
-    else if (k === "style") Object.assign(n.style, v);
+    else if (k === "style") for (const [prop, valor] of Object.entries(v)) { if (prop.startsWith("--")) n.style.setProperty(prop, valor); else n.style[prop] = valor; }
     else if (k === "dataset") Object.assign(n.dataset, v);
     else if (k.startsWith("on") && typeof v === "function") n.addEventListener(k.slice(2), v);
     else if (k in n && typeof v !== "string") n[k] = v;
@@ -50,6 +50,18 @@ const paraData = (iso) => {
 };
 export const data = (iso) => { const d = paraData(iso); return d ? dataCurta.format(d) : T.geral.semValor; };
 export const dataHora = (iso) => { const d = paraData(iso); return d ? dataHoraCurta.format(d).replace(",", "") : T.geral.semValor; };
+
+/** Data relativa ao dia de hoje: "hoje", "ontem", "há 3 dias", "em 12 dias", "há 5 meses", "há 2 anos". */
+const relativo = new Intl.RelativeTimeFormat("pt-BR", { numeric: "auto" });
+export function relativa(iso, agora = new Date()) {
+  const d = paraData(iso);
+  if (!d) return T.geral.semValor;
+  const dia = (x) => Date.UTC(x.getFullYear(), x.getMonth(), x.getDate());
+  const dias = Math.round((dia(d) - dia(agora)) / 86400000);
+  if (Math.abs(dias) < 45) return relativo.format(dias, "day");
+  if (Math.abs(dias) < 545) return relativo.format(Math.round(dias / 30.44), "month");
+  return relativo.format(Math.round(dias / 365.25), "year");
+}
 
 /** Lê número digitado com vírgula ou ponto ("31,5", "31.5", "1.234,5"); devolve null se não for número. */
 export function lerNumero(texto) {

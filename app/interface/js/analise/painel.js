@@ -138,8 +138,8 @@ export function montarPainel(ctx, { equipamentos }) {
     const inst = campo({ rotulo: A.instalacao, valor: id.instalacao || "", list: "dl-instalacoes", autocomplete: "off" });
     const equip = campo({ rotulo: A.equipamento, valor: id.equipamento || "", list: "dl-equipamentos", autocomplete: "off" });
     const resps = ctx.config.responsaveis || [];
-    const resp = campo({ rotulo: T.analise.responsavel, opcoes: [{ valor: "", texto: A.semResponsavelOpcao }, ...resps.map((r) => ({ valor: r.id, texto: [r.nome, r.registro].filter(Boolean).join(", ") }))], valor: id.responsavel_id || "" });
-    const art = campo({ rotulo: A.art, valor: id.art || "", marcador: A.artMarcador, autocomplete: "off" });
+    const resp = campo({ rotulo: T.laudo.responsavel, opcoes: [{ valor: "", texto: A.semResponsavelOpcao }, ...resps.map((r) => ({ valor: r.id, texto: [r.nome, r.registro].filter(Boolean).join(", ") }))], valor: id.responsavel_id || "" });
+    const art = campo({ rotulo: T.laudo.art, valor: id.art || "", marcador: T.laudo.artMarcador, autocomplete: "off" });
     const obs = campo({ rotulo: A.observacoes, area: true, valor: id.observacoes || "", marcador: A.observacoesMarcador });
     const ler = () => ({ identificacao: { ...id, instalacao: inst.querySelector("input").value.trim(), equipamento: equip.querySelector("input").value.trim(),
       responsavel_id: resp.querySelector("select").value, art: art.querySelector("input").value.trim(), observacoes: obs.querySelector("textarea").value.trim() } });

@@ -141,28 +141,46 @@ export function indicador({ rotulo, valor, nota, severidade, href, onclick }) {
 
 // ---------------------------------------------------------------- tabela
 /**
- * tabela({ rotulo, colunas: [{ chave, titulo, classe, ordenavel, celula(linha) }], linhas, severidade(linha), href(linha), ordem, aoOrdenar })
- * A linha inteira é clicável, mas o alvo de teclado é o link da primeira coluna de texto (sem div clicável).
+ * tabela({ rotulo, colunas: [{ chave, titulo, classe, ordenavel, link, celula(linha) }], linhas, severidade(linha), href(linha), ordem, aoOrdenar,
+ *          marcar: { rotulo(linha), marcada(linha), aoMudar(linhas, sim, todas), todas }, aoMenu(linha, evento) })
+ * A linha inteira é clicável, mas o alvo de teclado é o link da coluna com link: true (ou da primeira), sem div clicável.
+ * Com marcar, a primeira coluna tem a caixa de seleção e o cabeçalho marca ou desmarca todas as linhas visíveis.
  */
-export function tabela({ rotulo, colunas, linhas, severidade, href, ordem, aoOrdenar, selecionada }) {
+export function tabela({ rotulo, colunas, linhas, severidade, href, ordem, aoOrdenar, selecionada, marcar: sel, aoMenu }) {
   const comTraco = Boolean(severidade);
-  const cab = el("tr", {}, comTraco ? el("th", { "aria-hidden": "true" }) : null, colunas.map((c) => {
+  const iLink = Math.max(0, colunas.findIndex((c) => c.link));
+  let todas = null;
+  if (sel) {
+    todas = el("input", { type: "checkbox", "aria-label": sel.todas, onchange: (ev) => sel.aoMudar(linhas, ev.target.checked, true) });
+  }
+  const sincronizarTodas = () => {
+    if (!todas) return;
+    const n = linhas.filter((l) => sel.marcada(l)).length;
+    todas.checked = n > 0 && n === linhas.length;
+    todas.indeterminate = n > 0 && n < linhas.length;
+  };
+  const cab = el("tr", {}, sel ? el("th", { class: "celula-marcar" }, el("label", { class: "alvo-marcar" }, todas)) : null, comTraco ? el("th", { class: "celula-traco", "aria-hidden": "true" }) : null, colunas.map((c) => {
     const sentido = ordem && ordem.chave === c.chave ? (ordem.sentido === "asc" ? "ascending" : "descending") : null;
     return el("th", { scope: "col", class: c.classe, "aria-sort": sentido },
       c.ordenavel ? el("button", { type: "button", onclick: () => aoOrdenar?.(c.chave) }, c.titulo, sentido ? icone("ordenar", "ic p") : null) : c.titulo);
   }));
   const corpo = el("tbody", {}, linhas.map((l) => {
     const destino = href?.(l);
-    const tr = el("tr", { class: destino ? "clicavel" : null, "aria-selected": selecionada ? String(selecionada(l)) : null },
+    const marcada = sel ? sel.marcada(l) : false;
+    const tr = el("tr", { class: [destino && "clicavel", marcada && "marcada"].filter(Boolean).join(" ") || null, "aria-selected": selecionada ? String(selecionada(l)) : null },
+      sel ? el("td", { class: "celula-marcar" }, el("label", { class: "alvo-marcar" }, el("input", { type: "checkbox", checked: marcada, "aria-label": sel.rotulo(l),
+        onchange: (ev) => { tr.classList.toggle("marcada", ev.target.checked); sel.aoMudar([l], ev.target.checked); sincronizarTodas(); } }))) : null,
       comTraco ? el("td", { class: `traco-celula sev-${severidade(l)}` }) : null,
       colunas.map((c, i) => {
         let conteudo = c.celula ? c.celula(l) : l[c.chave];
-        if (i === 0 && destino) conteudo = el("a", { href: destino, class: "forte" }, conteudo);
+        if (i === iLink && destino) conteudo = el("a", { href: destino, class: "forte" }, conteudo);
         return el("td", { class: c.classe }, conteudo);
       }));
     if (destino) tr.addEventListener("click", (ev) => { if (!ev.target.closest("a, button, input, label")) location.hash = destino.replace(/^#/, ""); });
+    if (aoMenu) tr.addEventListener("contextmenu", (ev) => { ev.preventDefault(); aoMenu(l, ev); });
     return tr;
   }));
+  sincronizarTodas();
   return el("div", { class: "tabela-caixa" }, el("table", { class: "tabela", "aria-label": rotulo }, el("thead", {}, cab), corpo));
 }
 
@@ -173,6 +191,8 @@ export const esqueleto = {
   indicadores: (n = 4) => el("div", { class: "esqueleto" }, el("div", { class: "grade" }, Array.from({ length: n }, () => esq("bloco")))),
   tabela: (n = 6) => el("div", { class: "esqueleto tabela-caixa", "aria-busy": "true", "aria-label": T.geral.carregando },
     Array.from({ length: n }, () => el("div", { class: "linha-tabela" }, esq("linha"), esq("linha"), esq("linha"), esq("linha")))),
+  lista: () => el("div", { class: "esqueleto", "aria-busy": "true", "aria-label": T.geral.carregando, style: { paddingTop: "var(--e-6)" } },
+    esq("titulo"), esq("linha", { width: "40%" }), el("div", { class: "tabela-caixa" }, Array.from({ length: 8 }, () => el("div", { class: "linha-tabela" }, esq("linha"), esq("linha"), esq("linha"), esq("linha"))))),
   pagina: () => el("div", { class: "esqueleto", "aria-busy": "true", "aria-label": T.geral.carregando, style: { paddingTop: "var(--e-6)" } },
     esq("titulo"), el("div", { class: "grade" }, Array.from({ length: 4 }, () => esq("bloco"))), esq("cheio")),
 };
@@ -341,10 +361,11 @@ export function confirmar({ titulo, texto, confirmar: rotulo, perigo = false }) 
 
 // ---------------------------------------------------------------- menu
 /**
- * menu(gatilho, itens): itens = [{ texto, icone, executar, marcado, perigo, desabilitado } | { separador: true } | { grupo: "..." }]
+ * menu(gatilho, itens, { em, descartar }): itens = [{ texto, icone, executar, marcado, perigo, desabilitado } | { separador: true } | { grupo: "..." }]
  * Usa popover nativo (fecha com Esc e clique fora); setas, Home e End percorrem os itens.
+ * Com em = { x, y } (menu de contexto, botão direito), abre já no ponteiro; o foco volta ao gatilho ao fechar.
  */
-export function menu(gatilho, itens) {
+export function menu(gatilho, itens, { em = null, descartar = false } = {}) {
   const m = el("div", { class: "menu", popover: "auto", role: "menu", id: novoId("menu") });
   const comMarca = itens.some((i) => "marcado" in i);
   for (const i of itens) {
@@ -369,7 +390,7 @@ export function menu(gatilho, itens) {
   m.addEventListener("toggle", (ev) => {
     gatilho.setAttribute("aria-expanded", String(ev.newState === "open"));
     if (ev.newState === "open") {
-      const r = gatilho.getBoundingClientRect();
+      const r = em ? { left: em.x, right: em.x, bottom: em.y } : gatilho.getBoundingClientRect();
       const largura = m.offsetWidth;
       const folga = parseFloat(token("e-1"));
       const margem = parseFloat(token("e-2"));
@@ -378,10 +399,16 @@ export function menu(gatilho, itens) {
       const esquerda = r.left + largura <= innerWidth - margem ? r.left : r.right - largura;
       m.style.left = `${Math.max(margem, esquerda)}px`;
       itensFoco()[0]?.focus();
-    } else if (m.contains(document.activeElement) || document.activeElement === document.body) {
-      gatilho.focus();
+    } else {
+      if (m.contains(document.activeElement) || document.activeElement === document.body) gatilho.focus();
+      if (descartar) setTimeout(() => m.remove(), duracao("rapida"));
     }
   });
+  if (em) {
+    document.body.append(m);
+    m.showPopover();
+    return m;
+  }
   gatilho.setAttribute("aria-haspopup", "menu");
   gatilho.setAttribute("aria-expanded", "false");
   gatilho.setAttribute("aria-controls", m.id);

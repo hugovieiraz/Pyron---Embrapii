@@ -14,6 +14,12 @@
       "port": 8790
     },
     {
+      "name": "pyron-vazio",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": ["app/iniciar.py", "--porta", "8791", "--sem-navegador", "--dados", "saida/dados_vazio"],
+      "port": 8791
+    },
+    {
       "name": "esbocos",
       "runtimeExecutable": ".venv/Scripts/python.exe",
       "runtimeArgs": ["-m", "http.server", "8794", "--bind", "127.0.0.1"],

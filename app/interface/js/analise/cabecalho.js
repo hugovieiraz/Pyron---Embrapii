@@ -2,7 +2,8 @@
 // estado "Salvo" e as ações (Detectar de novo, Mais opções, Gerar laudo).
 import { TEXTOS as T } from "../../textos.js";
 import { el, api, json, dataHora, data as dataCurta } from "../base.js";
-import { botao, campo, selo, menu, dialogo, confirmar, avisar } from "../componentes.js";
+import { botao, selo, menu, confirmar, avisar } from "../componentes.js";
+import { abrirLaudo as laudoDialogo } from "../laudo.js";
 import { endereco } from "../rotas.js";
 
 const A = T.analise;
@@ -64,27 +65,8 @@ export function montarCabecalho(ctx) {
   const laudo = botao({ texto: A.laudo, icone: "laudo", variante: "primario", onclick: abrirLaudo });
   function abrirLaudo() {
     if (ctx.a.sem_temperatura) return;
-    const resps = ctx.config.responsaveis || [];
-    if (!resps.length) {
-      dialogo({ titulo: A.laudoTitulo, corpo: [el("p", {}, A.semResponsavel)], acoes: [el("a", { class: "btn primario", href: "/#configuracoes/identidade" }, A.cadastrar)] }).abrir();
-      return;
-    }
     const id = ctx.a.identificacao || {};
-    const escolhido = id.responsavel_id || ctx.config.responsavel_padrao || resps[0].id;
-    const resp = campo({ rotulo: A.responsavel, opcoes: resps.map((r) => ({ valor: r.id, texto: [r.nome, r.registro].filter(Boolean).join(", ") })), valor: escolhido });
-    const art = campo({ rotulo: A.art, valor: id.art || "", marcador: A.artMarcador, autocomplete: "off" });
-    const dlg = dialogo({
-      titulo: A.laudoTitulo, corpo: [resp, art],
-      acoes: [
-        botao({ texto: T.geral.cancelar, onclick: () => dlg.fechar() }),
-        botao({ texto: A.gerar, icone: "laudo", variante: "primario", onclick: () => {
-          const url = `/api/analises/${ctx.a.id}/laudo.pdf?${new URLSearchParams({ responsavel: resp.querySelector("select").value, art: art.querySelector("input").value.trim() })}`;
-          dlg.fechar();
-          window.open(url, "_blank", "noopener");
-          avisar(A.laudoAberto, { acao: { rotulo: A.abrirDeNovo, executar: () => window.open(url, "_blank", "noopener") } });
-        } }),
-      ],
-    }).abrir();
+    laudoDialogo({ ids: [ctx.a.id], config: ctx.config, responsavel: id.responsavel_id, art: id.art });
   }
 
   // ---------------------------------------------------------------- redesenho

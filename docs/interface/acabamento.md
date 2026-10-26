@@ -78,6 +78,10 @@ não é alinhada ao termograma, e o 7 fica para a tela Inspeções (5a). Detalhe
 
 ## 3. Toques finais: prioridade média
 
+**Etapa 5a (25/10):** feitos 7 (parte 2), 12, 13, 16, 17 e 19; o 11 (barra de status) foi descartado (24 px a
+menos na Análise, e cada informação já tem lugar); o 15 cede à decisão da Etapa 1; 14 fica para a 5b, 18 para a 6
+e 20 para a 5d. Detalhes em `5a-painel-inspecoes.md`.
+
 11. **Barra de status no rodapé** (24 px, texto 14 px): servidor ● conectado, câmera, detector
     carregado, versão. Clicar abre o item correspondente. Padrão de software técnico.
 12. **Dica com atalho** nos botões da barra de ferramentas: "Importar · Ctrl+I", aparece em 600 ms.

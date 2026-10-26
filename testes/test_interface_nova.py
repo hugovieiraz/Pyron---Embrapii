@@ -105,3 +105,14 @@ def test_textos_sem_emoji():
     emoji = re.compile("[\U0001F300-\U0001FAFF\u2600-\u27BF\u2B50\u2728]")
     for arq in [PASTA / "textos.js", PASTA / "index.html", PASTA / "catalogo.html"]:
         assert not emoji.findall(arq.read_text(encoding="utf-8")), arq.name
+
+
+def test_painel_e_inspecoes_tem_tela_propria_e_laudo_compartilhado():
+    """Etapa 5a: Painel e Inspeções saíram da tela provisória; o diálogo do laudo é um só (Análise e Inspeções)."""
+    rotas = (PASTA / "js" / "rotas.js").read_text(encoding="utf-8")
+    for tela in ("painel", "inspecoes"):
+        assert re.search(rf'{tela}: \{{[^}}]*modulo: "{tela}"', rotas), tela
+    for usuario in ("js/analise/cabecalho.js", "js/telas/inspecoes.js"):
+        assert 'from "../laudo.js"' in (PASTA / usuario).read_text(encoding="utf-8"), usuario
+    assert "laudo.pdf" not in (PASTA / "js" / "analise" / "cabecalho.js").read_text(encoding="utf-8")
+

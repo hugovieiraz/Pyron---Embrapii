@@ -34,7 +34,7 @@ async function mostrarRota() {
   const def = ROTAS[rota.tela];
   const modulo = rota.partes.length && def.detalhe ? def.detalhe : def.modulo;
   document.title = T.casca.titulo(def.titulo);
-  conteudo.replaceChildren(el("div", { class: "pagina" }, esqueleto.pagina()));
+  conteudo.replaceChildren(el("div", { class: "pagina" }, esqueleto[(!rota.partes.length && def.esqueleto) || "pagina"]()));
   try {
     const tela = await import(`./telas/${modulo}.js`);
     const pagina = el("div", { class: "pagina entra" });

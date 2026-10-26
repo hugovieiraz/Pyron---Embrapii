@@ -3,8 +3,8 @@
 import { TEXTOS as T } from "../textos.js";
 
 export const ROTAS = {
-  painel: { titulo: T.telas.painel, modulo: "provisoria", atalho: "1", icone: "painel" },
-  inspecoes: { titulo: T.telas.inspecoes, modulo: "provisoria", atalho: "2", icone: "inspecoes", detalhe: "analise" },
+  painel: { titulo: T.telas.painel, modulo: "painel", atalho: "1", icone: "painel" },
+  inspecoes: { titulo: T.telas.inspecoes, modulo: "inspecoes", esqueleto: "lista", atalho: "2", icone: "inspecoes", detalhe: "analise" },
   equipamentos: { titulo: T.telas.equipamentos, modulo: "provisoria", atalho: "3", icone: "equipamentos", detalhe: "provisoria" },
   pendencias: { titulo: T.telas.pendencias, modulo: "provisoria", atalho: "4", icone: "pendencias" },
   captura: { titulo: T.telas.captura, modulo: "captura", detalhe: "captura", atalho: "5", icone: "captura" },
