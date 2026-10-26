@@ -50,6 +50,7 @@ class Medida:
     tamanho_imagem: list = field(default_factory=list)  # [largura, altura] em pixels, já na orientação do EXIF
     nota_contorno: float | None = None
     contorno: list = field(default_factory=list)  # polígonos [[x, y], ...] em pixels
+    contorno_referencia: list = field(default_factory=list)
     tempos_ms: dict = field(default_factory=dict)
     modelos: dict = field(default_factory=dict)
 
@@ -124,8 +125,9 @@ def medir_geometria(pontos: np.ndarray, mascara: np.ndarray) -> dict:
             projetados = pontos
             pl2 = g.plano(pontos, mascara)
         medidas = {"comprimento": pl2.comprimento, "largura": pl2.largura}
-        # plano de pé (porta, parede, quadro): a altura é a extensão na vertical
-        if abs(pl.normal @ para_cima) < 0.5:
+        # plano de pé sobre um apoio achado (porta no chão): a altura é a extensão na vertical. Sem apoio não
+        # dá para saber se o plano está de pé ou deitado (cartão na mesa visto de cima): sem altura
+        if origem == "apoio" and abs(pl.normal @ para_cima) < 0.5:
             medidas["altura"] = g.altura(projetados, mascara, para_cima)
         return {"forma": "plano", "vertical": origem, "medidas": medidas}
     ext = g.extensoes(pontos, mascara)
@@ -215,8 +217,9 @@ class Medidor:
         r, mascara, nota = self._medir_pista(img, geo, pista, chave, tempos)
 
         fator, erro_escala, metodo = 1.0, ERRO_ESCALA_SEM_REFERENCIA, "sem referência"
+        mascara_ref = None
         if referencia:
-            rr, _, _ = self._medir_pista(img, geo, referencia, chave, tempos, rotulo="_referencia")
+            rr, mascara_ref, _ = self._medir_pista(img, geo, referencia, chave, tempos, rotulo="_referencia")
             qual = "distancia" if "pontos" in referencia else referencia.get("medida", "comprimento")
             ext_ref = rr["medidas"].get(qual)
             if ext_ref is None:
@@ -225,7 +228,8 @@ class Medidor:
             fator = g.fator_escala(ext_ref.valor, real_m)
             # o erro que sobra é o da própria referência medida (pixels e ruído), relativo
             erro_escala = ext_ref.incerteza() / ext_ref.valor
-            metodo = f"referência: {referencia.get('nome') or 'informada'} ({referencia['tamanho_cm']:g} cm)"
+            tamanho = f"{referencia['tamanho_cm']:g}".replace(".", ",")
+            metodo = f"referência: {referencia.get('nome') or 'informada'} ({tamanho} cm)"
 
         saida = Medida(
             metodo=metodo,
@@ -236,6 +240,7 @@ class Medidor:
             tamanho_imagem=[img.width, img.height],
             nota_contorno=None if nota is None else round(nota, 3),
             contorno=[] if mascara is None else contorno(mascara),
+            contorno_referencia=[] if mascara_ref is None else contorno(mascara_ref),
             modelos={"profundidade": geo.modelo, "contorno": getattr(self._segmentador, "nome", "")},
         )
         for nome, ext in r["medidas"].items():

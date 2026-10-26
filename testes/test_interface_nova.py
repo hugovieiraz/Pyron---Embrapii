@@ -140,11 +140,12 @@ def test_equipamentos_e_pendencias_tem_tela_propria_e_formulario_compartilhado()
 
 
 def test_captura_tem_as_quatro_abas_e_so_fontes_que_funcionam():
-    """Etapa 5c: Captura com as abas Pasta monitorada, Vídeo, Celular e Alertas (um módulo cada); as fontes e o
-    envio que ainda não existem (RTSP, SDK da FLIR, WhatsApp automático) não aparecem na tela."""
+    """Etapa 5c: Captura com as abas Pasta monitorada, Vídeo, Celular, Medir foto (roteiro de medição, fase 5) e
+    Alertas (um módulo cada); as fontes e o envio que ainda não existem (RTSP, SDK da FLIR, WhatsApp automático)
+    não aparecem na tela."""
     casca = (PASTA / "js" / "telas" / "captura.js").read_text(encoding="utf-8")
-    assert 'const ABAS = ["pasta", "video", "celular", "alertas"]' in casca
-    for aba in ("pasta", "video", "celular", "alertas"):
+    assert 'const ABAS = ["pasta", "video", "celular", "medir", "alertas"]' in casca
+    for aba in ("pasta", "video", "celular", "medir", "alertas"):
         assert (PASTA / "js" / "captura" / f"{aba}.js").exists(), aba
     codigo = [l for l in (PASTA / "js" / "captura" / "pasta.js").read_text(encoding="utf-8").splitlines() if not l.strip().startswith("//")]
     assert not any(p in l.lower() for l in codigo for p in ("rtsp", "flir_sdk", "automatico"))
@@ -158,7 +159,7 @@ def test_modelos_e_configuracoes_usam_a_tela_com_abas():
     assert "provisoria" not in rotas
     for tela, pasta, abas in (("modelos", "modelos", ("emuso", "treino", "avaliacao")),
                               ("configuracoes", "configuracoes", ("empresa", "criterio", "componentes", "aparencia", "dados", "sobre")),
-                              ("captura", "captura", ("pasta", "video", "celular", "alertas"))):
+                              ("captura", "captura", ("pasta", "video", "celular", "medir", "alertas"))):
         assert 'from "../telaAbas.js"' in (PASTA / "js" / "telas" / f"{tela}.js").read_text(encoding="utf-8"), tela
         for aba in abas:
             assert (PASTA / "js" / pasta / f"{aba}.js").exists(), f"{pasta}/{aba}"

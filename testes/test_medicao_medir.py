@@ -45,6 +45,7 @@ def test_referencia_corrige_a_escala(cena):
     assert abs(m.comprimento_cm - 210) <= m.incerteza_cm["comprimento"]
     assert m.fator_escala == pytest.approx(1 / 1.08, rel=0.01)
     assert m.metodo.startswith("referência: régua")
+    assert m.contorno_referencia and m.contorno
 
 
 def test_caixa_e_dois_pontos(cena):
