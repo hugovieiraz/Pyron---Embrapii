@@ -2013,25 +2013,42 @@ def medicao_estado() -> dict:
             "referencias_auto": {k: {"nome": v["nome"], "lado_cm": v["lado_cm"]} for k, v in REFERENCIAS_AUTO.items()}}
 
 
-@app.post("/api/medicao/baixar")
-def medicao_baixar(corpo: dict = Body(...)) -> dict:
-    """Baixa do Hugging Face os pesos de um modelo da medição (``da3``, ``moge`` ou ``sam``; só os da lista,
-    todos MIT ou Apache 2.0). Leva minutos: a tela espera com o botão ocupado."""
-    from nucleo.medicao import modelos as modelos_medicao
+# instalação dos modelos da medição pela tela (pip + pesos): uma por vez, numa linha de execução à parte
+_instalacao_medicao: dict = {"modelo": None, "etapa": None, "erro": None, "ativa": False}
 
-    variante = modelos_medicao.VARIANTE_DO_MODELO.get(str(corpo.get("modelo")))
-    if variante is None:
+
+@app.get("/api/medicao/instalar")
+def medicao_instalacao() -> dict:
+    """Como vai a instalação pedida em Modelos › Medição."""
+    return dict(_instalacao_medicao)
+
+
+@app.post("/api/medicao/instalar")
+def medicao_instalar(corpo: dict = Body(...)) -> dict:
+    """Instala os pacotes que faltam e baixa os pesos de ``da3``, ``moge`` ou ``sam`` (só os da lista, todos MIT
+    ou Apache 2.0). Leva minutos: volta na hora e a tela acompanha por ``GET /api/medicao/instalar``."""
+    from nucleo.medicao import instalar
+
+    modelo = str(corpo.get("modelo"))
+    if modelo not in instalar.PACOTES:
         raise HTTPException(400, "Modelo desconhecido (use da3, moge ou sam).")
-    if not modelos_medicao.pacote("huggingface_hub"):
-        raise HTTPException(409, "Falta o pacote huggingface_hub para baixar os pesos.")
-    try:
-        modelos_medicao.baixar([variante])
-    except Exception as e:  # rede, disco, Hugging Face fora do ar
-        raise HTTPException(502, f"Não consegui baixar os pesos: {e}") from e
-    import nucleo.medicao
+    if _instalacao_medicao["ativa"]:
+        raise HTTPException(409, "Já há uma instalação em andamento.")
+    _instalacao_medicao.update(modelo=modelo, etapa="começando", erro=None, ativa=True)
 
-    nucleo.medicao.esquecer()
-    return medicao_estado()
+    def rodar():
+        import nucleo.medicao
+
+        try:
+            instalar.instalar(modelo, aviso=lambda etapa: _instalacao_medicao.update(etapa=etapa))
+            nucleo.medicao.esquecer()  # o padrão pode ter mudado para o DA3
+        except Exception as e:  # pip, rede, disco
+            _instalacao_medicao["erro"] = str(e)
+        finally:
+            _instalacao_medicao["ativa"] = False
+
+    threading.Thread(target=rodar, daemon=True, name="instalar-medicao").start()
+    return dict(_instalacao_medicao)
 
 
 @app.post("/api/medicao")

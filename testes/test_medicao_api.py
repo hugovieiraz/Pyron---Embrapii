@@ -133,20 +133,41 @@ def test_estado(cliente, tmp_path, monkeypatch):
     assert not any(c["pesos"] for c in e["catalogo"])
 
 
-def test_baixar_pesos(cliente, tmp_path, monkeypatch):
-    from nucleo.medicao import modelos
+def test_instalar_pela_tela(cliente, monkeypatch):
+    import time
+
+    from nucleo.medicao import instalar
 
     cli, _ = cliente
-    monkeypatch.setenv("PYRON_MODELOS_MEDICAO", str(tmp_path / "pesos"))
-    assert cli.post("/api/medicao/baixar", json={"modelo": "outro"}).status_code == 400
+    assert cli.post("/api/medicao/instalar", json={"modelo": "outro"}).status_code == 400
     pedidos = []
-    monkeypatch.setattr(modelos, "pacote", lambda nome: True)
-    monkeypatch.setattr(modelos, "baixar", lambda variantes: pedidos.extend(variantes) or [])
-    r = cli.post("/api/medicao/baixar", json={"modelo": "moge"})
+    monkeypatch.setattr(instalar, "instalar", lambda modelo, aviso: (aviso("baixando os pesos"), pedidos.append(modelo)))
+    r = cli.post("/api/medicao/instalar", json={"modelo": "moge"})
     assert r.status_code == 200, r.text
-    assert pedidos == ["vitl"]
-    assert "catalogo" in r.json()
+    for _ in range(50):
+        e = cli.get("/api/medicao/instalar").json()
+        if not e["ativa"]:
+            break
+        time.sleep(0.05)
+    assert pedidos == ["moge"] and e["erro"] is None and e["etapa"] == "baixando os pesos"
 
+
+def test_instalador_so_pede_o_que_falta(monkeypatch):
+    from nucleo.medicao import instalar, modelos
+
+    chamadas = []
+    tem = {"torch", "torchvision", "transformers", "huggingface_hub", "safetensors", "cv2", "pillow_heif", "einops"}
+    monkeypatch.setattr(modelos, "pacote", lambda nome: nome in tem)
+
+    def pip(argumentos, aviso):
+        chamadas.append(argumentos)
+        tem.update({"omegaconf", "addict"} if "omegaconf" in argumentos else {"depth_anything_3"})
+
+    monkeypatch.setattr(instalar, "_pip", pip)
+    monkeypatch.setattr(modelos, "catalogo", lambda: [{"id": "da3", "pesos": True}])
+    instalar.instalar("da3", aviso=lambda _: None)
+    assert chamadas[0] == ["omegaconf", "addict"]  # o torch que já existe não entra
+    assert chamadas[1][:2] == ["--no-deps", "--ignore-requires-python"] and chamadas[1][2].endswith(".zip")
 
 def test_medir_pelo_plano_da_referencia_sem_modelo(cliente):
     cli, _ = cliente

@@ -46,8 +46,8 @@ núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Te
   `referencia_auto.py` acha o post-it rosa (8 cm) pela cor;
   `modelos.py` pesos em `modelos/medicao/`). API `/api/medicao`, `/api/medicao/estado`, `/api/medicao/plano`, `/api/medicao/referencia` e `/api/medicao/comparar`
   (mede nos dois modelos, sem e com referência, e grava em `registro.py`: fotos com os bytes originais). Pelo celular:
-  `/c/{token}/medir` (`app/estatico/medir_celular.*`, QR na seção "Medir pelo celular"), foto enviada sem recomprimir. Estado, erro e baixar pesos: Modelos › Medição
-  (`js/modelos/medicao.js`, `/api/medicao/baixar`).
+  `/c/{token}/medir` (`app/estatico/medir_celular.*`, QR na seção "Medir pelo celular"), foto enviada sem recomprimir. Estado, erro e o botão Instalar: Modelos › Medição
+  (`js/modelos/medicao.js`, `/api/medicao/instalar`; pacotes que faltam + pesos por `nucleo/medicao/instalar.py`, que nunca troca o torch).
   Licenças: só MIT e Apache 2.0 (nada CC BY-NC, AGPL, GPL; Depth Pro fora). Sem os pesos, a aba abre no modo
   "Retângulo de referência".
 - Conferir: `testes/test_interface_nova.py` (regra dura do CSS, foco, módulos), axe (WCAG 2.2 AA, Etapa 6) e o catálogo
@@ -127,7 +127,7 @@ núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Te
 - Testes: `.venv/Scripts/python.exe -m pytest -q` (pastas `testes` e `tests`, ≈255 testes, ~40 s).
 - Pyron para testar sem dados reais: pré-visualização `pyron-demo` (`.claude/launch.json`, porta 8790,
   dados em `saida/dados_demo`). Apresentação: pré-visualização `apresentacao` (porta 8792).
-- Medição em foto: instalar `.venv/Scripts/pip install --no-deps git+https://github.com/microsoft/MoGe.git` (mais o
+- Medição em foto: tudo de uma vez `.venv/Scripts/python.exe -m nucleo.medicao.instalar` (ou o botão em Modelos › Medição). À mão: `.venv/Scripts/pip install --no-deps git+https://github.com/microsoft/MoGe.git` (mais o
   extra `[medicao]` do `pyproject.toml`), DA3 `pip install --no-deps --ignore-requires-python git+https://github.com/ByteDance-Seed/Depth-Anything-3.git`
   (só a rede; a API dele puxa o `evo`, GPL), pesos `python -m nucleo.medicao.modelos --baixar da3 vitl small`, avaliação no
   gabarito `python -m ml.avaliar_medicao` (fotos e medidas reais em `testes/gabarito/`); fotos por pasta (uma

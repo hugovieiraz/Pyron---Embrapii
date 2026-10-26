@@ -9,6 +9,7 @@
 import { TEXTOS as T } from "../../textos.js";
 import { el, api, fmt, json, lerNumero } from "../base.js";
 import { botao, avisar, barraFerramentas, campo, esqueleto, estadoVazio, ocupado, secao } from "../componentes.js";
+import { endereco } from "../rotas.js";
 
 const M = T.medir;
 const SVG = "http://www.w3.org/2000/svg";
@@ -78,7 +79,8 @@ export async function montar(no) {
   const corpoPlano = el("div", { class: "grupo-campos" }, el("p", { class: "nota" }, M.planoTexto), retRef, ladoMaior, ladoMenor, el("div", { class: "grupo-btn" }, acharPostit, refazerCantos));
   const secaoRef = secao({ titulo: M.referenciaTitulo, conteudo: [corpoRef] });
   const secaoPlano = secao({ titulo: M.planoTitulo, conteudo: [corpoPlano] });
-  const avisoModelos = estado.pronto ? null : el("div", { class: "aviso-modelos" }, el("p", { class: "nota" }, M.semModelosNota), el("code", { class: "mono comando-medir" }, M.comandoInstalar));
+  const avisoModelos = estado.pronto ? null : el("div", { class: "aviso-modelos" }, el("p", { class: "nota" }, M.semModelosNota), el("code", { class: "mono comando-medir" }, M.comandoInstalar),
+    el("a", { class: "btn compacto", href: endereco("modelos", ["medicao"]) }, M.abrirModelos));
   const secaoResultado = el("section", {}, el("div", { class: "titulo-bloco" }, el("h2", {}, M.resultado)), caixaResultado);
   const caixaRegistro = el("div", { class: "registro-medir" });
   const caixaCelular = el("div", { class: "celular-medir" });
