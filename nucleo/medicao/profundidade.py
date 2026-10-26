@@ -81,19 +81,34 @@ def fov_do_exif(imagem: Image.Image) -> float | None:
     return math.degrees(2 * math.atan(w / (2 * f_px)))
 
 
+def _fp16_do_ambiente() -> bool | None:
+    """``PYRON_MEDICAO_FP16``: ``0`` desliga, ``1`` força; ausente = automático (None)."""
+    import os
+
+    valor = os.environ.get("PYRON_MEDICAO_FP16", "").strip().lower()
+    if valor in ("0", "false", "nao", "não", "off"):
+        return False
+    if valor in ("1", "true", "sim", "on"):
+        return True
+    return None
+
+
 class Profundidade:
     """MoGe-2 sob demanda. ``variante``: ``vits``, ``vitb`` ou ``vitl``. ``num_tokens``: resolução de entrada
     (o MoGe-2 usa de 1200 a 3600; padrão 3600). Na CPU de 4 núcleos da nuvem, o ViT-L levou ~19 s com 3600
     e ~4,5 s com 1200 numa foto de 900 × 1600."""
 
     def __init__(self, variante: str = modelos.MOGE_PADRAO, dispositivo: str | None = None, num_tokens: int | None = None,
-                 usar_exif: bool = True):
+                 usar_exif: bool = True, meia_precisao: bool | None = None):
         if variante not in modelos.MOGE:
             raise ValueError(f"variante do MoGe-2 desconhecida: {variante}")
         self.variante = variante
         self.dispositivo = dispositivo
         self.num_tokens = num_tokens
         self.usar_exif = usar_exif
+        # meia precisão (fp16) na placa de vídeo: None = automático (tenta e cai para fp32 se a saída vier vazia;
+        # na GTX 1650 o fp16 devolve máscara toda falsa). PYRON_MEDICAO_FP16=0/1 força.
+        self.meia_precisao = meia_precisao if meia_precisao is not None else _fp16_do_ambiente()
         self._modelo = None
         self._trava = threading.Lock()
 
@@ -123,12 +138,23 @@ class Profundidade:
         fov = fov_do_exif(img) if (self.usar_exif if usar_exif is None else usar_exif) else None
         t0 = time.perf_counter()
         x = torch.from_numpy(np.asarray(img, dtype=np.float32) / 255.0).permute(2, 0, 1).to(self.dispositivo)
-        with torch.inference_mode():
-            saida = modelo.infer(
-                x, fov_x=fov, num_tokens=num_tokens or self.num_tokens, use_fp16=self.dispositivo == "cuda"
-            )
-        pontos = saida["points"].float().cpu().numpy()
-        validos = saida["mask"].cpu().numpy().astype(bool) & np.all(np.isfinite(pontos), axis=-1)
+        tokens = num_tokens or self.num_tokens
+
+        def rodar(fp16: bool):
+            with torch.inference_mode():
+                saida = modelo.infer(x, fov_x=fov, num_tokens=tokens, use_fp16=fp16)
+            pontos = saida["points"].float().cpu().numpy()
+            validos = saida["mask"].cpu().numpy().astype(bool) & np.all(np.isfinite(pontos), axis=-1)
+            return saida, pontos, validos
+
+        fp16 = self.dispositivo == "cuda" and self.meia_precisao is not False
+        saida, pontos, validos = rodar(fp16)
+        if fp16 and not validos.any() and self.meia_precisao is None:
+            # placa sem fp16 confiável (GTX 16xx): refaz em fp32 e não tenta fp16 de novo nesta instância
+            self.meia_precisao = False
+            saida, pontos, validos = rodar(False)
+        elif fp16 and self.meia_precisao is None:
+            self.meia_precisao = True
         focal = float(saida["intrinsics"][0, 0].cpu()) * img.width
         return Geometria(
             pontos=pontos,

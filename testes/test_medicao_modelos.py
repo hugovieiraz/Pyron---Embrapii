@@ -165,3 +165,63 @@ def test_da3_de_ponta_a_ponta_e_padrao():
     assert m.modelos["profundidade"] == "depth-anything/DA3METRIC-LARGE"
     assert m.lente == "padrão"  # a foto do gabarito veio sem EXIF
     assert m.comprimento_cm > 5 * m.largura_cm
+class _MogeFalso:
+    """Imita o MoGe-2 na GTX 1650: em fp16 a máscara volta toda falsa; em fp32, cheia."""
+
+    def __init__(self, fp16_quebrado=True):
+        self.fp16_quebrado = fp16_quebrado
+        self.chamadas = []
+
+    def infer(self, x, fov_x=None, num_tokens=None, use_fp16=False):
+        self.chamadas.append(use_fp16)
+        h, w = x.shape[-2:]
+        pontos = torch.ones((h, w, 3))
+        mascara = torch.zeros((h, w), dtype=torch.bool) if (use_fp16 and self.fp16_quebrado) else torch.ones((h, w), dtype=torch.bool)
+        return {"points": pontos, "mask": mascara, "intrinsics": torch.eye(3)}
+
+
+def _prof_falsa(modelo, **kw):
+    from nucleo.medicao.profundidade import Profundidade
+
+    p = Profundidade("vits", dispositivo="cuda", **kw)  # "cuda" só no nome: o tensor fica na CPU
+    p._modelo = modelo
+    return p
+
+
+def test_fp16_vazio_cai_para_fp32(monkeypatch):
+    monkeypatch.delenv("PYRON_MEDICAO_FP16", raising=False)
+    monkeypatch.setattr(torch.Tensor, "to", lambda self, *a, **k: self)
+    falso = _MogeFalso(fp16_quebrado=True)
+    p = _prof_falsa(falso)
+    g = p.estimar(_foto())
+    assert g.validos.all()
+    assert falso.chamadas == [True, False]
+    assert p.meia_precisao is False
+    p.estimar(_foto())
+    assert falso.chamadas == [True, False, False]  # não tenta fp16 de novo
+
+
+def test_fp16_bom_fica_em_fp16(monkeypatch):
+    monkeypatch.delenv("PYRON_MEDICAO_FP16", raising=False)
+    monkeypatch.setattr(torch.Tensor, "to", lambda self, *a, **k: self)
+    falso = _MogeFalso(fp16_quebrado=False)
+    p = _prof_falsa(falso)
+    p.estimar(_foto())
+    p.estimar(_foto())
+    assert falso.chamadas == [True, True]
+    assert p.meia_precisao is True
+
+
+def test_fp16_desligado_pelo_ambiente(monkeypatch):
+    monkeypatch.setenv("PYRON_MEDICAO_FP16", "0")
+    monkeypatch.setattr(torch.Tensor, "to", lambda self, *a, **k: self)
+    falso = _MogeFalso()
+    _prof_falsa(falso).estimar(_foto())
+    assert falso.chamadas == [False]
+
+
+def test_fp16_forcado_nao_refaz(monkeypatch):
+    monkeypatch.setattr(torch.Tensor, "to", lambda self, *a, **k: self)
+    falso = _MogeFalso(fp16_quebrado=True)
+    g = _prof_falsa(falso, meia_precisao=True).estimar(_foto())
+    assert falso.chamadas == [True] and not g.validos.any()
