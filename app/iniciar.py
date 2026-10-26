@@ -13,6 +13,7 @@ manda um sinal a cada 20 s e avisa ao sair (``/api/sinal``).
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import socket
 import subprocess
@@ -56,6 +57,34 @@ def abrir_janela(url: str, pasta_perfil: Path) -> None:
             )
             return
     webbrowser.open(url)
+
+
+TEMA_EDGE = {"claro": 1, "escuro": 2, "sistema": 0}  # browser.theme.color_scheme2 do Chromium
+
+
+def preparar_perfil_janela(pasta_perfil: Path, tema: str = "claro") -> None:
+    """Acerta o perfil próprio da janela do aplicativo (dados_app/janela) antes de abri-la.
+
+    O Edge em modo aplicativo desenha a barra de título na cor do tema dele, que segue o Windows (escuro
+    neste computador) e ignora o theme-color da página: o tema vai gravado aqui, igual ao de Configurações ›
+    Aparência (claro por padrão). Também apaga o tamanho e a posição que o Edge guardou da última janela,
+    para ela abrir sempre maximizada. Só este perfil muda; o Edge do usuário fica como está. O Edge regrava
+    o arquivo ao fechar, por isso isto roda com a janela fechada (o servidor só sobe sem janela aberta).
+    """
+    arquivo = pasta_perfil / "Default" / "Preferences"
+    try:
+        dados = json.loads(arquivo.read_text(encoding="utf-8")) if arquivo.exists() else {}
+    except (OSError, ValueError):
+        return
+    navegador = dados.setdefault("browser", {})
+    valor = TEMA_EDGE.get(tema, 1)
+    navegador.setdefault("theme", {}).update({"color_scheme2": valor, "color_scheme": valor})
+    navegador.pop("app_window_placement", None)
+    try:
+        arquivo.parent.mkdir(parents=True, exist_ok=True)
+        arquivo.write_text(json.dumps(dados), encoding="utf-8")
+    except OSError:
+        pass
 
 
 def deve_encerrar(sinais: dict, agora: float, inicio: float, vazio_desde: float | None) -> tuple[bool, float | None]:
@@ -111,6 +140,7 @@ def main(argv=None) -> None:
 
     import uvicorn
 
+    preparar_perfil_janela(srv.PASTA_DADOS / "janela", srv._config().get("tema", "claro"))
     porta = args.porta or porta_livre()
     url = f"http://127.0.0.1:{porta}"
     print("Pyron", srv.VERSAO)

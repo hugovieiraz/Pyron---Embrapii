@@ -133,5 +133,11 @@ núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Te
   com CUDA e o pacote `onnx` são bloqueados de forma intermitente pelo SAC: não depender deles em
   tempo de execução (testes que precisam deles se pulam sozinhos).
 - Tela de 1536 × 816 úteis: janelas `--start-maximized`; conferir telas nesse tamanho.
+- A janela do aplicativo (Edge `--app`, perfil `app/dados_app/janela`) abre maximizada e com a barra de título
+  clara: o Edge ignora o theme-color e pinta a barra pelo tema do perfil, que `app/iniciar.py`
+  (`preparar_perfil_janela`) grava antes de abrir, seguindo Configurações › Aparência. Ícone da janela e da
+  barra de tarefas: `app/estatico/marca/icone-janela-*.png` (o mesmo símbolo sem fundo do `Pyron.exe`).
+- Ao testar no servidor real (porta 8765), fechar a aba de teste: ela conta como janela aberta e o
+  servidor não desliga.
 - A janela do Edge em modo aplicativo guarda arquivos em cache: o servidor manda `Cache-Control: no-cache`
   em tudo que não é `/api` (middleware `sem_cache_da_interface`), então arquivo novo entra sem `?v=`.

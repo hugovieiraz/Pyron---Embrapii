@@ -10,7 +10,8 @@ Saídas:
     marca/vetor/pyron-icone-sem-fundo.svg    ícone do Windows: só o símbolo, sem ladrilho
     app/estatico/marca/logo-cor.svg          logo horizontal para fundo claro (barra da interface nova)
     app/estatico/marca/logo-escuro.svg       logo horizontal para fundo escuro
-    app/estatico/marca/icone-64.png          ícone do aplicativo: favicon
+    app/estatico/marca/icone-janela-*.png    ícone da página da interface (barra de título e de tarefas), sem fundo
+    app/estatico/marca/icone-64.png          ícone com ladrilho: favicon da interface anterior
     app/estatico/marca/icone-192.png         ícone do aplicativo: atalhos e página do celular
     marca/pyron.ico e <destino_ico>          ícone do Windows multi-tamanho (atalhos e Pyron.exe), sem fundo
     apresentacao/estatico/marca/             cópias usadas pela apresentação
@@ -171,6 +172,10 @@ def main() -> None:
     montar_abertura(montar_vertical("escuro")).save(ESTATICO / "abertura.png", optimize=True)
 
     camadas = [rasterizar(icone_janela, t, t) for t in TAMANHOS_ICO]
+    # o mesmo símbolo sem fundo como ícone da página: é ele que aparece na barra de título e na barra de
+    # tarefas da janela do aplicativo (nome novo, para o Edge não reaproveitar o ícone antigo guardado)
+    for lado in (32, 64, 256):
+        camadas[TAMANHOS_ICO.index(lado)].save(ESTATICO / f"icone-janela-{lado}.png", optimize=True)
     camadas[-1].save(destino_ico, format="ICO", sizes=[(t, t) for t in TAMANHOS_ICO], append_images=camadas[:-1])
     if destino_ico.resolve() != (AQUI / "pyron.ico").resolve():
         shutil.copyfile(destino_ico, AQUI / "pyron.ico")

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from app.iniciar import deve_encerrar
+import json
+
+from app.iniciar import deve_encerrar, preparar_perfil_janela
 
 
 def _sinais(**clientes: float) -> dict:
@@ -60,3 +62,20 @@ def test_rota_de_sinal_conta_janelas(tmp_path, monkeypatch) -> None:
     assert c.post("/api/sinal?cliente=b").json()["janelas"] == 2
     assert c.post("/api/sinal?cliente=a&saindo=true").json()["janelas"] == 1
     assert servidor.sinais["algum"]
+
+
+def test_perfil_da_janela_fica_no_tema_escolhido_e_sem_tamanho_guardado(tmp_path) -> None:
+    """A barra de título do Edge segue o tema do perfil (não o theme-color da página): claro por padrão;
+    o tamanho guardado da última janela sai, para ela abrir maximizada. O resto das preferências fica."""
+    prefs = tmp_path / "Default" / "Preferences"
+    prefs.parent.mkdir(parents=True)
+    prefs.write_text(json.dumps({"browser": {"app_window_placement": {"x": 1}, "outro": 7}, "perfil": {"nome": "a"}}), encoding="utf-8")
+    preparar_perfil_janela(tmp_path)
+    d = json.loads(prefs.read_text(encoding="utf-8"))
+    assert d["browser"]["theme"] == {"color_scheme2": 1, "color_scheme": 1}
+    assert "app_window_placement" not in d["browser"] and d["browser"]["outro"] == 7 and d["perfil"] == {"nome": "a"}
+    preparar_perfil_janela(tmp_path, "escuro")
+    assert json.loads(prefs.read_text(encoding="utf-8"))["browser"]["theme"]["color_scheme2"] == 2
+    novo = tmp_path / "novo"
+    preparar_perfil_janela(novo)  # perfil ainda não criado: cria só o necessário
+    assert json.loads((novo / "Default" / "Preferences").read_text(encoding="utf-8"))["browser"]["theme"]["color_scheme2"] == 1

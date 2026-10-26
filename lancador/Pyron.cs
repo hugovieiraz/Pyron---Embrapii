@@ -353,16 +353,12 @@ namespace Pyron
                 Process.Start(url);
                 return;
             }
-            var area = Screen.PrimaryScreen.WorkingArea;
-            int largura = Math.Min(1480, (int)(area.Width * 0.94));
-            int altura = Math.Min(920, (int)(area.Height * 0.94));
-            int x = area.Left + (area.Width - largura) / 2;
-            int y = area.Top + (area.Height - altura) / 2;
+            // Maximizada: um tamanho fixo cortava o lado direito das telas em notebook com escala de 125 %.
+            // O tema claro da barra de título vem do perfil (app/iniciar.py, preparar_perfil_janela).
             string perfil = Path.Combine(PastaDados, "janela");
             string args = "--app=" + url +
                           " --user-data-dir=\"" + perfil + "\"" +
-                          " --window-size=" + largura + "," + altura +
-                          " --window-position=" + x + "," + y +
+                          " --start-maximized" +
                           " --no-first-run --no-default-browser-check --disable-features=Translate";
             var inicio = new ProcessStartInfo(edge, args);
             inicio.UseShellExecute = false;
