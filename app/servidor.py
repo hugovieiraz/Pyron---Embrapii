@@ -2317,7 +2317,39 @@ def _celular_capturar(dados: bytes, nome: str) -> dict:
     return {"id": a["id"], "arquivo": a["arquivo"], "regioes": len(a["regioes"]), "nomes": [r["nome"] for r in a["regioes"]]}
 
 
-celular_modo = celular.ModoCelular(PASTA_DADOS / "celular", _celular_detectar, _celular_capturar, _celular_modelo)
+def _celular_guardar_foto(dados: bytes) -> str:
+    """Foto que o celular mandou para medir: confere que abre e guarda os bytes como chegaram."""
+    from nucleo.medicao.profundidade import abrir
+
+    try:
+        abrir(dados)
+    except Exception as erro:
+        raise ValueError("Não consegui abrir a foto.") from erro
+    return _registro_medicao().guardar_foto(dados)
+
+
+def _celular_medir(codigo: str, pista: dict, referencia: dict | None) -> dict:
+    """Mede no computador, nos dois modelos, a pista que o celular marcou na foto que ele mandou."""
+    p = _validar_pista_medicao(pista, "a pista")
+    ref = _validar_pista_medicao(referencia, "a referência", exige_tamanho=True) if referencia else None
+    caminho = _registro_medicao().caminho_foto(codigo)
+    if caminho is None:
+        raise KeyError(codigo)
+    return comparar_e_registrar(caminho.read_bytes(), p, ref, origem="celular")
+
+
+def _celular_previa(codigo: str) -> bytes:
+    """JPEG do mesmo tamanho da foto (para o navegador do celular mostrar HEIC); os toques valem no original."""
+    from nucleo.medicao.profundidade import abrir
+
+    caminho = _registro_medicao().caminho_foto(codigo)
+    buf = io.BytesIO()
+    abrir(caminho.read_bytes()).save(buf, format="JPEG", quality=85)
+    return buf.getvalue()
+
+
+celular_modo = celular.ModoCelular(PASTA_DADOS / "celular", _celular_detectar, _celular_capturar, _celular_modelo,
+                                   guardar_foto=_celular_guardar_foto, medir=_celular_medir, previa=_celular_previa)
 INTERVALO_ESPELHO_S = 1 / 30  # o espelho confere se chegou quadro novo até 30 vezes por segundo
 
 
@@ -2327,10 +2359,12 @@ def celular_estado() -> dict:
 
 
 @app.post("/api/celular/ligar")
-def celular_ligar() -> dict:
-    """Abre o servidor do celular na rede local (HTTPS, só as rotas do celular, com código no link)."""
+def celular_ligar(para: str = "camera") -> dict:
+    """Abre o servidor do celular na rede local (HTTPS, só as rotas do celular, com código no link).
+    ``para=medicao``: só para medir objetos em foto, sem exigir o detector térmico."""
     try:
-        _detector_imagem()
+        if para != "medicao":
+            _detector_imagem()
         leitor_escala_celular.reiniciar()
         celular_modo.ligar()
     except ValueError as erro:
@@ -2347,10 +2381,18 @@ def celular_desligar() -> dict:
 
 
 @app.get("/api/celular/qr.png")
-def celular_qr() -> Response:
+def celular_qr(medir: bool = False) -> Response:
+    """QR do link do celular; ``medir=1``: o link da página de medir objetos em foto."""
     if not celular_modo.url:
         raise HTTPException(404, "O modo celular está desligado.")
-    return Response(celular.qr_png(celular_modo.url), media_type="image/png", headers={"Cache-Control": "no-store"})
+    url = celular_modo.url_medir if medir else celular_modo.url
+    return Response(celular.qr_png(url), media_type="image/png", headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/medicao/celular")
+def medicao_celular() -> dict:
+    """A conexão com o celular para medir: ligada, o link e as fotos que chegaram (a mais nova primeiro)."""
+    return celular_modo.estado_medicao()
 
 
 @app.websocket("/api/celular/ws")

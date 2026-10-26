@@ -81,9 +81,11 @@ export async function montar(no) {
   const avisoModelos = estado.pronto ? null : el("div", { class: "aviso-modelos" }, el("p", { class: "nota" }, M.semModelosNota), el("code", { class: "mono comando-medir" }, M.comandoInstalar));
   const secaoResultado = el("section", {}, el("div", { class: "titulo-bloco" }, el("h2", {}, M.resultado)), caixaResultado);
   const caixaRegistro = el("div", { class: "registro-medir" });
+  const caixaCelular = el("div", { class: "celular-medir" });
+  const secaoCelular = secao({ titulo: M.celularTitulo, conteudo: [el("p", { class: "nota" }, M.celularTexto), caixaCelular] });
   const secaoRegistro = secao({ titulo: M.registroTitulo, conteudo: [el("p", { class: "nota" }, M.registroTexto), caixaRegistro] });
   const painel = el("aside", { class: "painel-medir", "aria-label": M.resultado },
-    secaoResultado, secaoPlano, secaoRef, secaoRegistro,
+    secaoResultado, secaoPlano, secaoRef, secaoCelular, secaoRegistro,
     secao({ titulo: M.detalhes, aberta: false, conteudo: [caixaDetalhes] }),
     avisoModelos);
 
@@ -359,7 +361,7 @@ export async function montar(no) {
     const url = URL.createObjectURL(previa || arquivo);
     const img = new Image();
     img.onload = () => {
-      foto = { arquivo, url, largura: img.naturalWidth, altura: img.naturalHeight };
+      foto = { arquivo, url, largura: img.naturalWidth, altura: img.naturalHeight, codigo: arquivo.codigo || null };
       pistaRef = primeiroPonto = pontoPlano = null;
       cantos = []; medidasPlano = []; medicoes = [];
       alvo = "objeto";
@@ -368,6 +370,7 @@ export async function montar(no) {
       area.replaceChildren(palco, blocoComparacao);
       desenharReferencia(); atualizarTudo();
       palco.focus({ preventScroll: true });
+      if (foto.codigo) trazerMedidasDoCelular();
     };
     img.onerror = async () => {
       URL.revokeObjectURL(url);
@@ -442,6 +445,7 @@ export async function montar(no) {
         const r = await api("/api/medicao/comparar", { method: "POST", body: dados });
         if (minha !== geracao) return;
         m.r = r; m.id = r.id; m.erros = r.erros;
+        if (foto) foto.codigo = r.foto;
         if (Object.keys(m.real).length) {  // o valor real já informado vale também para a medida refeita
           const e = await api(`/api/medicao/registro/${m.id}`, json("PUT", { real: m.real }));
           m.erros = e.erros;
@@ -518,10 +522,69 @@ export async function montar(no) {
   palco.addEventListener("focus", () => desenharCamada());
   palco.addEventListener("blur", () => desenharCamada());
 
+  // ---------------------------------------------------------------- celular: a foto que chega abre sozinha
+  let celular = { versao: -1, fotos: [] };
+  let vistas = null;  // fotos do celular que já estavam lá ao abrir a aba (não abrem sozinhas)
+
+  function desenharCelular() {
+    if (!celular.ligado) {
+      const ligar = botao({ texto: M.ligarCelular, icone: "celular", variante: "secundario", onclick: () => ocupado(ligar, async () => {
+        try { await api("/api/celular/ligar?para=medicao", { method: "POST" }); await vigiarCelular(); } catch (e) { avisar(e.message, { erro: true }); }
+      }) });
+      caixaCelular.replaceChildren(el("div", { class: "grupo-btn" }, ligar));
+      return;
+    }
+    const hora = (t) => new Date(t * 1000).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    caixaCelular.replaceChildren(
+      el("img", { class: "qr-medir", src: `/api/celular/qr.png?medir=1&v=${encodeURIComponent(celular.url)}`, alt: M.celularQrAlt }),
+      el("code", { class: "mono corta" }, celular.url),
+      el("p", { class: "nota" }, M.celularQr),
+      celular.fotos.length ? el("p", { class: "nota" }, M.fotosCelular) : null,
+      ...celular.fotos.slice(0, 5).map((f) => botao({ texto: M.abrirFotoCelular(hora(f.quando)), compacto: true, variante: "fantasma", onclick: () => abrirDoCelular(f.id) })));
+  }
+
+  async function abrirDoCelular(codigo) {
+    const r = await fetch(`/api/medicao/fotos/${codigo}`);
+    if (!r.ok) { avisar(M.erroMedir, { erro: true }); return; }
+    const blob = await r.blob();
+    const arquivo = new File([blob], codigo, { type: blob.type });
+    arquivo.codigo = codigo;
+    abrir(arquivo);  // ao carregar, traz as medidas que o celular já fez nesta foto
+  }
+
+  /** As medidas feitas no celular para a foto aberta entram como cartões aqui (sem o contorno, que fica no celular). */
+  async function trazerMedidasDoCelular() {
+    if (!foto?.codigo) return;
+    const reg = await api("/api/medicao/registro?limite=100");
+    const ids = new Set(medicoes.map((m) => m.id));
+    const novas = reg.entradas.filter((e) => e.foto === foto.codigo && e.origem === "celular" && !ids.has(e.id)).reverse();
+    for (const e of novas) medicoes.push({ n: ++contador, pista: e.pista, r: { resultados: e.resultados, contorno: [], contorno_referencia: [] }, real: e.real || {}, id: e.id, erros: e.erros });
+    if (novas.length) { desenharResultado(); desenharCamada(); atualizarRegistro(); }
+  }
+
+  async function vigiarCelular() {
+    try {
+      const est = await api("/api/medicao/celular");
+      const mudou = est.versao !== celular.versao || est.ligado !== celular.ligado;
+      celular = est;
+      if (vistas == null) vistas = new Set(est.fotos.map((f) => f.id));
+      if (!mudou) return;
+      desenharCelular();
+      const nova = est.fotos.find((f) => !vistas.has(f.id));
+      if (nova) {
+        vistas.add(nova.id);
+        if (foto?.codigo !== nova.id) { await abrirDoCelular(nova.id); avisar(M.fotoNovaCelular); }
+      }
+      await trazerMedidasDoCelular();
+    } catch { /* a faixa de conexão já avisa */ }
+  }
+  const relogioCelular = setInterval(vigiarCelular, 2000);
+
   desenharReferencia();
   atualizarTudo();
   desenharVazio();
   atualizarRegistro();
-  return () => { geracao++; if (foto) URL.revokeObjectURL(foto.url); };
+  vigiarCelular();
+  return () => { geracao++; clearInterval(relogioCelular); if (foto) URL.revokeObjectURL(foto.url); };
 }
 

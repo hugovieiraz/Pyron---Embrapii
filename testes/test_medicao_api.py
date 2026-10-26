@@ -235,3 +235,20 @@ def test_comparar_dois_pontos_sem_referencia(comparacao):
     res = r.json()["resultados"]
     assert res["da3"]["sem_referencia"]["distancia_cm"] == pytest.approx(200 * 1.05, rel=0.01)
     assert res["moge"]["com_referencia"] is None
+
+
+def test_celular_para_medir_liga_sem_detector_e_mede_a_foto(comparacao, monkeypatch):
+    """O servidor do Pyron: a foto do celular fica no registro como chegou e é medida nos dois modelos."""
+    from app import servidor
+
+    cli, foto = comparacao
+    assert cli.get("/api/medicao/celular").json()["ligado"] is False
+    codigo = servidor._celular_guardar_foto(foto)
+    assert cli.get(f"/api/medicao/fotos/{codigo}").content == foto
+    r = servidor._celular_medir(codigo, {"ponto": _px(-0.6, 0.0, 3.0)}, None)
+    assert r["resultados"]["da3"]["sem_referencia"]["comprimento_cm"] == pytest.approx(210 * 1.05, rel=0.005)
+    entrada = cli.get("/api/medicao/registro").json()["entradas"][0]
+    assert entrada["origem"] == "celular" and entrada["foto"] == codigo
+    assert servidor._celular_previa(codigo)[:3] == b"\xff\xd8\xff"
+    r = cli.post("/api/medicao/previa", files={"arquivo": ("f.png", foto, "image/png")})
+    assert r.status_code == 200 and r.content[:3] == b"\xff\xd8\xff"

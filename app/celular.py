@@ -39,7 +39,7 @@ import struct
 import subprocess
 import threading
 import time
-from collections import deque
+from collections import OrderedDict, deque
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
@@ -50,6 +50,8 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
 
+LIMITE_FOTO_MEDICAO = 40 * 1024 * 1024  # foto original do celular (12 a 50 MP)
+FOTOS_MEDICAO = 20  # fotos de medição que o celular pode citar (as mais novas)
 ESTATICO = Path(__file__).resolve().parent / "estatico"
 PORTA_INICIAL = 8791
 LIMITE_QUADRO = 4 * 1024 * 1024  # bytes de um quadro ou captura (o celular manda ~60 KB)
@@ -221,9 +223,15 @@ class ModoCelular:
     Os dois vêm do servidor principal, que sabe qual modelo usar e onde guardar.
     """
 
-    def __init__(self, pasta: Path, detectar: Callable, capturar: Callable, modelo: Callable):
+    def __init__(self, pasta: Path, detectar: Callable, capturar: Callable, modelo: Callable,
+                 guardar_foto: Callable | None = None, medir: Callable | None = None, previa: Callable | None = None):
         self.pasta = pasta
         self._detectar, self._capturar, self._modelo = detectar, capturar, modelo
+        # medir objetos em foto (nucleo/medicao): guardar_foto(bytes) -> código; medir(código, pista, referência) -> dict;
+        # previa(código) -> JPEG para mostrar foto que o navegador do celular não abre (HEIC)
+        self._guardar_foto, self._medir, self._previa = guardar_foto, medir, previa
+        self.fotos_medicao: OrderedDict[str, float] = OrderedDict()  # código -> quando chegou (as últimas)
+        self.versao_medicao = 0
         self.host = "0.0.0.0"  # toda a rede local; os testes usam 127.0.0.1
         self.token: str | None = None
         self.porta: int | None = None
@@ -253,6 +261,39 @@ class ModoCelular:
     @property
     def url(self) -> str | None:
         return f"https://{self.ip}:{self.porta}/c/{self.token}" if self.ligado else None
+
+    @property
+    def url_medir(self) -> str | None:
+        return f"{self.url}/medir" if self.ligado else None
+
+    # ------------------------------------------------------------ medir objetos em foto
+
+    def receber_foto_medicao(self, dados: bytes) -> str:
+        """A foto que o celular tirou para medir, guardada como chegou (sem recomprimir: qualidade e metadados)."""
+        if self._guardar_foto is None:
+            raise RuntimeError("A medição não está disponível neste Pyron.")
+        if not dados or len(dados) > LIMITE_FOTO_MEDICAO:
+            raise ValueError("Foto vazia ou maior que 40 MB.")
+        codigo = self._guardar_foto(dados)
+        self.fotos_medicao[codigo] = time.time()
+        self.fotos_medicao.move_to_end(codigo)
+        while len(self.fotos_medicao) > FOTOS_MEDICAO:
+            self.fotos_medicao.popitem(last=False)
+        self.versao_medicao += 1
+        return codigo
+
+    def medir_foto(self, codigo: str, pista: dict, referencia: dict | None) -> dict:
+        if self._medir is None:
+            raise RuntimeError("A medição não está disponível neste Pyron.")
+        if codigo not in self.fotos_medicao:
+            raise KeyError(codigo)
+        r = self._medir(codigo, pista, referencia)
+        self.versao_medicao += 1
+        return r
+
+    def estado_medicao(self) -> dict:
+        return {"ligado": self.ligado, "url": self.url_medir, "versao": self.versao_medicao,
+                "fotos": [{"id": k, "quando": v} for k, v in reversed(self.fotos_medicao.items())]}
 
     def ligar(self) -> None:
         import uvicorn
@@ -546,6 +587,50 @@ def criar_app(modo: ModoCelular) -> FastAPI:
                     return
 
         await asyncio.gather(receber(), analisar())
+
+    @app.get("/c/{token}/medir")
+    def pagina_medir(token: str):
+        """Medir objeto: foto da câmera do celular, um toque no objeto, a medida volta do computador."""
+        if not modo.token or not secrets.compare_digest(token, modo.token):
+            return pagina(token)
+        return FileResponse(ESTATICO / "medir_celular.html", headers={"Cache-Control": "no-store"})
+
+    @app.post("/c/{token}/medir/foto")
+    async def medir_foto(token: str, request: Request) -> dict:
+        conferir(token)
+        try:
+            return {"id": await _em_fio(modo.receber_foto_medicao, await request.body())}
+        except ValueError as erro:
+            raise HTTPException(422, str(erro)) from erro
+        except RuntimeError as erro:
+            raise HTTPException(503, str(erro)) from erro
+
+    @app.get("/c/{token}/medir/{codigo}/previa")
+    async def medir_previa(token: str, codigo: str):
+        conferir(token)
+        if modo._previa is None or codigo not in modo.fotos_medicao:
+            raise HTTPException(404, "Foto não encontrada. Tire de novo.")
+        from fastapi.responses import Response
+
+        return Response(await _em_fio(modo._previa, codigo), media_type="image/jpeg")
+
+    @app.post("/c/{token}/medir/{codigo}")
+    async def medir(token: str, codigo: str, request: Request) -> dict:
+        conferir(token)
+        try:
+            corpo = await request.json()
+        except ValueError as erro:
+            raise HTTPException(422, "Pista inválida.") from erro
+        if not isinstance(corpo, dict) or not isinstance(corpo.get("pista"), dict):
+            raise HTTPException(422, "Pista inválida.")
+        try:
+            return await _em_fio(modo.medir_foto, codigo, corpo["pista"], corpo.get("referencia"))
+        except KeyError as erro:
+            raise HTTPException(404, "Foto não encontrada. Tire de novo.") from erro
+        except ValueError as erro:
+            raise HTTPException(422, str(erro)) from erro
+        except (RuntimeError, ImportError, OSError) as erro:
+            raise HTTPException(503, str(erro)) from erro
 
     @app.post("/c/{token}/capturar")
     async def capturar(token: str, request: Request) -> dict:

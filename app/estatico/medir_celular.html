@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="pt-BR" data-tema="escuro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E1330">
+<title>Pyron · medir objeto</title>
+<link rel="icon" href="/e/marca/icone-192.png">
+<link rel="stylesheet" href="/e/tokens.css">
+<link rel="stylesheet" href="/e/celular.css">
+<link rel="stylesheet" href="/e/medir_celular.css">
+</head>
+<body>
+<main class="med">
+  <header class="cel-topo med-topo">
+    <img class="cel-logo" src="/e/marca/icone-192.png" alt="">
+    <div class="cel-titulo"><b>Pyron</b><span id="subtitulo">Medir objeto</span></div>
+  </header>
+
+  <section class="med-inicio" id="inicio">
+    <h1 id="titulo"></h1>
+    <p id="texto"></p>
+    <button class="cel-btn" type="button" id="btn-tirar"></button>
+    <button class="cel-btn cel-btn-contorno" type="button" id="btn-galeria"></button>
+  </section>
+
+  <section class="med-foto" id="area-foto" hidden>
+    <div class="med-opcoes">
+      <div class="med-seg" role="group" id="seg-modo"></div>
+      <div class="med-seg" role="group" id="seg-ref"></div>
+    </div>
+    <p class="med-dica" id="dica" role="status"></p>
+    <div class="med-quadro" id="quadro"><img id="foto" alt=""><svg id="camada" aria-hidden="true" preserveAspectRatio="none"></svg></div>
+    <div class="med-resultados" id="resultados" aria-live="polite"></div>
+    <p class="cel-nota" id="nota-pc"></p>
+    <button class="cel-btn cel-btn-contorno" type="button" id="btn-nova"></button>
+  </section>
+
+  <p class="cel-nota cel-nota-erro med-erro" id="erro" role="alert"></p>
+  <input type="file" id="arq-camera" accept="image/*" capture="environment" hidden>
+  <input type="file" id="arq-galeria" accept="image/*,.heic,.heif" hidden>
+</main>
+<script src="/e/textos.js"></script>
+<script src="/e/medir_celular.js"></script>
+</body>
+</html>

@@ -44,7 +44,9 @@ núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Te
   de objeto qualquer em foto comum. Núcleo em `nucleo/medicao/` (`medir()` no `__init__`; `geometria.py` só NumPy;
   `profundidade.py` Depth Anything 3 Metric (padrão, Apache 2.0) e MoGe-2 (reserva); `segmentar.py` SAM 2.1 pelo `transformers`; `plano_ref.py` sem modelo, por homografia;
   `referencia_auto.py` acha o post-it rosa (8 cm) pela cor;
-  `modelos.py` pesos em `modelos/medicao/`). API `/api/medicao`, `/api/medicao/estado`, `/api/medicao/plano` e `/api/medicao/referencia`.
+  `modelos.py` pesos em `modelos/medicao/`). API `/api/medicao`, `/api/medicao/estado`, `/api/medicao/plano`, `/api/medicao/referencia` e `/api/medicao/comparar`
+  (mede nos dois modelos, sem e com referência, e grava em `registro.py`: fotos com os bytes originais). Pelo celular:
+  `/c/{token}/medir` (`app/estatico/medir_celular.*`, QR na seção "Medir pelo celular"), foto enviada sem recomprimir.
   Licenças: só MIT e Apache 2.0 (nada CC BY-NC, AGPL, GPL; Depth Pro fora). Sem os pesos, a aba abre no modo
   "Retângulo de referência".
 - Conferir: `testes/test_interface_nova.py` (regra dura do CSS, foco, módulos), axe (WCAG 2.2 AA, Etapa 6) e o catálogo
