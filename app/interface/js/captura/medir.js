@@ -40,6 +40,7 @@ export async function montar(no, ctx = {}) {
   const NOMES = Object.fromEntries((estado.modelos || []).map((m) => [m.id, M.colunas[m.id] || m.id]));
   let geracao = 0;
   let mira = { x: 0.5, y: 0.5 };
+  let cotaDestacada = null;
 
   // ---------------------------------------------------------------- ferramentas e palco
   const entrada = el("input", { type: "file", accept: "image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif", hidden: true, onchange: () => { if (entrada.files[0]) abrir(entrada.files[0]); entrada.value = ""; } });
@@ -219,8 +220,86 @@ export async function montar(no, ctx = {}) {
       const pts = p.map((q) => q.join(",")).join(" ");
       filhos.push(svg("polygon", { points: pts, class: `${classe} sombra` }), svg("polygon", { points: pts, class: classe }));
     });
+    function desenharCota(tipo, pts, valorTexto = "", destaque = false) {
+      if (!pts || pts.length < 2) return;
+      const [[x1, y1], [x2, y2]] = pts;
+      const dx = x2 - x1, dy = y2 - y1;
+      const len = Math.hypot(dx, dy);
+      if (len < 2) return;
+      const nx = -dy / len, ny = dx / len;
+      const tamTerm = Math.max(W, H) * 0.014;
+      const classe = `cota-${tipo}${destaque ? " cota-destaque" : ""}`;
+
+      filhos.push(svg("line", { x1, y1, x2, y2, class: `cota-linha sombra ${classe}` }));
+      filhos.push(svg("line", { x1, y1, x2, y2, class: `cota-linha ${classe}` }));
+
+      filhos.push(svg("line", { x1: x1 - nx * tamTerm, y1: y1 - ny * tamTerm, x2: x1 + nx * tamTerm, y2: y1 + ny * tamTerm, class: `cota-terminador sombra ${classe}` }));
+      filhos.push(svg("line", { x1: x1 - nx * tamTerm, y1: y1 - ny * tamTerm, x2: x1 + nx * tamTerm, y2: y1 + ny * tamTerm, class: `cota-terminador ${classe}` }));
+
+      filhos.push(svg("line", { x1: x2 - nx * tamTerm, y1: y2 - ny * tamTerm, x2: x2 + nx * tamTerm, y2: y2 + ny * tamTerm, class: `cota-terminador sombra ${classe}` }));
+      filhos.push(svg("line", { x1: x2 - nx * tamTerm, y1: y2 - ny * tamTerm, x2: x2 + nx * tamTerm, y2: y2 + ny * tamTerm, class: `cota-terminador ${classe}` }));
+
+      if (valorTexto) {
+        const mx = (x1 + x2) / 2 + nx * (tamTerm * 1.6);
+        const my = (y1 + y2) / 2 + ny * (tamTerm * 1.6);
+        const bw = valorTexto.length * Math.max(W, H) * 0.0075 + 14;
+        const bh = Math.max(W, H) * 0.024;
+        filhos.push(svg("rect", { x: mx - bw / 2, y: my - bh / 2, width: bw, height: bh, class: "cota-badge-fundo" }));
+        const txt = svg("text", { x: mx, y: my, class: "cota-badge-texto" });
+        txt.textContent = valorTexto;
+        filhos.push(txt);
+      }
+    }
+
     const ultima = [...medicoes].reverse().find((m) => m.r);
-    if (ultima && modo !== "plano") { poligonos(ultima.r.contorno_referencia || [], "contorno-ref"); poligonos(ultima.r.contorno || [], "contorno-obj"); }
+    if (ultima && modo !== "plano") {
+      poligonos(ultima.r.contorno_referencia || [], "contorno-ref");
+      poligonos(ultima.r.contorno || [], "contorno-obj");
+
+      const cotas = ultima.r.cotas || {};
+      const res0 = Object.values(ultima.r.resultados || {}).find((x) => x.com_referencia || x.sem_referencia);
+      const v0 = res0?.com_referencia || res0?.sem_referencia || {};
+
+      if (cotas.apoio && (!cotaDestacada || cotaDestacada === "altura")) {
+        const [[ax1, ay1], [ax2, ay2]] = cotas.apoio;
+        filhos.push(svg("line", { x1: ax1, y1: ay1, x2: ax2, y2: ay2, class: "cota-apoio sombra" }));
+        filhos.push(svg("line", { x1: ax1, y1: ay1, x2: ax2, y2: ay2, class: "cota-apoio" }));
+        const txt = svg("text", { x: (ax1 + ax2) / 2, y: ay1 + Math.max(W, H) * 0.02, class: "cota-badge-texto" });
+        txt.textContent = "Apoio (base)";
+        filhos.push(txt);
+      }
+
+      if (cotas.altura && (!cotaDestacada || cotaDestacada === "altura")) {
+        const altTxt = v0.altura_cm != null ? `↕ ${fmt(v0.altura_cm, 1)} cm` : "Altura";
+        desenharCota("altura", cotas.altura, altTxt, cotaDestacada === "altura");
+      }
+
+      if (cotas.comprimento && (!cotaDestacada || cotaDestacada === "comprimento")) {
+        const compTxt = v0.comprimento_cm != null ? `↔ ${fmt(v0.comprimento_cm, 1)} cm` : "Comprimento";
+        desenharCota("comprimento", cotas.comprimento, compTxt, cotaDestacada === "comprimento");
+      }
+
+      if (cotas.largura && (!cotaDestacada || cotaDestacada === "largura")) {
+        const largTxt = v0.largura_cm != null ? `⤢ ${fmt(v0.largura_cm, 1)} cm` : "Largura";
+        desenharCota("largura", cotas.largura, largTxt, cotaDestacada === "largura");
+      }
+
+      if (cotas.distancia && (!cotaDestacada || cotaDestacada === "distancia")) {
+        const distTxt = v0.distancia_cm != null ? `${fmt(v0.distancia_cm, 1)} cm` : "Distância";
+        desenharCota("distancia", cotas.distancia, distTxt, cotaDestacada === "distancia");
+      }
+
+      if (ultima.r.contorno_referencia?.length && (!cotaDestacada || cotaDestacada === "referencia")) {
+        const pRef = ultima.r.contorno_referencia[0];
+        if (pRef?.length) {
+          const rx = pRef.reduce((s, p) => s + p[0], 0) / pRef.length;
+          const ry = pRef.reduce((s, p) => s + p[1], 0) / pRef.length;
+          const txtRef = svg("text", { x: rx, y: ry, class: "cota-badge-texto" });
+          txtRef.textContent = "Ref. 8 cm";
+          filhos.push(txtRef);
+        }
+      }
+    }
     const marca = (p, classe) => {
       if (!p) return;
       if (p.ponto) filhos.push(svg("circle", { cx: p.ponto[0], cy: p.ponto[1], r: Math.max(W, H) * 0.008, class: classe }));
@@ -284,7 +363,11 @@ export async function montar(no, ctx = {}) {
     };
     const linhas = medidas.map((q) => {
       const real = campoReal(m, q);
-      return el("tr", {}, el("th", { scope: "row" }, M.nomes[q]), ...colunas.map(([k, modo]) => celula(k, modo, q)), el("td", {}, real));
+      return el("tr", {
+        class: "linha-medida",
+        onmouseenter: () => { cotaDestacada = q; desenharCamada(); },
+        onmouseleave: () => { cotaDestacada = null; desenharCamada(); },
+      }, el("th", { scope: "row" }, M.nomes[q]), ...colunas.map(([k, modo]) => celula(k, modo, q)), el("td", {}, real));
     });
     const notas = [];
     for (const k of modelos) {

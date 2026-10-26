@@ -65,6 +65,7 @@ class Medida:
     nota_contorno: float | None = None
     contorno: list = field(default_factory=list)  # polígonos [[x, y], ...] em pixels
     contorno_referencia: list = field(default_factory=list)
+    cotas: dict = field(default_factory=dict)  # segmentos e referências visuais na imagem: {"altura": [[x1, y1], [x2, y2]], ...}
     no_plano_da_referencia: dict = field(default_factory=dict)  # comprimento e largura pela homografia
     referencia_ignorada: str = ""  # por que a referência pedida não foi usada (pequena ou longe do objeto)
     tempos_ms: dict = field(default_factory=dict)
@@ -107,10 +108,30 @@ def _erodir(mascara: np.ndarray, px: int = 2) -> np.ndarray:
     return m
 
 
+def _extremos_em_pixels(pontos: np.ndarray, mascara: np.ndarray, eixo: np.ndarray, offset_x: int = 0, offset_y: int = 0) -> list[list[int]]:
+    """Localiza as coordenadas [x, y] dos dois pixels extremos na imagem original ao longo de um eixo 3D."""
+    ys, xs = np.nonzero(mascara)
+    if len(ys) < 5:
+        return []
+    p = pontos[ys, xs]
+    val = np.all(np.isfinite(p), axis=1)
+    if val.sum() < 5:
+        return []
+    ys, xs, p = ys[val], xs[val], p[val]
+    proj = p @ eixo
+    q_lo, q_hi = np.quantile(proj, [0.02, 0.98])
+    idx_lo = int(np.argmin(np.abs(proj - q_lo)))
+    idx_hi = int(np.argmin(np.abs(proj - q_hi)))
+    return [
+        [int(xs[idx_lo] + offset_x), int(ys[idx_lo] + offset_y)],
+        [int(xs[idx_hi] + offset_x), int(ys[idx_hi] + offset_y)],
+    ]
+
+
 def medir_geometria(pontos: np.ndarray, mascara: np.ndarray) -> dict:
     """Medidas em metros de um objeto já recortado: decide se é plano e mede do jeito certo.
 
-    Devolve ``{"forma", "vertical", "medidas": {nome: Extensao}}``.
+    Devolve ``{"forma", "vertical", "medidas": {nome: Extensao}, "cotas": {nome: [[x1, y1], [x2, y2]]}}``.
     """
     # só a região do objeto (com folga embaixo para achar o apoio): as contas ficam proporcionais ao objeto
     ys, xs = np.nonzero(mascara)
@@ -119,40 +140,63 @@ def medir_geometria(pontos: np.ndarray, mascara: np.ndarray) -> dict:
     folga = 45
     y0, y1 = max(0, ys.min() - folga), min(mascara.shape[0], ys.max() + folga + 1)
     x0, x1 = max(0, xs.min() - folga), min(mascara.shape[1], xs.max() + folga + 1)
-    pontos, mascara = pontos[y0:y1, x0:x1], mascara[y0:y1, x0:x1]
-    interior = _erodir(mascara, 2)
-    if g._validos(pontos, interior).sum() < 200:
-        interior = mascara
-    ext = g.extensoes(pontos, interior)
-    pl = g.plano(pontos, interior)
-    para_cima, origem = g.vertical(pontos, mascara)
+    pontos_recorte, mascara_recorte = pontos[y0:y1, x0:x1], mascara[y0:y1, x0:x1]
+    interior = _erodir(mascara_recorte, 2)
+    if g._validos(pontos_recorte, interior).sum() < 200:
+        interior = mascara_recorte
+    ext = g.extensoes(pontos_recorte, interior)
+    pl = g.plano(pontos_recorte, interior)
+    para_cima, origem = g.vertical(pontos_recorte, mascara_recorte)
+    forma = "volume"
     if g.eh_plano(pl, ext):
-        # projetar no plano só se ele não estiver de lado para a câmera (ruído num objeto pequeno pode dar
-        # um plano quase paralelo aos raios) e se a projeção não mudar muito o tamanho
-        visada = np.median(pontos[g._validos(pontos, interior)], axis=0)
+        visada = np.median(pontos_recorte[g._validos(pontos_recorte, interior)], axis=0)
         visada = visada / np.linalg.norm(visada)
         pl2 = None
         if abs(pl.normal @ visada) >= 0.25:
-            projetados = g.projetar_no_plano(pontos, mascara, pl)
-            pl2 = g.plano(projetados, mascara)
+            projetados = g.projetar_no_plano(pontos_recorte, mascara_recorte, pl)
+            pl2 = g.plano(projetados, mascara_recorte)
             if not (0.8 <= pl2.comprimento.valor / max(ext.comprimento.valor, 1e-9) <= 1.25):
                 pl2 = None
         if pl2 is None:
-            projetados = pontos
-            pl2 = g.plano(pontos, mascara)
+            projetados = pontos_recorte
+            pl2 = g.plano(pontos_recorte, mascara_recorte)
         medidas = {"comprimento": pl2.comprimento, "largura": pl2.largura}
-        # plano de pé sobre um apoio achado (porta no chão): a altura é a extensão na vertical. Sem apoio não
-        # dá para saber se o plano está de pé ou deitado (cartão na mesa visto de cima): sem altura
         if origem == "apoio" and abs(pl.normal @ para_cima) < 0.5:
-            medidas["altura"] = g.altura(projetados, mascara, para_cima)
-        return {"forma": "plano", "vertical": origem, "medidas": medidas}
-    ext = g.extensoes(pontos, mascara)
-    medidas = {"comprimento": ext.comprimento, "largura": ext.largura, "espessura": ext.espessura}
-    # objeto achatado (Kindle, livro) sem apoio achado: visto de cima, a "altura" pelo eixo da câmera seria o
-    # comprimento de novo; só vale quando o apoio (mesa, chão) dá a vertical ou o objeto não é achatado
-    if origem == "apoio" or ext.espessura.valor > 0.15 * ext.comprimento.valor:
-        medidas["altura"] = g.altura(pontos, mascara, para_cima)
-    return {"forma": "volume", "vertical": origem, "medidas": medidas}
+            medidas["altura"] = g.altura(projetados, mascara_recorte, para_cima)
+        forma = "plano"
+        pts_calc = projetados
+        masc_calc = mascara_recorte
+    else:
+        medidas = {"comprimento": ext.comprimento, "largura": ext.largura, "espessura": ext.espessura}
+        if origem == "apoio" or ext.espessura.valor > 0.15 * ext.comprimento.valor:
+            medidas["altura"] = g.altura(pontos_recorte, mascara_recorte, para_cima)
+        pts_calc = pontos_recorte
+        masc_calc = mascara_recorte
+
+    # Calcula as referências visuais (cotas em pixels) de onde cada medida foi tomada
+    cotas: dict[str, list] = {}
+    if "altura" in medidas:
+        alt_pts = _extremos_em_pixels(pts_calc, masc_calc, para_cima, x0, y0)
+        if alt_pts:
+            # Ordena com o topo em primeiro (menor y na imagem) e base em segundo (maior y)
+            cotas["altura"] = sorted(alt_pts, key=lambda p: p[1])
+            if origem == "apoio":
+                y_base = cotas["altura"][1][1]
+                x_base = cotas["altura"][1][0]
+                larg_apoio = max(25, int((xs.max() - xs.min()) * 0.35))
+                cotas["apoio"] = [[x_base - larg_apoio, y_base], [x_base + larg_apoio, y_base]]
+
+    if "comprimento" in medidas:
+        comp_pts = _extremos_em_pixels(pts_calc, interior, medidas["comprimento"].eixo, x0, y0)
+        if comp_pts:
+            cotas["comprimento"] = comp_pts
+
+    if "largura" in medidas:
+        larg_pts = _extremos_em_pixels(pts_calc, interior, medidas["largura"].eixo, x0, y0)
+        if larg_pts:
+            cotas["largura"] = larg_pts
+
+    return {"forma": forma, "vertical": origem, "medidas": medidas, "cotas": cotas}
 
 
 class Medidor:
@@ -230,7 +274,7 @@ class Medidor:
             return r, m, None
         if "pontos" in pista:
             p1, p2 = pista["pontos"]
-            return {"forma": "distância", "vertical": "", "medidas": {"distancia": g.distancia(geo.pontos, p1, p2)}}, None, None
+            return {"forma": "distância", "vertical": "", "medidas": {"distancia": g.distancia(geo.pontos, p1, p2)}, "cotas": {"distancia": [list(p1), list(p2)]}}, None, None
         m, nota = self._mascara(img, pista, chave, tempos, rotulo)
         mascara = m & geo.validos
         if mascara.sum() < 20:
@@ -330,6 +374,7 @@ class Medidor:
             nota_contorno=None if nota is None else round(nota, 3),
             contorno=[] if mascara is None else contorno(mascara),
             contorno_referencia=[] if mascara_ref is None else contorno(mascara_ref),
+            cotas=dict(r.get("cotas", {})),
             referencia_ignorada=ignorada,
             no_plano_da_referencia=no_plano,
             modelos={"profundidade": geo.modelo, "contorno": getattr(self._segmentador, "nome", "")},
@@ -373,7 +418,7 @@ def medir(imagem, pista: dict, referencia: dict | None = None, modelo: str | Non
 
 
 CAMPOS_COMPARACAO = ("comprimento_cm", "largura_cm", "espessura_cm", "altura_cm", "distancia_cm", "incerteza_cm", "metodo",
-                     "forma", "vertical", "lente", "fator_escala", "referencia_ignorada", "no_plano_da_referencia", "tempos_ms")
+                     "forma", "vertical", "lente", "fator_escala", "referencia_ignorada", "no_plano_da_referencia", "tempos_ms", "cotas")
 
 
 def comparar(imagem, pista: dict, referencia: dict | None = None, modelos: list[str] | None = None) -> dict:
@@ -389,7 +434,7 @@ def comparar(imagem, pista: dict, referencia: dict | None = None, modelos: list[
     ids = modelos or [m["id"] for m in disponiveis() if m["instalado"]]
     if not ids:
         raise ImportError("nenhum modelo de profundidade instalado (python -m nucleo.medicao.modelos --baixar da3 small)")
-    saida: dict = {"resultados": {}, "contorno": [], "contorno_referencia": [], "tamanho_imagem": [img.width, img.height]}
+    saida: dict = {"resultados": {}, "contorno": [], "contorno_referencia": [], "cotas": {}, "tamanho_imagem": [img.width, img.height]}
     compacto = lambda m: {k: getattr(m, k) for k in CAMPOS_COMPARACAO}  # noqa: E731
     for modelo in ids:
         r: dict = {"sem_referencia": None, "com_referencia": None}
@@ -398,6 +443,7 @@ def comparar(imagem, pista: dict, referencia: dict | None = None, modelos: list[
             r["sem_referencia"] = compacto(sem)
             r["modelo"] = sem.modelos.get("profundidade", modelo)
             saida["contorno"] = saida["contorno"] or sem.contorno
+            saida["cotas"] = saida["cotas"] or getattr(sem, "cotas", {})
             if referencia:
                 com = medidor(modelo).medir(img, pista, referencia)
                 r["com_referencia"] = compacto(com)

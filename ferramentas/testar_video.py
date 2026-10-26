@@ -163,6 +163,28 @@ def main():
                     if v.get("reducao_incerteza_pct"):
                         print(f"  (Incerteza reduzida em ~{v['reducao_incerteza_pct']}% comparado a foto única)")
             print("=" * 55)
+
+            if res.get("quadros"):
+                for q_idx, q_info in enumerate(res["quadros"], 1):
+                    med = q_info.get("medida", {})
+                    cotas_q = med.get("cotas", {})
+                    if cotas_q and q_idx <= len(keyframes):
+                        caminho_cota = pasta_saida / f"keyframe_{q_idx:02d}_cotas.jpg"
+                        img_bgr = cv2.imdecode(np.frombuffer(keyframes[q_idx - 1].bytes_jpeg, np.uint8), cv2.IMREAD_COLOR)
+                        if "altura" in cotas_q:
+                            p1, p2 = cotas_q["altura"]
+                            cv2.line(img_bgr, tuple(p1), tuple(p2), (0, 255, 255), 2)
+                            cv2.putText(img_bgr, f"Alt: {med.get('altura_cm', '')}cm", ((p1[0] + p2[0]) // 2 + 10, (p1[1] + p2[1]) // 2), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+                        if "comprimento" in cotas_q:
+                            p1, p2 = cotas_q["comprimento"]
+                            cv2.line(img_bgr, tuple(p1), tuple(p2), (0, 220, 0), 2)
+                            cv2.putText(img_bgr, f"Comp: {med.get('comprimento_cm', '')}cm", ((p1[0] + p2[0]) // 2 + 10, (p1[1] + p2[1]) // 2), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 220, 0), 2)
+                        if "apoio" in cotas_q:
+                            p1, p2 = cotas_q["apoio"]
+                            cv2.line(img_bgr, tuple(p1), tuple(p2), (0, 165, 255), 2)
+                            cv2.putText(img_bgr, "Apoio", (p1[0], p1[1] + 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 1)
+                        cv2.imwrite(str(caminho_cota), img_bgr)
+                        print(f"-> Imagem com cotas anotadas salva em: {caminho_cota.name}")
         except Exception as e:
             print(f"\nNota: Inferência completa de medição requer pesos dos modelos instalados ({e}).")
 
