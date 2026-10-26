@@ -1932,6 +1932,101 @@ def whatsapp_alerta(id_: str) -> dict:
     return {"mensagem": alerta["mensagem"], "links": monitoramento.links_whatsapp(alerta["mensagem"], destinatarios)}
 
 
+# ---------------------------------------------------------------- medição em foto comum (nucleo/medicao)
+
+_trava_medicao = threading.Lock()
+LIMITE_FOTO_MEDICAO = 40 * 1024 * 1024
+
+
+def _json_form(texto: str | None, nome: str) -> dict | None:
+    if texto is None or not texto.strip():
+        return None
+    try:
+        valor = json.loads(texto)
+    except json.JSONDecodeError:
+        raise HTTPException(422, f"O campo {nome} não é um JSON válido.")
+    if not isinstance(valor, dict):
+        raise HTTPException(422, f"O campo {nome} precisa ser um objeto.")
+    return valor
+
+
+def _validar_pista_medicao(p: dict | None, nome: str, exige_tamanho: bool = False) -> dict:
+    if not p:
+        raise HTTPException(422, f"Informe {nome}: um ponto, uma caixa ou dois pontos.")
+
+    def numeros(v, n):
+        if not isinstance(v, (list, tuple)) or len(v) != n or not all(isinstance(x, (int, float)) for x in v):
+            raise HTTPException(422, f"{nome}: esperava {n} números.")
+        return [float(x) for x in v]
+
+    saida: dict = {}
+    if "pontos" in p:
+        par = p["pontos"]
+        if not isinstance(par, (list, tuple)) or len(par) != 2:
+            raise HTTPException(422, f"{nome}: \"pontos\" precisa de dois pontos.")
+        saida["pontos"] = [numeros(par[0], 2), numeros(par[1], 2)]
+    elif "caixa" in p:
+        x0, y0, x1, y1 = numeros(p["caixa"], 4)
+        if x1 <= x0 or y1 <= y0:
+            raise HTTPException(422, f"{nome}: caixa vazia.")
+        saida["caixa"] = [x0, y0, x1, y1]
+    elif "ponto" in p:
+        saida["ponto"] = numeros(p["ponto"], 2)
+    else:
+        raise HTTPException(422, f"Informe {nome}: um ponto, uma caixa ou dois pontos.")
+    if exige_tamanho:
+        tam = p.get("tamanho_cm")
+        if not isinstance(tam, (int, float)) or not (0 < tam < 100000):
+            raise HTTPException(422, "Informe o tamanho real da referência, em cm.")
+        saida["tamanho_cm"] = float(tam)
+        medida = p.get("medida", "comprimento")
+        if medida not in ("comprimento", "largura", "altura"):
+            raise HTTPException(422, "A medida da referência é comprimento, largura ou altura.")
+        saida["medida"] = medida
+        saida["nome"] = str(p.get("nome") or "")[:60]
+    return saida
+
+
+@app.get("/api/medicao/estado")
+def medicao_estado() -> dict:
+    """Modelos da medição instalados e dispositivo (placa de vídeo ou processador)."""
+    from nucleo.medicao import REFERENCIAS_PRONTAS, modelos as modelos_medicao
+
+    return {**modelos_medicao.estado(), "referencias": REFERENCIAS_PRONTAS}
+
+
+@app.post("/api/medicao")
+async def medicao(arquivo: UploadFile = File(...), pista: str = Form(...), referencia: str | None = Form(None)) -> dict:
+    """Mede um objeto numa foto comum: pista (ponto, caixa ou dois pontos) e referência opcional
+    (outra pista mais o tamanho real). Devolve as medidas em cm, a incerteza, o método e os tempos."""
+    dados = await arquivo.read()
+    if not dados:
+        raise HTTPException(422, "O arquivo está vazio.")
+    if len(dados) > LIMITE_FOTO_MEDICAO:
+        raise HTTPException(413, "A foto passa de 40 MB.")
+    p = _validar_pista_medicao(_json_form(pista, "pista"), "a pista")
+    ref_bruta = _json_form(referencia, "referencia")
+    ref = _validar_pista_medicao(ref_bruta, "a referência", exige_tamanho=True) if ref_bruta else None
+    try:
+        Image.open(io.BytesIO(dados)).verify()
+    except Exception:
+        raise HTTPException(422, "Não consegui abrir a foto.")
+    from nucleo import medicao as medicao_mod
+
+    def medir() -> dict:
+        with _trava_medicao:
+            return medicao_mod.medir(dados, p, ref).para_dict()
+
+    try:
+        from starlette.concurrency import run_in_threadpool
+
+        return await run_in_threadpool(medir)
+    except (ImportError, OSError) as e:
+        raise HTTPException(503, f"Os modelos da medição não estão instalados ({type(e).__name__}: {e}).")
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+
 # ---------------------------------------------------------------- câmera do celular
 
 
