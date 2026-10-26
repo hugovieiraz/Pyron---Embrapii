@@ -202,12 +202,12 @@ export function estadoSemConexao({ tentar }) {
 export function barraFerramentas({ rotulo, grupos = [], direita = [] }) {
   const ferramenta = (f) => {
     const tag = f.href && !f.indisponivel ? "a" : "button";
-    const dica = f.indisponivel ? `${f.texto}: ${f.indisponivel}` : f.soIcone ? f.texto : f.dica || null;
+    const dica = f.indisponivel ? `${f.texto}: ${f.indisponivel}` : f.atalho ? `${f.texto} (${f.atalho})` : f.soIcone ? f.texto : f.dica || null;
     return el(tag, {
       class: `ferramenta${f.soIcone ? " so-icone" : ""}`, type: tag === "button" ? "button" : null, href: tag === "a" ? f.href : null,
       "aria-pressed": f.pressionado == null ? null : String(f.pressionado), "aria-disabled": f.indisponivel ? "true" : null,
-      "aria-label": f.soIcone ? f.texto : null, title: dica, tabindex: "-1",
-      onclick: (ev) => { if (f.indisponivel) { ev.preventDefault(); return; } f.onclick?.(ev); },
+      "aria-label": f.soIcone ? f.texto : null, title: dica, tabindex: "-1", dataset: f.chave ? { chave: f.chave } : null,
+      onclick: (ev) => { if (ev.currentTarget.getAttribute("aria-disabled") === "true") { ev.preventDefault(); return; } f.onclick?.(ev); },
     }, f.icone ? icone(f.icone) : null, f.soIcone ? null : el("span", { class: "rotulo" }, f.texto));
   };
   const partes = [];
@@ -244,13 +244,20 @@ export function secao({ titulo, aberta = true, qtd, conteudo = [] }) {
  */
 export function painelDetalhe({ rotulo, itens, ativa = itens[0].id }) {
   const conteudo = el("div", { class: "painel-conteudo" });
+  let atual = ativa;
   const mostrar = (id) => {
+    atual = id;
     const item = itens.find((i) => i.id === id);
-    conteudo.replaceChildren(el("div", { role: "tabpanel", id: `painel-${id}`, "aria-labelledby": `aba-${id}` }, el("h2", {}, item.texto), item.montar()));
+    const titulo = typeof item.titulo === "function" ? item.titulo() : item.texto;
+    conteudo.replaceChildren(el("div", { role: "tabpanel", id: `painel-${id}`, "aria-labelledby": `aba-${id}` }, titulo ? el("h2", {}, titulo) : null, item.montar()));
   };
   const trilho = abas({ rotulo, itens, ativa, vertical: true, aoMudar: mostrar });
   mostrar(ativa);
-  return el("aside", { class: "painel-detalhe", "aria-label": rotulo }, trilho, conteudo);
+  const painel = el("aside", { class: "painel-detalhe", "aria-label": rotulo }, trilho, conteudo);
+  painel.ativa = () => atual;
+  painel.atualizar = () => mostrar(atual);                       // redesenha a aba aberta (dados novos)
+  painel.mostrar = (id) => { trilho.escolher(id); mostrar(id); }; // troca de aba por código
+  return painel;
 }
 
 /** Erro: o que aconteceu, a mensagem do servidor e "Tentar de novo". */
@@ -367,7 +374,9 @@ export function menu(gatilho, itens) {
       const folga = parseFloat(token("e-1"));
       const margem = parseFloat(token("e-2"));
       m.style.top = `${Math.min(r.bottom + folga, innerHeight - m.offsetHeight - margem)}px`;
-      m.style.left = `${Math.max(margem, Math.min(r.right - largura, innerWidth - largura - margem))}px`;
+      // alinha pela esquerda do botão; perto da borda direita da janela, pela direita
+      const esquerda = r.left + largura <= innerWidth - margem ? r.left : r.right - largura;
+      m.style.left = `${Math.max(margem, esquerda)}px`;
       itensFoco()[0]?.focus();
     } else if (m.contains(document.activeElement) || document.activeElement === document.body) {
       gatilho.focus();

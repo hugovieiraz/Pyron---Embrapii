@@ -25,7 +25,10 @@ núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Te
   tokens `--ilu-*` e `--ferro-*`, um acento térmico por desenho, nunca cobalto; onde cada uma entra está
   em `docs/interface/acabamento.md`. Movimento contínuo só no estado `procurando`.
 - Módulos ES sem build: `js/base.js`, `js/componentes.js`, `js/casca.js`, uma tela por arquivo em
-  `js/telas/` (mapa em `js/rotas.js`). Textos do JS em `app/interface/textos.js`.
+  `js/telas/` (mapa em `js/rotas.js`). Textos do JS em `app/interface/textos.js`. Layout das telas em
+  `telas.css`. **Tela de referência: a Análise** (`js/telas/analise.js` + `js/analise/`, `docs/interface/4-analise.md`):
+  contexto com `ouvir()/mudou()`, salvamento automático com "Salvo", Desfazer em vez de confirmar; as
+  outras telas seguem esse padrão. Testes visuais: `?conferir`, `?tema=escuro`, `?toque` no endereço.
 - Conferir: `testes/test_interface_nova.py` (regra dura do CSS, foco, módulos) e o catálogo
   `/nova/catalogo.html` com "Conferir acessibilidade" (claro, `?tema=escuro`, `?toque`).
 

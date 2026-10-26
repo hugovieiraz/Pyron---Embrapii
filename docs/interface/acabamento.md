@@ -51,6 +51,9 @@ Conferido: testes da interface (10/10), `node --check`, os dois temas.
 
 ## 2. Toques finais: prioridade alta (Etapas 4 e 5)
 
+**Etapa 4 (25/10):** feitos 1, 2, 3, 4, 6, 8, 9 e 10; o 5 (cortina) foi descartado porque a foto da FLIR C5
+não é alinhada ao termograma, e o 7 fica para a tela Inspeções (5a). Detalhes em `4-analise.md`.
+
 **Termograma (Análise), o coração do produto**
 1. **Mira com leitura ao vivo** (como o medidor pontual da FLIR): cursor em cruz sobre o termograma,
    com a temperatura do pixel num rótulo que segue o mouse (fonte mono, `tabular-nums`).

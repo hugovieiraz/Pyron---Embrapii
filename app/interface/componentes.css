@@ -23,6 +23,8 @@
 .btn.compacto.icone { width: var(--alvo-compacto); padding: 0; }
 .btn[disabled], .btn[aria-disabled="true"] { color: var(--texto-apagado); background: var(--superficie-2); border-color: var(--borda); cursor: not-allowed; }
 .btn.primario[disabled] { color: var(--acao-texto); background: var(--borda-forte); border-color: var(--borda-forte); }
+.btn.fantasma[disabled] { background: transparent; border-color: transparent; }
+.btn.primario[aria-disabled="true"] { color: var(--acao-texto); background: var(--borda-forte); border-color: var(--borda-forte); }
 .btn[aria-busy="true"] { position: relative; color: transparent; pointer-events: none; }
 .btn[aria-busy="true"]::after {
   content: ""; position: absolute; width: var(--ic-p); height: var(--ic-p); border-radius: 50%;
@@ -265,7 +267,7 @@ dialog.busca-rapida::backdrop { background: var(--veu); }
 /* ---------------------------------------------------------------- soltar arquivo em qualquer tela */
 .soltar-tela { position: fixed; inset: 0; z-index: var(--z-sobre); display: grid; place-items: center; background: var(--veu); pointer-events: none; }
 .soltar-tela .alvo-soltar { display: grid; justify-items: center; gap: var(--e-3); padding: var(--e-12) var(--e-16); border: var(--borda-sel) dashed var(--acao); border-radius: var(--r-g); background: var(--superficie); color: var(--texto); box-shadow: var(--sombra-3); }
-.soltar-tela .alvo-soltar .ic { width: var(--e-10); height: var(--e-10); color: var(--acao); }
+.soltar-tela .alvo-soltar .ilustracao { width: calc(var(--ilu) * .7); }
 .soltar-tela .alvo-soltar p { font-size: var(--t-1); color: var(--texto-3); }
 
 /* ---------------------------------------------------------------- lista de definições (rótulo e valor) */

@@ -100,7 +100,7 @@ export async function api(caminho, opcoes = {}) {
   const tipo = r.headers.get("content-type") || "";
   const corpo = tipo.includes("application/json") ? await r.json() : null;
   if (r.status === 404 && versaoServidor && versaoServidor !== VERSAO_INTERFACE) throw new Error(T.geral.versaoDiferente(versaoServidor, VERSAO_INTERFACE));
-  if (!r.ok) throw new Error((corpo && (corpo.erro || corpo.detail)) || T.geral.erroServidor(r.status));
+  if (!r.ok) throw Object.assign(new Error((corpo && (corpo.erro || corpo.detail)) || T.geral.erroServidor(r.status)), { status: r.status });
   return corpo;
 }
 export const json = (metodo, corpo) => ({ method: metodo, headers: { "Content-Type": "application/json" }, body: JSON.stringify(corpo) });

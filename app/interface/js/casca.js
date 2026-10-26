@@ -1,8 +1,9 @@
 // Casca da interface nova: navegação, roteamento, atalhos, busca, importação por arrastar, conexão e tema.
 import { TEXTOS as T } from "../textos.js";
-import { $, $$, el, icone, api, json, conexao, definirVersaoServidor, VERSAO_INTERFACE } from "./base.js";
+import { $, $$, el, api, json, conexao, definirVersaoServidor, VERSAO_INTERFACE } from "./base.js";
 import { esqueleto, estadoVazio, estadoErro, estadoSemConexao, avisar, dialogo } from "./componentes.js";
 import { instalarIcones } from "./icones.js";
+import { ilustracao } from "./ilustracoes.js";
 import { ROTAS, lerRota, endereco } from "./rotas.js";
 import { abrirBusca } from "./busca.js";
 import { importar, escolherArquivos } from "./importar.js";
@@ -117,7 +118,7 @@ function ligarSoltar() {
     profundidade++;
     if (!camada) {
       camada = el("div", { class: "soltar-tela", "aria-hidden": "true" },
-        el("div", { class: "alvo-soltar" }, icone("importar"), el("h2", {}, T.casca.soltarTitulo), el("p", {}, T.casca.soltarDica)));
+        el("div", { class: "alvo-soltar" }, ilustracao("inspecoes", { rotulo: T.casca.soltarTitulo }), el("h2", {}, T.casca.soltarTitulo), el("p", {}, T.casca.soltarDica)));
       document.body.append(camada);
     }
   });

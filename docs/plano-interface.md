@@ -144,8 +144,8 @@ medida nas capturas; o resto da cor é dado (termograma, severidade) ou o acento
 
 ## Etapa 4 · Tela de referência
 Modelo: **Opus**, esforço **alto**.
-- [ ] Construir a **Análise** completa na interface nova, ligada à API real, já com o acabamento da Etapa 3b.
-- [ ] Capturas antes/depois; `laws-of-ux-checklist` 12/12; nota ≥ 50/60.
+- [x] Construir a **Análise** completa na interface nova, ligada à API real, já com o acabamento da Etapa 3b.
+- [x] Capturas antes/depois; `laws-of-ux-checklist` 12/12; nota ≥ 50/60 (54 de 56 aplicáveis, ≈ 58/60). `docs/interface/4-analise.md`.
 - **Pronto quando:** os critérios acima passam. Esta tela vira o padrão das outras.
 
 ## Etapa 5 · Demais telas (uma conversa por grupo)
@@ -180,6 +180,7 @@ Modelo: Opus com esforço **médio**.
 | 3b (nuvem) | 25/10/2026 | Ilustrações v2: moldura 4:3 comum, gradiente nas faces, filete de luz, sombra difusa; 6 corrigidas e 4 novas (`analise`, `laudo`, `busca`, `celular`); entrada peça a peça e varredura no `procurando`; 4 tokens `--ilu-*`; capturas em `docs/interface/capturas/etapa3b/`; lista de toques finais em `docs/interface/acabamento.md` | Cada ilustração em até 6 peças (chão, peças, acento por último); loop só em `procurando`; logo nova aprovada em `marca/vetor/` (símbolo vetorizado da referência do Hugo + Chakra Petch Bold), ainda não aplicada | Usar as ilustrações nos estados da tabela de `acabamento.md`; aplicar a logo nova (`acabamento.md`, parte 6); CLAUDE.md seções 1 e 2; comparação com a FLIR; Etapa 3c (`acabamento.md`, parte 5), pedida pelo Hugo |
 | 3b | 25/10/2026 | Pacote da nuvem integrado (3 commits, testes 242/8); 10 ilustrações revisadas no catálogo, claro e escuro; logo nova aplicada: `marca/gerar_marca.py` reescrito (rasteriza os SVG no Edge sem janela, fundo transparente), `simbolo.png`, `logo.png` vertical, `icone-64/192.png`, `pyron.ico` com 10 tamanhos e cópias da apresentação; barra da interface nova com a logo horizontal (claro e escuro); comparação com a FLIR em `saida/capturas/etapa3/comparacao-flir.png`; catálogo 0 falhas em 398 textos e 83 alvos, Captura 0 falhas, nos dois temas e em toque | `logo.png` em montagem vertical (símbolo sobre a palavra, das mesmas peças) para caber na tela de abertura do `Pyron.exe` sem recompilar; o `.exe` não foi recompilado (o ícone embutido só muda ao rodar `lancador/construir.py`); a comparação com a FLIR mostra a mesma estrutura e acabamento, e a diferença restante é a cor (cobalto), que é a Etapa 3c | Etapa 3c (estilo FLIR); recompilar o `Pyron.exe` quando quiser o ícone novo na barra do Windows (conferir o tamanho de ≈100 KB) |
 | 3c | 25/10/2026 | Cancelada depois de medir a proporção de cor (tabela na Etapa 3c) | FLIR é referência de sobriedade, não estilo a copiar (Hugo); cobalto fica só como o destaque da ação; regra nova: cor de estrutura < 2 % da tela, medida em toda etapa | Etapa 4: Análise |
+| 4 | 25/10/2026 | Análise completa em `/nova/#inspecoes/<id>` (`js/analise/`, `telas.css`): termograma com escala editável, mira com leitura ao vivo, zoom e arrasto, regiões (desenhar, mover, redimensionar, apagar com Desfazer), pontos e linhas, isoterma, paleta, camadas, foto; painel Resumo/Região, Condições, Identificação, Pendência; Detectar de novo, exportar, apagar, laudo; salvamento automático com "Salvo" | Detalhe da região no lugar do resumo; Isoterma e Foto nos menus (Hick); pendência e "temperatura estimada" no cabeçalho; cortina visível × térmica descartada (foto não alinhada); contraste e alvos 0 falhas; cor fora do termograma 1,4 %; checklist 12/12; nota 54/56 aplicáveis | Etapa 5a (Painel e Inspeções); lacunas da nota: escolha de modelo (5d) e fim do laudo (5a) |
 
 ### Medição de equipamentos (Etapa 0)
 
@@ -259,3 +260,4 @@ a classificação DINOv2 carrega.
 | Função ou tela | Para onde foi | Motivo |
 |---|---|---|
 | (lista completa com 17 itens) | `docs/interface/1-diagnostico.md`, seção 5 | Decidido na Etapa 1; cada item sai quando a tela nova correspondente for feita |
+| Análise: barra de etapas com tempo em ms; botões "Segmentar (SAM 2)", "Classificar (DINOv2)", "Metodologia completa", "Auto Identificar"; camadas Térmica/SAM 2/DINOv2 e Tudo/Peças/Pontos como botões; "Anexar nova imagem" | Etapa 4: dimensões e "Medir" na região, "Identificar componentes" no menu Detectar, um menu Camadas, importar por Ctrl+O e arrastar | Saíram da tela nova da Análise; as rotas continuam |

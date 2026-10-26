@@ -43,7 +43,8 @@ def _importados(arquivo: Path) -> set[Path]:
 
 
 def test_todo_modulo_importado_existe_e_e_servido(cliente):
-    modulos = _importados((PASTA / "js" / "casca.js").resolve()) | _importados((PASTA / "js" / "catalogo.js").resolve())
+    raizes = [PASTA / "js" / "casca.js", PASTA / "js" / "catalogo.js", *(PASTA / "js" / "telas").glob("*.js")]  # telas: carregadas sob demanda
+    modulos = set().union(*(_importados(r.resolve()) for r in raizes))
     for m in modulos:
         assert m.exists(), m
         caminho = "/nova/" + m.relative_to(PASTA.resolve()).as_posix()
@@ -63,7 +64,7 @@ def _sem_comentarios(css: str) -> str:
     return re.sub(r"/\*.*?\*/", "", css, flags=re.S)
 
 
-@pytest.mark.parametrize("nome", ["base.css", "componentes.css", "catalogo.css"])
+@pytest.mark.parametrize("nome", ["base.css", "componentes.css", "catalogo.css", "telas.css"])
 def test_regra_dura_css_so_usa_tokens(nome):
     """Fora do tokens.css: nenhuma cor literal, nenhum tamanho além da linha fina de 1 px, nenhuma duração."""
     css = _sem_comentarios((PASTA / nome).read_text(encoding="utf-8"))
@@ -84,7 +85,7 @@ def test_js_nao_tem_cor_literal():
 def test_foco_visivel_sempre_definido():
     base = (PASTA / "base.css").read_text(encoding="utf-8")
     assert re.search(r":focus-visible\s*\{\s*outline:\s*var\(--borda-sel\) solid var\(--foco\)", base)
-    for nome in ("componentes.css", "catalogo.css"):
+    for nome in ("componentes.css", "catalogo.css", "telas.css"):
         for regra in re.findall(r"([^{}]+)\{([^}]*outline:\s*none[^}]*)\}", (PASTA / nome).read_text(encoding="utf-8")):
             seletor, corpo = regra
             # tirar o contorno só vale se a regra põe outro sinal de foco no lugar
