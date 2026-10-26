@@ -1,0 +1,8 @@
+{
+  "a4_mesa.jpg": {"ponto": [420, 760], "caixa": [215, 495, 628, 1022]},
+  "cartao_mesa.jpg": {"ponto": [450, 960], "caixa": [350, 824, 550, 1139]},
+  "regua_30cm.jpg": {"ponto": [690, 800], "caixa": [608, 14, 760, 1592]},
+  "pessoa_em_pe.jpg": {"ponto": [360, 950], "caixa": [218, 588, 495, 1538]},
+  "pote_fox.jpg": {"ponto": [430, 930], "caixa": [202, 670, 665, 1002]},
+  "kindle_capa.jpg": {"ponto": [410, 780], "caixa": [242, 564, 585, 992]}
+}

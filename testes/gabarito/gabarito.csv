@@ -1,0 +1,10 @@
+arquivo,objeto,medida,valor_cm,referencia_na_foto,observacao
+a4_mesa.jpg,folha_a4,comprimento,29.7,,deitada na bancada de granito; foto de cima
+a4_mesa.jpg,folha_a4,largura,21.0,,
+cartao_mesa.jpg,cartao_id1,comprimento,8.56,,na mesa de madeira; foto de cima
+cartao_mesa.jpg,cartao_id1,largura,5.40,,
+regua_30cm.jpg,regua,comprimento,30.0,,transparente; 30 cm de marcação (a peça inteira tem cerca de 31 cm)
+pessoa_em_pe.jpg,pessoa,altura,183.0,,em pé e descalço; de frente
+pote_fox.jpg,pote,altura,3.5,,pote redondo na mesa; foto de lado
+kindle_capa.jpg,kindle,comprimento,17.4,,medida do Kindle sem capa; a foto tem capa (valor real um pouco maior)
+kindle_capa.jpg,kindle,largura,12.5,,

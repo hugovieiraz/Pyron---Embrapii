@@ -30,7 +30,7 @@ segmentacao = [
 
 [tool.setuptools]
 packages = [
-    "nucleo", "nucleo.detectores", "nucleo.segmentacao", "nucleo.metrologia", "nucleo.pipeline",
+    "nucleo", "nucleo.detectores", "nucleo.segmentacao", "nucleo.metrologia", "nucleo.pipeline", "nucleo.medicao",
     "src", "src.geometry", "src.segmentation", "src.pipeline"
 ]
 
