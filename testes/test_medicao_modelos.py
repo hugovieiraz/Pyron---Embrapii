@@ -147,3 +147,21 @@ def test_lente_do_exif_em_foto_cortada_do_sensor_4_3():
     fov = fov_do_exif(abrir(buf.getvalue()))
     f_px = 1848 / (2 * math.tan(math.radians(fov) / 2))
     assert f_px == pytest.approx(23 * 5000 / 43.267, rel=1e-3)
+
+
+@pytest.mark.skipif(not modelos.da3_instalado(), reason="Depth Anything 3 Metric não instalado")
+def test_da3_de_ponta_a_ponta_e_padrao():
+    """Com os pesos: o DA3 é o padrão e passa a régua do gabarito de ponta a ponta (sem conferir a escala)."""
+    import json
+
+    from nucleo.medicao import Medidor
+    from nucleo.medicao.profundidade import ProfundidadeDA3
+    from nucleo.medicao.segmentar import Segmentador
+
+    assert isinstance(modelos.profundidade_padrao(), ProfundidadeDA3)
+    sam = next(v for v in modelos.SAM if modelos.sam_instalado(v))
+    pistas = json.loads((GABARITO / "pistas.json").read_text(encoding="utf-8"))
+    m = Medidor(ProfundidadeDA3(), Segmentador(sam)).medir(GABARITO / "regua_30cm.jpg", {"caixa": pistas["regua_30cm.jpg"]["caixa"]})
+    assert m.modelos["profundidade"] == "depth-anything/DA3METRIC-LARGE"
+    assert m.lente == "padrão"  # a foto do gabarito veio sem EXIF
+    assert m.comprimento_cm > 5 * m.largura_cm

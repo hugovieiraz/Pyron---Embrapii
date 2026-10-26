@@ -224,7 +224,7 @@ export const TEXTOS = {
     palco: "Foto. Clique no objeto para medir; com o teclado, as setas movem a mira e Enter marca.",
     vazioTitulo: "Medir um objeto numa foto",
     vazioTexto: "Abra uma foto comum, do celular ou de uma câmera, e clique no objeto. A medida sai em centímetros, com a margem de erro.",
-    comandoInstalar: "python -m nucleo.medicao.modelos --baixar vitl small",
+    comandoInstalar: "python -m nucleo.medicao.modelos --baixar da3 small",
     dicaModo: {
       ponto: "Clique no objeto.",
       caixa: "Arraste uma caixa em volta do objeto.",

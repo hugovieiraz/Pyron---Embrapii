@@ -175,7 +175,12 @@ def avaliar_fotos(pasta: Path, variantes: list[str], sam: str, pistas_modos: lis
     resultado_linhas: list[dict] = []
     tempos: dict = {}
     for v in variantes:
-        prof = Profundidade(v, usar_exif=usar_exif)
+        if v == "da3":
+            from nucleo.medicao.profundidade import ProfundidadeDA3
+
+            prof = ProfundidadeDA3(usar_exif=usar_exif)
+        else:
+            prof = Profundidade(v, usar_exif=usar_exif)
         t0 = time.perf_counter()
         prof.carregar()
         tempos[f"carregar_{v}_ms"] = round((time.perf_counter() - t0) * 1000, 1)
@@ -358,7 +363,8 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--gabarito", type=Path, default=PASTA_GABARITO)
     ap.add_argument("--pasta", type=Path, help="uma subpasta por objeto e medidas.csv (ver o cabeçalho)")
-    ap.add_argument("--modelos", nargs="+", default=list(modelos.MOGE), choices=list(modelos.MOGE))
+    ap.add_argument("--modelos", nargs="+", default=list(modelos.MOGE), choices=[*modelos.MOGE, "da3"],
+                    help="vits vitb vitl (MoGe-2) e da3 (Depth Anything 3 Metric Large)")
     ap.add_argument("--sam", default=modelos.SAM_PADRAO, choices=list(modelos.SAM))
     ap.add_argument("--pistas", nargs="+", default=["ponto", "caixa"], choices=["ponto", "caixa"])
     ap.add_argument("--sintetico", action="store_true", help="avaliar nas cenas sintéticas (sem modelo)")

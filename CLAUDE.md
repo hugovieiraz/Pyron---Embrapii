@@ -42,7 +42,7 @@ núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Te
   `saida/dados_vazio`, apagar pela Lixeira depois).
 - **Medir foto** (Captura › Medir foto, `js/captura/medir.js`; roteiro em `docs/07_roteiro_medicao_geral.md`): medida
   de objeto qualquer em foto comum. Núcleo em `nucleo/medicao/` (`medir()` no `__init__`; `geometria.py` só NumPy;
-  `profundidade.py` MoGe-2; `segmentar.py` SAM 2.1 pelo `transformers`; `plano_ref.py` sem modelo, por homografia;
+  `profundidade.py` Depth Anything 3 Metric (padrão, Apache 2.0) e MoGe-2 (reserva); `segmentar.py` SAM 2.1 pelo `transformers`; `plano_ref.py` sem modelo, por homografia;
   `referencia_auto.py` acha o post-it rosa de 7,6 cm pela cor;
   `modelos.py` pesos em `modelos/medicao/`). API `/api/medicao`, `/api/medicao/estado`, `/api/medicao/plano` e `/api/medicao/referencia`.
   Licenças: só MIT e Apache 2.0 (nada CC BY-NC, AGPL, GPL; Depth Pro fora). Sem os pesos, a aba abre no modo
@@ -125,7 +125,8 @@ núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Te
 - Pyron para testar sem dados reais: pré-visualização `pyron-demo` (`.claude/launch.json`, porta 8790,
   dados em `saida/dados_demo`). Apresentação: pré-visualização `apresentacao` (porta 8792).
 - Medição em foto: instalar `.venv/Scripts/pip install --no-deps git+https://github.com/microsoft/MoGe.git` (mais o
-  extra `[medicao]` do `pyproject.toml`), pesos `python -m nucleo.medicao.modelos --baixar vitl small`, avaliação no
+  extra `[medicao]` do `pyproject.toml`), DA3 `pip install --no-deps --ignore-requires-python git+https://github.com/ByteDance-Seed/Depth-Anything-3.git`
+  (só a rede; a API dele puxa o `evo`, GPL), pesos `python -m nucleo.medicao.modelos --baixar da3 vitl small`, avaliação no
   gabarito `python -m ml.avaliar_medicao` (fotos e medidas reais em `testes/gabarito/`); fotos por pasta (uma
   subpasta por objeto e `medidas.csv`): `python -m ml.avaliar_medicao --pasta <pasta> --modelos vitl`.
 - Abrir de verdade: atalhos "Abrir Pyron" e "Pyron Apresentação" da área de trabalho (`pythonw.exe -m apresentacao`).

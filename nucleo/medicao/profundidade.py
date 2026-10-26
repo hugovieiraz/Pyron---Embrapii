@@ -138,3 +138,78 @@ class Profundidade:
             tempo_ms=(time.perf_counter() - t0) * 1000,
             modelo=self.nome,
         )
+
+
+# ---------------------------------------------------------------- Depth Anything 3 Metric (alternativa ao MoGe-2)
+FOV_PADRAO = 65.0  # graus no lado maior, quando a foto não traz a lente (câmera principal típica de celular)
+
+
+def focal_px(imagem: Image.Image) -> tuple[float, str]:
+    """Focal em pixels pelo EXIF (quadro 4:3, ver ``fov_do_exif``) ou, sem EXIF, por um campo de visão padrão."""
+    fov = fov_do_exif(imagem)
+    if fov is not None:
+        return imagem.width / (2 * math.tan(math.radians(fov) / 2)), "exif"
+    return max(imagem.size) / (2 * math.tan(math.radians(FOV_PADRAO) / 2)), "padrão"
+
+
+class ProfundidadeDA3:
+    """Depth Anything 3 Metric Large (ByteDance, Apache 2.0; ``depth-anything/DA3METRIC-LARGE``).
+
+    Só a rede (``depth_anything_3.model``), sem a API do pacote, que puxa open3d, pycolmap e o ``evo`` (GPL). A rede dá
+    a profundidade relativa à focal: metros = saída · focal / 300, com a focal em pixels na resolução processada
+    (lado maior 504, múltiplo de 14). Não estima a lente: usa a do EXIF ou ``FOV_PADRAO``.
+    Instalar: ``pip install --no-deps --ignore-requires-python git+https://github.com/ByteDance-Seed/Depth-Anything-3.git``
+    e ``einops omegaconf addict safetensors``; pesos em ``modelos/medicao/DA3METRIC-LARGE``.
+    """
+
+    nome = "depth-anything/DA3METRIC-LARGE"
+
+    def __init__(self, dispositivo: str | None = None, resolucao: int = 504, usar_exif: bool = True):
+        self.dispositivo = dispositivo
+        self.resolucao = resolucao
+        self.usar_exif = usar_exif
+        self._modelo = None
+        self._trava = threading.Lock()
+
+    def carregar(self):
+        with self._trava:
+            if self._modelo is None:
+                import torch
+                from depth_anything_3.cfg import create_object, load_config
+                from depth_anything_3.registry import MODEL_REGISTRY
+                from safetensors.torch import load_file
+
+                self.dispositivo = self.dispositivo or modelos.dispositivo()
+                rede = create_object(load_config(MODEL_REGISTRY["da3metric-large"]))
+                pesos = load_file(str(modelos.pasta() / "DA3METRIC-LARGE" / "model.safetensors"))
+                rede.load_state_dict({k.removeprefix("model."): v for k, v in pesos.items()}, strict=True)
+                torch.set_grad_enabled(False)
+                self._modelo = rede.to(self.dispositivo).eval()
+        return self._modelo
+
+    def estimar(self, imagem, **_) -> Geometria:
+        import cv2
+        import torch
+
+        img = abrir(imagem)
+        rede = self.carregar()
+        w, h = img.size
+        fx, lente = focal_px(img) if self.usar_exif else (max(w, h) / (2 * math.tan(math.radians(FOV_PADRAO) / 2)), "padrão")
+        t0 = time.perf_counter()
+        escala = self.resolucao / max(w, h)
+        wp = max(14, int(round(w * escala / 14)) * 14)
+        hp = max(14, int(round(h * escala / 14)) * 14)
+        x = cv2.resize(np.asarray(img), (wp, hp), interpolation=cv2.INTER_AREA).astype(np.float32) / 255.0
+        x = (x - np.array([0.485, 0.456, 0.406], np.float32)) / np.array([0.229, 0.224, 0.225], np.float32)
+        x = torch.from_numpy(x).permute(2, 0, 1)[None, None].to(self.dispositivo)
+        with torch.inference_mode():
+            saida = rede(x)
+        f_proc = (fx * wp / w + fx * hp / h) / 2
+        prof = saida["depth"].float().reshape(hp, wp).cpu().numpy() * f_proc / 300.0
+        z = cv2.resize(prof, (w, h), interpolation=cv2.INTER_LINEAR)
+        xs = (np.arange(w, dtype=np.float32) + 0.5 - w / 2) / fx
+        ys = (np.arange(h, dtype=np.float32) + 0.5 - h / 2) / fx
+        pontos = np.stack([xs[None, :] * z, ys[:, None] * z, z], axis=-1)
+        validos = np.isfinite(z) & (z > 0)
+        return Geometria(pontos=pontos, validos=validos, focal_px=float(fx), lente=lente,
+                         tempo_ms=(time.perf_counter() - t0) * 1000, modelo=self.nome)

@@ -3,9 +3,12 @@
 Pesos em ``modelos/medicao/`` (fora do git, como os outros modelos), um diretório por modelo com o nome
 do repositório do Hugging Face. ``PYRON_MODELOS_MEDICAO`` troca a pasta.
 
-Baixar (só os modelos da lista do roteiro, licenças MIT e Apache 2.0)::
+Baixar (licenças MIT e Apache 2.0, conferidas nos cartões oficiais)::
 
-    python -m nucleo.medicao.modelos --baixar vitl small
+    python -m nucleo.medicao.modelos --baixar da3 vitl small
+
+Profundidade padrão: o Depth Anything 3 Metric Large quando instalado (nas fotos do Hugo com post-it: erro mediano
+5,1 % contra 8,1 % do MoGe-2 ViT-L, e 2 s por foto na CPU contra 20 s); senão o MoGe-2 ViT-L.
 """
 
 from __future__ import annotations
@@ -28,6 +31,7 @@ SAM = {
 }
 MOGE_PADRAO = "vitl"  # no gabarito: erro mediano 19 % (ViT-L), 28 % (ViT-B), 47 % (ViT-S)
 SAM_PADRAO = "small"
+DA3 = "depth-anything/DA3METRIC-LARGE"
 
 
 def pasta() -> Path:
@@ -40,6 +44,21 @@ def caminho_moge(variante: str = MOGE_PADRAO) -> Path:
 
 def caminho_sam(variante: str = SAM_PADRAO) -> Path:
     return pasta() / SAM[variante].split("/")[1]
+
+
+def caminho_da3() -> Path:
+    return pasta() / "DA3METRIC-LARGE" / "model.safetensors"
+
+
+def da3_instalado() -> bool:
+    return caminho_da3().exists() and pacote("depth_anything_3") and pacote("safetensors")
+
+
+def profundidade_padrao():
+    """O estimador de profundidade que o Pyron usa: DA3 Metric se instalado, senão o MoGe-2 (``MOGE_PADRAO``)."""
+    from nucleo.medicao.profundidade import Profundidade, ProfundidadeDA3
+
+    return ProfundidadeDA3() if da3_instalado() else Profundidade()
 
 
 def sam_instalado(variante: str = SAM_PADRAO) -> bool:
@@ -66,13 +85,12 @@ def estado() -> dict:
     return {
         "pacotes": pacotes,
         "dispositivo": dispositivo() if pacotes["torch"] else None,
-        "profundidade": {v: caminho_moge(v).exists() for v in MOGE},
+        "profundidade": {**{v: caminho_moge(v).exists() for v in MOGE}, "da3": da3_instalado()},
         "contorno": {v: sam_instalado(v) for v in SAM},
         "pasta": str(pasta()),
         "pronto": pacotes["torch"]
         and pacotes["transformers"]
-        and pacotes["moge"]
-        and any(caminho_moge(v).exists() for v in MOGE)
+        and (da3_instalado() or (pacotes["moge"] and any(caminho_moge(v).exists() for v in MOGE)))
         and any(sam_instalado(v) for v in SAM),
     }
 
@@ -83,7 +101,11 @@ def baixar(variantes: list[str]) -> list[Path]:
 
     feitos = []
     for v in variantes:
-        if v in MOGE:
+        if v == "da3":
+            destino = caminho_da3().parent
+            snapshot_download(DA3, local_dir=destino, allow_patterns=["*.json", "*.safetensors"])
+            feitos.append(destino)
+        elif v in MOGE:
             destino = caminho_moge(v).parent
             hf_hub_download(MOGE[v], "model.pt", local_dir=destino)
             feitos.append(destino)
@@ -92,13 +114,13 @@ def baixar(variantes: list[str]) -> list[Path]:
             snapshot_download(SAM[v], local_dir=destino, allow_patterns=["*.json", "*.safetensors", "*.txt"])
             feitos.append(destino)
         else:
-            raise ValueError(f"variante desconhecida: {v} (use {', '.join([*MOGE, *SAM])})")
+            raise ValueError(f"variante desconhecida: {v} (use da3, {', '.join([*MOGE, *SAM])})")
     return feitos
 
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Pesos da medição em foto comum")
-    ap.add_argument("--baixar", nargs="+", metavar="VARIANTE", help="vits vitb vitl small base-plus")
+    ap.add_argument("--baixar", nargs="+", metavar="VARIANTE", help="da3 vits vitb vitl small base-plus")
     args = ap.parse_args()
     if args.baixar:
         for p in baixar(args.baixar):

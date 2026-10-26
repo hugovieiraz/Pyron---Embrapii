@@ -161,9 +161,9 @@ class Medidor:
     @property
     def profundidade(self):
         if self._profundidade is None:
-            from nucleo.medicao.profundidade import Profundidade
+            from nucleo.medicao.modelos import profundidade_padrao
 
-            self._profundidade = Profundidade()
+            self._profundidade = profundidade_padrao()
         return self._profundidade
 
     @property

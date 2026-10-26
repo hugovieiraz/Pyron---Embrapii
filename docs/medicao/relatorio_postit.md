@@ -27,6 +27,26 @@ com post-it 8,1 % × 8,2 %).
 | kindle | 35,2 % (95 %: +7 a +89 %; n = 16) | 7,7 % (95 %: -15 a +8 %; n = 16) | 15,2 % (95 %: +2 a +136 %; n = 16) |
 | hugo | 3,1 % (95 %: -4 a -2 %; n = 3) | 66,3 % (95 %: -79 a +17 %; n = 3) | — |
 
+## Depth Anything 3 Metric Large × MoGe-2 ViT-L (erro mediano)
+
+DA3 Metric Large (Apache 2.0) instalado com a autorização do Hugo; só a rede, sem a API do pacote (que puxa o `evo`, GPL).
+Profundidade em 2 s por foto na CPU (MoGe-2 ViT-L: 20 s).
+
+| Fotos | Sem ref. MoGe-2 | Sem ref. DA3 | Post-it + MoGe-2 | Post-it + DA3 | Post-it + DA3 sem EXIF |
+|---|---|---|---|---|---|
+| Todas | 29,6 % | 19,8 % | 8,1 % | 5,1 % | 5,9 % |
+| Normais | 19,5 % | 16,6 % | 8,1 % | 5,1 % | 4,7 % |
+| Difíceis | 69,9 % | 38,0 % | 7,8 % | 5,9 % | 6,8 % |
+| Ideais | 38,3 % | 56,8 % | 13,7 % | 4,8 % | 4,9 % |
+| a4 | 4,7 % | 9,6 % | 4,0 % | 5,6 % | 5,1 % |
+| cartao | 71,1 % | 62,7 % | 11,7 % | 3,7 % | 4,2 % |
+| fox | 61,4 % | 60,4 % | 11,2 % | 24,4 % | 16,4 % |
+| kindle | 35,2 % | 28,5 % | 7,7 % | 3,8 % | 4,3 % |
+| hugo | 3,1 % | 7,2 % | 66,3 % | 76,8 % | 78,4 % |
+
+A média geométrica dos dois modelos com post-it deu 6,1 % (não supera o DA3 sozinho). Sem EXIF (lente padrão de 65°)
+o DA3 fica em 5,9 % com post-it e 22,4 % sem referência. Padrão do Pyron a partir daqui: DA3 quando instalado.
+
 ## Achados
 
 - **Detecção do post-it sem treino:** 36 de 36 fotos, inclusive as difíceis e as de longe (50 a 70 px de lado); o cartão roxo

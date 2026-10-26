@@ -126,7 +126,7 @@ def test_estado(cliente, tmp_path, monkeypatch):
     assert r.status_code == 200
     e = r.json()
     assert e["pronto"] is False
-    assert set(e["profundidade"]) == {"vits", "vitb", "vitl"}
+    assert set(e["profundidade"]) == {"vits", "vitb", "vitl", "da3"}
     assert set(e["contorno"]) == {"small", "base-plus"}
     assert e["referencias"]["folha_a4"]["comprimento"] == 29.7
 
