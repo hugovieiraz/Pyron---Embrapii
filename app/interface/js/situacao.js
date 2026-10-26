@@ -8,6 +8,7 @@ import { ORDEM_SEVERIDADE } from "./analise/faixa.js";
 
 export const SEM_EQUIPAMENTO = "sem-equipamento";
 export const CRITICAS = ["urgente", "imediato"];
+export const ESQUENTANDO = 0.5; // °C por mês: acima disso o equipamento conta como "esquentando"
 
 /** Filtros de severidade das listas: valor do endereço (?sev=) → níveis que entram. */
 export const FILTROS_SEVERIDADE = {
@@ -55,3 +56,6 @@ export function leituraDestaque(d) {
 
 /** Miniatura com a severidade e o número de regiões no endereço: muda quando a análise muda. */
 export const miniatura = (it) => `/api/analises/${it.id}/miniatura.png?v=${encodeURIComponent(`${severidade(it)}-${it.resumo?.regioes ?? 0}`)}`;
+
+/** Nome da classe de componente pelo cadastro (Configurações › Componentes); sem cadastro, a própria classe legível. */
+export const nomeClasse = (classe, config) => config?.componentes?.[classe]?.nome || String(classe || "").replace(/_/g, " ").replace(/^./, (l) => l.toUpperCase());

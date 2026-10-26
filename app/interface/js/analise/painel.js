@@ -1,9 +1,10 @@
 // Painel de detalhe da Análise: Resumo ou Região selecionada, Condições, Identificação e Pendência.
 // Edições salvam sozinhas (indicador "Salvo" no cabeçalho); ações que recalculam têm botão próprio.
 import { TEXTOS as T } from "../../textos.js";
-import { el, api, json, fmt, temperatura, data, dataHora, lerNumero } from "../base.js";
+import { el, api, json, fmt, temperatura, lerNumero } from "../base.js";
 import { botao, campo, secao, selo, painelDetalhe, estadoVazio, avisar, ocupado } from "../componentes.js";
 import { apagarRegiao } from "./faixa.js";
+import { formularioPendencia } from "../pendencia.js";
 
 const A = T.analise;
 const pct = (v) => fmt(v, 0, " %");
@@ -153,23 +154,7 @@ export function montarPainel(ctx, { equipamentos }) {
   function pendencia() {
     const p = ctx.a.pendencia;
     if (!p) return [estadoVazio({ ilustracao: "pendencias", titulo: A.semPendencia, compacto: true })];
-    const situacao = campo({ rotulo: A.situacaoPend, opcoes: Object.entries(A.status).map(([valor, texto]) => ({ valor, texto })), valor: p.status });
-    const prazo = campo({ rotulo: A.prazo, tipo: "date", valor: p.prazo, ajuda: p.vencida ? A.vencida(Math.abs(p.dias)) : p.dias != null ? A.faltam(p.dias) : null });
-    const os = campo({ rotulo: A.os, valor: p.ordem_servico || "", autocomplete: "off", maxlength: "40" });
-    const resp = campo({ rotulo: A.responsavelPend, valor: p.responsavel || "", autocomplete: "off", maxlength: "80" });
-    const nota = campo({ rotulo: A.nota, area: true, marcador: A.notaMarcador, maxlength: "500" });
-    const registrar = botao({ texto: A.registrar, variante: "secundario", compacto: true, onclick: (ev) => ocupado(ev.currentTarget, async () => {
-      try {
-        await api(`/api/analises/${ctx.a.id}/acompanhamento`, json("PUT", { status: situacao.querySelector("select").value, prazo: prazo.querySelector("input").value || null, ordem_servico: os.querySelector("input").value, responsavel: resp.querySelector("input").value, nota: nota.querySelector("textarea").value }));
-        ctx.aplicar(await api(`/api/analises/${ctx.a.id}`));
-        avisar(A.pendenciaAtualizada);
-      } catch (e) { avisar(e.message, { erro: true }); }
-    }) });
-    const hist = (p.historico || []).slice().reverse();
-    return [
-      secao({ titulo: A.acompanhamento, conteudo: [el("div", { class: "linha-selo" }, selo(p.severidade), el("span", { class: p.vencida ? "vencida" : "nota" }, `${A.prazo} ${data(p.prazo)}`)), situacao, prazo, os, resp, nota, el("div", { class: "grupo-btn" }, registrar)] }),
-      hist.length ? secao({ titulo: A.historico, qtd: hist.length, aberta: false, conteudo: [el("ul", { class: "lista-avisos" }, hist.map((h) => el("li", {}, `${dataHora(h.quando)} · ${A.status[h.status] || h.status}${h.nota ? `: ${h.nota}` : ""}`)))] }) : null,
-    ];
+    return formularioPendencia(p, { aoSalvar: async () => ctx.aplicar(await api(`/api/analises/${ctx.a.id}`)) });
   }
 
   // ---------------------------------------------------------------- montagem e redesenho

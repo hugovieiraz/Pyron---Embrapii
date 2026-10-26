@@ -116,3 +116,16 @@ def test_painel_e_inspecoes_tem_tela_propria_e_laudo_compartilhado():
         assert 'from "../laudo.js"' in (PASTA / usuario).read_text(encoding="utf-8"), usuario
     assert "laudo.pdf" not in (PASTA / "js" / "analise" / "cabecalho.js").read_text(encoding="utf-8")
 
+
+
+def test_equipamentos_e_pendencias_tem_tela_propria_e_formulario_compartilhado():
+    """Etapa 5b: Equipamentos (lista e detalhe) e Pendências saíram da tela provisória; o formulário da
+    pendência é um só (Análise e Pendências) e a busca das listas é o mesmo componente."""
+    rotas = (PASTA / "js" / "rotas.js").read_text(encoding="utf-8")
+    assert re.search(r'equipamentos: \{[^}]*modulo: "equipamentos"[^}]*detalhe: "equipamento"', rotas)
+    assert re.search(r'pendencias: \{[^}]*modulo: "pendencias"', rotas)
+    for usuario in ("js/analise/painel.js", "js/telas/pendencias.js"):
+        assert 'from "../pendencia.js"' in (PASTA / usuario).read_text(encoding="utf-8"), usuario
+    assert "/acompanhamento" not in (PASTA / "js" / "analise" / "painel.js").read_text(encoding="utf-8")
+    for tela in ("inspecoes", "equipamentos", "pendencias"):
+        assert "campoBusca(" in (PASTA / "js" / "telas" / f"{tela}.js").read_text(encoding="utf-8"), tela

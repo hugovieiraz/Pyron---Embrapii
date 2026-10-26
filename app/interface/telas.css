@@ -259,3 +259,77 @@ body.com-selecao .avisos { bottom: calc(var(--e-6) + var(--alvo) + var(--e-8)); 
 .lista-falhas li { display: grid; min-width: 0; }
 .lista-falhas b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--texto); }
 .lista-falhas span { color: var(--texto-3); font-size: var(--t-1); line-height: var(--a-1); }
+
+/* ================================================================ Equipamentos (lista) */
+.nota-lista { padding-top: var(--e-4); color: var(--texto-3); font-size: var(--t-1); line-height: var(--a-1); }
+.celula-tendencia { display: flex; align-items: center; gap: var(--e-3); }
+.mini-serie { flex: none; overflow: visible; }
+.mini-serie .linha-serie { stroke-width: 1.5; }
+.tendencia { display: inline-flex; align-items: center; gap: var(--e-1); white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--texto-2); }
+.tendencia.sobe { color: var(--texto); font-weight: var(--p-medio); }
+.tendencia.sobe .ic { color: var(--aviso-texto); }
+
+/* ================================================================ gráfico de uma série (js/grafico.js) */
+.grafico { position: relative; display: flex; flex-direction: column; min-height: 0; margin: 0; }
+.grafico-area { position: relative; flex: 1; min-height: 0; }
+.grafico-area svg { position: absolute; inset: 0; display: block; overflow: visible; }
+.grafico .grade { stroke: var(--borda); stroke-width: 1; shape-rendering: crispEdges; }
+.grafico .eixo { fill: var(--texto-3); font-size: var(--t-1); font-variant-numeric: tabular-nums; }
+.grafico .linha-serie, .mini-serie .linha-serie { fill: none; stroke: var(--texto-3); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.grafico .reta-tendencia { stroke: var(--borda-forte); stroke-width: 1.5; stroke-dasharray: 6 4; }
+.grafico .cruz { stroke: var(--borda-forte); stroke-width: 1; }
+.ponto-serie { fill: var(--sev, var(--sem_medida)); stroke: var(--superficie); stroke-width: 2; }
+.grafico .alvo-ponto { fill: transparent; cursor: pointer; }
+.grafico a:focus-visible .ponto-serie { stroke: var(--foco); stroke-width: 3; }
+.grafico .rotulo-fim { fill: var(--texto); font-size: var(--t-1); font-weight: var(--p-medio); font-variant-numeric: tabular-nums; }
+.dica-grafico {
+  position: absolute; left: 0; top: 0; z-index: var(--z-menu); display: grid; gap: var(--e-1); pointer-events: none;
+  padding: var(--e-2) var(--e-3); border: 1px solid var(--borda); border-radius: var(--r-m); background: var(--superficie); box-shadow: var(--sombra-2);
+  font-size: var(--t-1); line-height: var(--a-1); color: var(--texto-2); white-space: nowrap;
+}
+.dica-grafico[hidden] { display: none; }
+.dica-grafico b { color: var(--texto); font-variant-numeric: tabular-nums; }
+
+/* ================================================================ Equipamento (detalhe) */
+.migalhas ol { display: flex; flex-wrap: wrap; align-items: center; list-style: none; margin: 0 0 var(--e-1); padding: 0; font-size: var(--t-1); line-height: var(--a-1); color: var(--texto-3); }
+.migalhas li + li::before { content: "›"; margin: 0 var(--e-2); color: var(--texto-3); }
+.migalhas a { display: inline-flex; align-items: center; min-height: var(--alvo); margin: calc((var(--alvo) - var(--a-1)) / -2) 0; color: var(--texto-2); }
+.migalhas [aria-current] { color: var(--texto-3); }
+.indicadores-linha { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--e-3); padding-bottom: var(--e-6); }
+.indicadores-linha .indicador { align-content: start; }
+.indicadores-linha .valor-bloco { display: flex; align-items: center; min-height: var(--a-5); font-size: var(--t-5); line-height: var(--a-5); font-weight: var(--p-forte); }
+.indicadores-linha .valor-bloco .selo { font-size: var(--t-2); line-height: var(--a-2); }
+.indicadores-linha .valor-bloco .tendencia { font-size: var(--t-3); line-height: var(--a-3); }
+.equipamento-grade { display: grid; grid-template-columns: minmax(0, 1fr) var(--detalhe); align-items: start; gap: var(--e-8); }
+.coluna-grafico { display: flex; flex-direction: column; gap: var(--e-8); min-width: 0; }
+.bloco-grafico { display: flex; flex-direction: column; gap: var(--e-3); }
+.bloco-grafico .segmentado { align-self: center; }
+.caixa-grafico { display: flex; flex-direction: column; height: calc(var(--e-16) * 5); } /* 320 px: datas e marcas em 14 px com folga */
+.caixa-grafico > .grafico { flex: 1; }
+.bloco-grafico > .nota { font-size: var(--t-1); line-height: var(--a-1); }
+.bloco-pecas { flex: none; }
+.tabela-simples { margin-top: var(--e-1); }
+.tabela-simples th { position: static; }
+.tabela-simples td { height: var(--alvo-compacto); }
+.coluna-inspecoes { display: flex; flex-direction: column; }
+.coluna-inspecoes .lista-recentes a { grid-template-columns: var(--miniatura) minmax(0, 1fr) auto auto; padding-right: 0; }
+
+/* ================================================================ Pendências: lista e painel ao lado */
+.corpo-lista.com-lado { display: grid; grid-template-columns: minmax(0, 1fr) var(--detalhe); gap: var(--e-6); }
+.area-lista { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.area-lista > .tabela-caixa { flex: 0 1 auto; }
+.area-lista > .vazio { flex: 1; }
+.painel-lateral { display: flex; flex-direction: column; min-height: 0; overflow: auto; border: 1px solid var(--borda); border-radius: var(--r-g); background: var(--superficie); }
+.painel-lateral > .vazio.compacto { flex: 1; border: 0; }
+.painel-lateral .corpo-secao > .grupo-btn { position: sticky; bottom: 0; margin: 0 calc(var(--e-4) * -1) calc(var(--e-4) * -1); padding: var(--e-3) var(--e-4); background: var(--superficie); border-top: 1px solid var(--borda); } /* Salvar sempre à vista */
+body:has(.painel-lateral) .avisos { right: calc(var(--detalhe) + var(--e-6) * 2); } /* o aviso não cobre o painel nem o Salvar */
+.cab-lado { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: var(--e-2) var(--e-3); padding: var(--e-4); border-bottom: 1px solid var(--borda); }
+.miniatura-lado { display: block; width: calc(var(--miniatura) * 1.5); height: auto; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--r-p); background: var(--palco); }
+.titulo-lado { display: grid; gap: var(--e-1); min-width: 0; }
+.titulo-lado h2 { font-size: var(--t-3); line-height: var(--a-3); }
+.cab-lado .btn { grid-column: 1 / -1; justify-self: start; }
+.dica-reinspecao { padding: var(--e-2) var(--e-3); border-radius: var(--r-m); background: var(--sucesso-fundo); color: var(--sucesso-texto); }
+.dica-reinspecao a { color: inherit; text-decoration: underline; text-underline-offset: var(--e-1); }
+.lista-historico { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-3); }
+.lista-historico li { display: grid; }
+.lista-historico b { color: var(--texto); }

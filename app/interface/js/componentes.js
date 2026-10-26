@@ -68,6 +68,14 @@ export function marcar({ rotulo, marcado = false, onchange, ...attrs } = {}) {
   return el("label", { class: "marcar" }, el("input", { type: "checkbox", checked: marcado, onchange, ...attrs }), el("span", {}, rotulo));
 }
 
+/** Busca das telas de lista: lupa dentro do campo, rótulo acessível, aoMudar a cada letra. */
+export function campoBusca({ rotulo, valor = "", aoMudar }) {
+  const entrada = el("input", { type: "search", class: "entrada", value: valor, placeholder: rotulo, "aria-label": rotulo, autocomplete: "off", spellcheck: "false", oninput: () => aoMudar(entrada.value) });
+  const no = el("div", { class: "busca-lista" }, icone("busca"), entrada);
+  no.entrada = entrada;
+  return no;
+}
+
 // ---------------------------------------------------------------- segmentado e abas
 /** Grupo de opções exclusivas (filtro, modo): botões com aria-pressed. */
 export function segmentado({ rotulo, opcoes, valor, aoMudar }) {
@@ -142,11 +150,13 @@ export function indicador({ rotulo, valor, nota, severidade, href, onclick }) {
 // ---------------------------------------------------------------- tabela
 /**
  * tabela({ rotulo, colunas: [{ chave, titulo, classe, ordenavel, link, celula(linha) }], linhas, severidade(linha), href(linha), ordem, aoOrdenar,
- *          marcar: { rotulo(linha), marcada(linha), aoMudar(linhas, sim, todas), todas }, aoMenu(linha, evento) })
+ *          marcar: { rotulo(linha), marcada(linha), aoMudar(linhas, sim, todas), todas }, aoMenu(linha, evento), aoEscolher(linha), grupo(linha) })
  * A linha inteira é clicável, mas o alvo de teclado é o link da coluna com link: true (ou da primeira), sem div clicável.
  * Com marcar, a primeira coluna tem a caixa de seleção e o cabeçalho marca ou desmarca todas as linhas visíveis.
+ * Com aoEscolher (lista com painel de detalhe), a linha seleciona em vez de navegar: o alvo de teclado vira botão.
+ * Com grupo, uma linha de título separa as linhas a cada valor novo (ex.: instalação).
  */
-export function tabela({ rotulo, colunas, linhas, severidade, href, ordem, aoOrdenar, selecionada, marcar: sel, aoMenu }) {
+export function tabela({ rotulo, colunas, linhas, severidade, href, ordem, aoOrdenar, selecionada, marcar: sel, aoMenu, aoEscolher, grupo }) {
   const comTraco = Boolean(severidade);
   const iLink = Math.max(0, colunas.findIndex((c) => c.link));
   let todas = null;
@@ -164,7 +174,12 @@ export function tabela({ rotulo, colunas, linhas, severidade, href, ordem, aoOrd
     return el("th", { scope: "col", class: c.classe, "aria-sort": sentido },
       c.ordenavel ? el("button", { type: "button", onclick: () => aoOrdenar?.(c.chave) }, c.titulo, sentido ? icone("ordenar", "ic p") : null) : c.titulo);
   }));
-  const corpo = el("tbody", {}, linhas.map((l) => {
+  const nColunas = colunas.length + (sel ? 1 : 0) + (comTraco ? 1 : 0);
+  let grupoAtual;
+  const corpo = el("tbody", {}, linhas.flatMap((l) => {
+    const titulo = grupo?.(l);
+    const cabGrupo = grupo && titulo !== grupoAtual ? el("tr", { class: "linha-grupo" }, el("th", { scope: "colgroup", colspan: String(nColunas) }, titulo)) : null;
+    grupoAtual = titulo;
     const destino = href?.(l);
     const marcada = sel ? sel.marcada(l) : false;
     const tr = el("tr", { class: [destino && "clicavel", marcada && "marcada"].filter(Boolean).join(" ") || null, "aria-selected": selecionada ? String(selecionada(l)) : null },
@@ -174,11 +189,16 @@ export function tabela({ rotulo, colunas, linhas, severidade, href, ordem, aoOrd
       colunas.map((c, i) => {
         let conteudo = c.celula ? c.celula(l) : l[c.chave];
         if (i === iLink && destino) conteudo = el("a", { href: destino, class: "forte" }, conteudo);
+        else if (i === iLink && aoEscolher) conteudo = el("button", { type: "button", class: "forte escolher", onclick: () => aoEscolher(l) }, conteudo);
         return el("td", { class: c.classe }, conteudo);
       }));
+    if (aoEscolher) {
+      tr.classList.add("clicavel");
+      tr.addEventListener("click", (ev) => { if (!ev.target.closest("a, button, input, label")) aoEscolher(l); });
+    }
     if (destino) tr.addEventListener("click", (ev) => { if (!ev.target.closest("a, button, input, label")) location.hash = destino.replace(/^#/, ""); });
     if (aoMenu) tr.addEventListener("contextmenu", (ev) => { ev.preventDefault(); aoMenu(l, ev); });
-    return tr;
+    return cabGrupo ? [cabGrupo, tr] : [tr];
   }));
   sincronizarTodas();
   return el("div", { class: "tabela-caixa" }, el("table", { class: "tabela", "aria-label": rotulo }, el("thead", {}, cab), corpo));

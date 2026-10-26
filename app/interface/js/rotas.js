@@ -5,8 +5,8 @@ import { TEXTOS as T } from "../textos.js";
 export const ROTAS = {
   painel: { titulo: T.telas.painel, modulo: "painel", atalho: "1", icone: "painel" },
   inspecoes: { titulo: T.telas.inspecoes, modulo: "inspecoes", esqueleto: "lista", atalho: "2", icone: "inspecoes", detalhe: "analise" },
-  equipamentos: { titulo: T.telas.equipamentos, modulo: "provisoria", atalho: "3", icone: "equipamentos", detalhe: "provisoria" },
-  pendencias: { titulo: T.telas.pendencias, modulo: "provisoria", atalho: "4", icone: "pendencias" },
+  equipamentos: { titulo: T.telas.equipamentos, modulo: "equipamentos", atalho: "3", icone: "equipamentos", detalhe: "equipamento", esqueleto: "lista" },
+  pendencias: { titulo: T.telas.pendencias, modulo: "pendencias", atalho: "4", icone: "pendencias", esqueleto: "lista" },
   captura: { titulo: T.telas.captura, modulo: "captura", detalhe: "captura", atalho: "5", icone: "captura" },
   modelos: { titulo: T.telas.modelos, modulo: "provisoria", atalho: "6", icone: "modelos" },
   configuracoes: { titulo: T.telas.configuracoes, modulo: "provisoria", atalho: "0", icone: "config" },

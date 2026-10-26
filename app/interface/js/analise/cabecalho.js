@@ -93,7 +93,7 @@ export function montarCabecalho(ctx) {
   // pendência em aberto fica à vista no cabeçalho (o que falta fazer); clicar abre a aba Pendência
   function pendenciaNaMeta(p) {
     if (!p || !["aberta", "programada"].includes(p.status)) return null;
-    const texto = p.vencida ? A.pendenciaVencida(dataCurta(p.prazo)) : A.pendenciaAberta(A.status[p.status], dataCurta(p.prazo));
+    const texto = p.vencida ? A.pendenciaVencida(dataCurta(p.prazo)) : A.pendenciaAberta(T.pendencia.status[p.status], dataCurta(p.prazo));
     return el("button", { type: "button", class: `link-pendencia${p.vencida ? " vencida" : ""}`, onclick: () => ctx.mudou("abrir-pendencia") }, texto);
   }
   function desenharSalvo() {

@@ -155,6 +155,13 @@ button.indicador:hover, a.indicador:hover { border-color: var(--borda-forte); ba
 .tabela .forte { font-weight: var(--p-medio); color: var(--texto); }
 .tabela td > a.forte { display: block; margin: calc(var(--e-2) * -1) 0; padding: var(--e-2) 0; } /* o alvo do link cobre a célula */
 .tabela td > a.forte:hover { text-decoration: none; color: var(--acao-hover); }
+.tabela td > button.escolher { display: block; width: 100%; margin: calc(var(--e-2) * -1) 0; padding: var(--e-2) 0; text-align: left; font: inherit; font-weight: var(--p-medio); color: var(--texto); }
+.tabela td > button.escolher:hover { color: var(--acao-hover); }
+.tabela tr.linha-grupo th {
+  position: sticky; top: var(--alvo); z-index: 1; height: var(--alvo-compacto); padding: 0 var(--e-4); text-align: left;
+  background: var(--superficie); border-bottom: 1px solid var(--borda); color: var(--texto); font-weight: var(--p-medio);
+  font-size: var(--t-2); line-height: var(--a-2); text-transform: none; letter-spacing: normal; font-family: var(--fonte);
+}
 .tabela .sub { display: block; color: var(--texto-3); font-weight: var(--p-normal); font-variant-numeric: tabular-nums; }
 .tabela td.traco-celula { width: var(--traco); padding: 0; position: relative; }
 .tabela td.traco-celula::before { content: ""; position: absolute; left: 0; top: var(--e-2); bottom: var(--e-2); width: var(--traco); border-radius: var(--r-p); background: var(--sev, transparent); }
@@ -162,6 +169,7 @@ button.indicador:hover, a.indicador:hover { border-color: var(--borda-forte); ba
 .tabela tbody tr.clicavel:hover { background: var(--superficie-2); }
 .tabela tbody tr[aria-selected="true"] { background: var(--acao-suave); }
 .tabela .vencida { color: var(--erro-texto); font-weight: var(--p-medio); }
+.tabela td > .vencida { display: block; } /* a data em cima, o atraso embaixo */
 .tabela .acoes-linha { display: flex; justify-content: flex-end; gap: var(--e-1); }
 .tabela .marcar { min-height: 0; }
 

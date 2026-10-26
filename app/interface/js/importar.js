@@ -36,8 +36,18 @@ function notificar() {
   importacao.dispatchEvent(new CustomEvent("progresso", { detail: estadoImportacao() || { ativa: false } }));
 }
 
-export function escolherArquivos() {
+/** Abre a escolha de arquivos; destino = { instalacao, equipamento } liga as imagens a um equipamento. */
+let destinoEscolha = {};
+export function escolherArquivos(destino) {
+  destinoEscolha = destino && !(destino instanceof Event) ? destino : {}; // também é usada direto como onclick
   document.getElementById("arquivos").click();
+}
+
+/** Arquivos que voltaram da escolha (o campo oculto da casca chama isto). */
+export function arquivosEscolhidos(arquivos) {
+  const destino = destinoEscolha;
+  destinoEscolha = {};
+  return importar(arquivos, destino);
 }
 
 /** Envia os arquivos um a um (o servidor analisa em fila); destino = { instalacao, equipamento } opcional. */

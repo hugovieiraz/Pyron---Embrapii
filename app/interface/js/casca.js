@@ -6,7 +6,7 @@ import { instalarIcones } from "./icones.js";
 import { ilustracao } from "./ilustracoes.js";
 import { ROTAS, lerRota, endereco } from "./rotas.js";
 import { abrirBusca } from "./busca.js";
-import { importar, escolherArquivos } from "./importar.js";
+import { importar, escolherArquivos, arquivosEscolhidos } from "./importar.js";
 
 // ---------------------------------------------------------------- roteamento
 const PARAMS = new URLSearchParams(location.search); // só para testes: ?conferir, ?tema=escuro, ?toque
@@ -130,7 +130,7 @@ function ligarSoltar() {
     esconder();
     importar(ev.dataTransfer.files);
   });
-  $("#arquivos").addEventListener("change", (ev) => { importar(ev.target.files); ev.target.value = ""; });
+  $("#arquivos").addEventListener("change", (ev) => { arquivosEscolhidos(ev.target.files); ev.target.value = ""; });
 }
 
 // ---------------------------------------------------------------- conexão com o servidor

@@ -3,7 +3,7 @@
 // progresso da importação num lugar fixo. Filtros ficam no endereço (#inspecoes?sev=criticas&q=tr-01).
 import { TEXTOS as T } from "../../textos.js";
 import { el, icone, api, json, dataHora, temperatura, normalizar, animarEntrada } from "../base.js";
-import { botao, campo, segmentado, tabela, selo, estadoVazio, avisar, dialogo, confirmar, menu, ocupado } from "../componentes.js";
+import { botao, campo, campoBusca, segmentado, tabela, selo, estadoVazio, avisar, dialogo, confirmar, menu, ocupado } from "../componentes.js";
 import { endereco } from "../rotas.js";
 import { escolherArquivos, importarDemonstracao, importacao, estadoImportacao, mostrarProgressoNaTela } from "../importar.js";
 import { abrirLaudo } from "../laudo.js";
@@ -26,6 +26,7 @@ export async function montar(pagina, rota) {
     sev: FILTROS_SEVERIDADE[p.get("sev")] !== undefined ? p.get("sev") : "todas",
     q: p.get("q") || "",
     atual: p.get("atual") === "1",
+    semEquipamento: p.get("equipamento") === "sem",
     ordem: lerOrdem(p.get("ordem")),
     mostrar: POR_PAGINA,
     marcadas: new Set(),
@@ -50,9 +51,8 @@ export async function montar(pagina, rota) {
 
   const faixa = faixaImportacao();
   const filtros = el("div", { class: "barra-lista" });
-  const busca = el("input", { type: "search", class: "entrada", value: estado.q, placeholder: N.buscar, "aria-label": N.buscar, autocomplete: "off", spellcheck: "false",
-    oninput: () => { estado.q = busca.value; estado.mostrar = POR_PAGINA; guardar(); desenharCorpo(); } });
-  const caixaBusca = el("div", { class: "busca-lista" }, icone("busca"), busca);
+  const caixaBusca = campoBusca({ rotulo: N.buscar, valor: estado.q, aoMudar: (v) => { estado.q = v; estado.mostrar = POR_PAGINA; guardar(); desenharCorpo(); } });
+  const busca = caixaBusca.entrada;
   const corpo = el("div", { class: "corpo-lista" });
   const barraSelecao = el("div", { class: "barra-selecao", role: "toolbar", "aria-label": N.selecao, hidden: true });
 
@@ -63,7 +63,7 @@ export async function montar(pagina, rota) {
 
   // ---------------------------------------------------------------- desenho
   function visiveis() {
-    const base = estado.atual ? situacaoAtual(lista) : lista;
+    const base = baseFiltrada();
     const niveis = FILTROS_SEVERIDADE[estado.sev];
     const termo = normalizar(estado.q);
     const passa = (it) => (!niveis || niveis.includes(severidade(it)))
@@ -82,8 +82,14 @@ export async function montar(pagina, rota) {
     desenharCorpo();
   }
 
-  function desenharFiltros() {
+  // recortes que chegam de outras telas (Painel, Equipamentos) e aparecem como chip removível
+  function baseFiltrada() {
     const base = estado.atual ? situacaoAtual(lista) : lista;
+    return estado.semEquipamento ? base.filter((it) => !it.identificacao?.equipamento) : base;
+  }
+
+  function desenharFiltros() {
+    const base = baseFiltrada();
     const conta = (chave) => (FILTROS_SEVERIDADE[chave] ? base.filter((it) => FILTROS_SEVERIDADE[chave].includes(severidade(it))).length : base.length);
     const opcoes = Object.keys(FILTROS_SEVERIDADE)
       .filter((k) => k !== "sem" || conta("sem") || estado.sev === "sem")
@@ -92,7 +98,10 @@ export async function montar(pagina, rota) {
     const chipAtual = estado.atual
       ? el("button", { type: "button", class: "chip compacto", title: N.atualDica, onclick: () => { estado.atual = false; guardar(); desenhar(); } }, el("span", {}, N.atual), icone("x", "ic p"))
       : null;
-    filtros.replaceChildren(...[seg, chipAtual, el("span", { class: "empurrar" }), caixaBusca].filter(Boolean));
+    const chipSem = estado.semEquipamento
+      ? el("button", { type: "button", class: "chip compacto", title: N.atualDica, onclick: () => { estado.semEquipamento = false; guardar(); desenhar(); } }, el("span", {}, N.soSemEquipamento), icone("x", "ic p"))
+      : null;
+    filtros.replaceChildren(...[seg, chipAtual, chipSem, el("span", { class: "empurrar" }), caixaBusca].filter(Boolean));
   }
 
   function desenharCorpo() {
@@ -268,6 +277,7 @@ export async function montar(pagina, rota) {
     if (estado.sev !== "todas") params.sev = estado.sev;
     if (estado.q.trim()) params.q = estado.q.trim();
     if (estado.atual) params.atual = "1";
+    if (estado.semEquipamento) params.equipamento = "sem";
     if (estado.ordem.chave !== "data" || estado.ordem.sentido !== "desc") params.ordem = `${estado.ordem.chave}-${estado.ordem.sentido}`;
     history.replaceState(null, "", endereco("inspecoes", [], params));
   }
@@ -275,6 +285,7 @@ export async function montar(pagina, rota) {
     estado.sev = "todas";
     estado.q = "";
     estado.atual = false;
+    estado.semEquipamento = false;
     busca.value = "";
     guardar();
     desenhar();
