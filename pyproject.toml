@@ -37,6 +37,7 @@ medicao = [
     "transformers>=4.56",
     "huggingface_hub",
     "opencv-python-headless",
+    "pillow-heif",  # fotos HEIC do celular (BSD-3)
     "utils3d_moge @ git+https://github.com/EasternJournalist/utils3d-moge.git@62f09d58509485564e24d5d9f6aac9ee9ebc0c37",
 ]
 

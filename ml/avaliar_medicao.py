@@ -112,7 +112,15 @@ def _desenhar(img, medida, caminho: Path, rotulo: str) -> None:
 
 
 SINONIMOS = {"lado": "comprimento", "diametro": "comprimento", "diâmetro": "comprimento"}
-EXTENSOES = {".jpg", ".jpeg", ".png", ".webp"}
+EXTENSOES = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"}
+
+
+def grupo_da_foto(nome: str) -> str:
+    """Tipo da foto pelo nome do arquivo: "ideal", "difícil" ou "normal" (as numeradas)."""
+    import unicodedata
+
+    n = unicodedata.normalize("NFD", nome.lower()).encode("ascii", "ignore").decode()
+    return "ideal" if "ideal" in n else "difícil" if "dificil" in n else "normal"
 
 
 def ler_pasta(pasta: Path) -> tuple[list[dict], dict, dict | None]:
@@ -131,7 +139,9 @@ def ler_pasta(pasta: Path) -> tuple[list[dict], dict, dict | None]:
         if chave(m["objeto"]).startswith("postit"):
             ref = {"auto": "postit_rosa", "tamanho_cm": valor}
             continue
-        reais.setdefault(chave(m["objeto"]), []).append((SINONIMOS.get(chave(m["medida"]), chave(m["medida"])), valor))
+        # coluna opcional so_em: a medida só vale nas fotos cujo nome contém este trecho (altura do pote: só de lado)
+        reais.setdefault(chave(m["objeto"]), []).append(
+            (SINONIMOS.get(chave(m["medida"]), chave(m["medida"])), valor, chave(m.get("so_em", "") or "")))
     pistas_arquivo = pasta / "pistas.json"
     pistas_extra = json.loads(pistas_arquivo.read_text(encoding="utf-8")) if pistas_arquivo.exists() else {}
     linhas, pistas = [], {}
@@ -144,14 +154,18 @@ def ler_pasta(pasta: Path) -> tuple[list[dict], dict, dict | None]:
         for foto in sorted(f for f in sub.iterdir() if f.suffix.lower() in EXTENSOES):
             rel = f"{sub.name}/{foto.name}"
             pistas[rel] = pistas_extra.get(rel) or {"centro": True}
-            for medida, valor in reais[objeto]:
+            for medida, valor, so_em in reais[objeto]:
+                if so_em and so_em not in chave(foto.name):
+                    continue
                 linhas.append({"arquivo": rel, "objeto": objeto, "medida": medida, "valor_cm": valor,
-                               "referencia_na_foto": "auto" if ref else "", "observacao": ""})
+                               "referencia_na_foto": "auto" if ref else "", "observacao": "",
+                               "grupo": grupo_da_foto(foto.name)})
     return linhas, pistas, ref
 
 
 def avaliar_fotos(pasta: Path, variantes: list[str], sam: str, pistas_modos: list[str], saida: Path,
-                  linhas_gab: list[dict] | None = None, pistas: dict | None = None, ref_auto: dict | None = None) -> dict:
+                  linhas_gab: list[dict] | None = None, pistas: dict | None = None, ref_auto: dict | None = None,
+                  usar_exif: bool = True) -> dict:
     from nucleo.medicao.profundidade import Profundidade, abrir
     from nucleo.medicao.segmentar import Segmentador
 
@@ -161,7 +175,7 @@ def avaliar_fotos(pasta: Path, variantes: list[str], sam: str, pistas_modos: lis
     resultado_linhas: list[dict] = []
     tempos: dict = {}
     for v in variantes:
-        prof = Profundidade(v)
+        prof = Profundidade(v, usar_exif=usar_exif)
         t0 = time.perf_counter()
         prof.carregar()
         tempos[f"carregar_{v}_ms"] = round((time.perf_counter() - t0) * 1000, 1)
@@ -169,9 +183,15 @@ def avaliar_fotos(pasta: Path, variantes: list[str], sam: str, pistas_modos: lis
         for arquivo in dict.fromkeys(l["arquivo"] for l in linhas_gab):
             img = abrir(pasta / arquivo)
             p = pistas[arquivo]
-            modos = ["ponto"] if p.get("centro") else [m for m in pistas_modos if m in p]
+            # "usar" no pistas.json escolhe a pista daquela foto (ponto ou caixa) e a linha sai como "marcada"
+            modos = ["ponto"] if p.get("centro") else ["marcada"] if p.get("usar") else [m for m in pistas_modos if m in p]
             for modo in modos:
-                pista = {"ponto": (img.width / 2, img.height / 2)} if p.get("centro") else {modo: p[modo]}
+                if p.get("centro"):
+                    pista = {"ponto": (img.width / 2, img.height / 2)}
+                elif modo == "marcada":
+                    pista = {p["usar"]: p[p["usar"]]}
+                else:
+                    pista = {modo: p[modo]}
                 ref = None
                 linhas_foto = [l for l in linhas_gab if l["arquivo"] == arquivo]
                 nome_ref = next((l["referencia_na_foto"] for l in linhas_foto if l["referencia_na_foto"]), "")
@@ -214,6 +234,7 @@ def avaliar_fotos(pasta: Path, variantes: list[str], sam: str, pistas_modos: lis
                             "estimado_plano": (m_com.no_plano_da_referencia.get(chave) if m_com else None),
                             "tempos_ms": m_sem.tempos_ms,
                             "observacao": l["observacao"],
+                            "grupo": l.get("grupo", ""),
                         }
                     )
     _calibrar_deixando_uma_fora(resultado_linhas, "estimado_sem_ref", "estimado_calibrado")
@@ -270,10 +291,14 @@ def avaliar_sintetico(semente: int = 0) -> dict:
 def resumir(res: dict) -> dict:
     grupos: dict = {}
     for l in res["linhas"]:
-        g = grupos.setdefault(f"{l['modelo']} · {l['pista']}", {"sem_ref": [], "com_ref": [], "calibrado": [], "plano": [], "tempo": []})
-        for modo in ("sem_ref", "com_ref", "calibrado", "plano"):
-            g[modo].append(l.get(f"erro_{modo}_rel"))
-        g["tempo"].append(l["tempos_ms"].get("total"))
+        chaves = [f"{l['modelo']} · {l['pista']}"]
+        if l.get("grupo"):  # fotos marcadas no nome: também por tipo (ideal, normal, difícil)
+            chaves = [f"{chaves[0]} · todas", f"{chaves[0]} · {l['grupo']}"]
+        for k in chaves:
+            g = grupos.setdefault(k, {"sem_ref": [], "com_ref": [], "calibrado": [], "plano": [], "tempo": []})
+            for modo in ("sem_ref", "com_ref", "calibrado", "plano"):
+                g[modo].append(l.get(f"erro_{modo}_rel"))
+            g["tempo"].append(l["tempos_ms"].get("total"))
     saida = {}
     for k, g in grupos.items():
         tempos = [t for t in g["tempo"] if t]
@@ -337,6 +362,7 @@ def main(argv=None) -> int:
     ap.add_argument("--sam", default=modelos.SAM_PADRAO, choices=list(modelos.SAM))
     ap.add_argument("--pistas", nargs="+", default=["ponto", "caixa"], choices=["ponto", "caixa"])
     ap.add_argument("--sintetico", action="store_true", help="avaliar nas cenas sintéticas (sem modelo)")
+    ap.add_argument("--sem-exif", action="store_true", help="ignorar a lente gravada na foto (usar a estimada)")
     ap.add_argument("--saida", type=Path, default=PASTA_SAIDA)
     args = ap.parse_args(argv)
 
@@ -347,7 +373,8 @@ def main(argv=None) -> int:
     elif args.pasta:
         linhas, pistas, ref = ler_pasta(args.pasta)
         print(f"{len(pistas)} fotos, {len(linhas)} medidas, referência automática: {ref}")
-        res = avaliar_fotos(args.pasta, args.modelos, args.sam, args.pistas, args.saida, linhas, pistas, ref)
+        res = avaliar_fotos(args.pasta, args.modelos, args.sam, args.pistas, args.saida, linhas, pistas, ref,
+                            usar_exif=not args.sem_exif)
         titulo = f"Medição em foto comum: {args.pasta.name}"
     else:
         res = avaliar_fotos(args.gabarito, args.modelos, args.sam, args.pistas, args.saida)

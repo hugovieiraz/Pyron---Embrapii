@@ -33,8 +33,21 @@ class Geometria:
     modelo: str
 
 
+def _registrar_heif() -> None:
+    """HEIC/HEIF (padrão de muitos celulares) pelo ``pillow-heif`` (BSD-3), se estiver instalado."""
+    try:
+        from pillow_heif import register_heif_opener
+
+        register_heif_opener()
+    except ImportError:
+        pass
+
+
+_registrar_heif()
+
+
 def abrir(imagem) -> Image.Image:
-    """Abre (caminho, bytes ou PIL) já na orientação certa do EXIF, em RGB."""
+    """Abre (caminho, bytes ou PIL; JPEG, PNG ou HEIC) já na orientação certa do EXIF, em RGB."""
     if isinstance(imagem, (bytes, bytearray)):
         import io
 
@@ -50,7 +63,10 @@ def abrir(imagem) -> Image.Image:
 def fov_do_exif(imagem: Image.Image) -> float | None:
     """Campo de visão horizontal (graus) pela focal equivalente em 35 mm do EXIF, se houver.
 
-    Equivalente em 35 mm mede pela diagonal: f_px = f35 · diagonal_px / 43,27 mm.
+    Equivalente em 35 mm mede pela diagonal: f_px = f35 · diagonal_px / 43,27 mm. A diagonal é a do quadro 4:3
+    do sensor (lado maior da foto × 5/4), não a da foto: o celular grava 16:9 ou 19,5:9 cortando o sensor 4:3 e
+    mantém o equivalente do quadro inteiro (Galaxy S23, 1848 × 4000: 23 mm → 2658 px, o mesmo que f = 5,4 mm com
+    pixel de 2,04 µm; pela diagonal da foto cortada daria 2342 px, 12 % a menos). Em foto 4:3 dá o mesmo.
     """
     exif = imagem.info.get("exif_pyron") or imagem.getexif()
     try:
@@ -60,7 +76,8 @@ def fov_do_exif(imagem: Image.Image) -> float | None:
     if not f35:
         return None
     w, h = imagem.size
-    f_px = float(f35) * math.hypot(w, h) / DIAGONAL_35MM
+    diagonal_43 = max(w, h) * 5 / 4
+    f_px = float(f35) * diagonal_43 / DIAGONAL_35MM
     return math.degrees(2 * math.atan(w / (2 * f_px)))
 
 
@@ -69,12 +86,14 @@ class Profundidade:
     (o MoGe-2 usa de 1200 a 3600; padrão 3600). Na CPU de 4 núcleos da nuvem, o ViT-L levou ~19 s com 3600
     e ~4,5 s com 1200 numa foto de 900 × 1600."""
 
-    def __init__(self, variante: str = modelos.MOGE_PADRAO, dispositivo: str | None = None, num_tokens: int | None = None):
+    def __init__(self, variante: str = modelos.MOGE_PADRAO, dispositivo: str | None = None, num_tokens: int | None = None,
+                 usar_exif: bool = True):
         if variante not in modelos.MOGE:
             raise ValueError(f"variante do MoGe-2 desconhecida: {variante}")
         self.variante = variante
         self.dispositivo = dispositivo
         self.num_tokens = num_tokens
+        self.usar_exif = usar_exif
         self._modelo = None
         self._trava = threading.Lock()
 
@@ -96,12 +115,12 @@ class Profundidade:
                 self._modelo = modelo
         return self._modelo
 
-    def estimar(self, imagem, usar_exif: bool = True, num_tokens: int | None = None) -> Geometria:
+    def estimar(self, imagem, usar_exif: bool | None = None, num_tokens: int | None = None) -> Geometria:
         import torch
 
         img = abrir(imagem)
         modelo = self.carregar()
-        fov = fov_do_exif(img) if usar_exif else None
+        fov = fov_do_exif(img) if (self.usar_exif if usar_exif is None else usar_exif) else None
         t0 = time.perf_counter()
         x = torch.from_numpy(np.asarray(img, dtype=np.float32) / 255.0).permute(2, 0, 1).to(self.dispositivo)
         with torch.inference_mode():

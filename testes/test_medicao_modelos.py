@@ -130,3 +130,20 @@ def test_regua_do_gabarito_de_ponta_a_ponta():
     assert m.forma == "plano"
     assert m.comprimento_cm > 5 * m.largura_cm  # régua de 30 × 3,5 cm: comprida e fina
     assert m.tempos_ms["total"] > 0
+
+
+def test_lente_do_exif_em_foto_cortada_do_sensor_4_3():
+    """Galaxy S23 grava 1848 × 4000 (19,5:9) cortando o sensor 4:3 e mantém o equivalente do quadro inteiro:
+    23 mm → f = 23 · 5000 / 43,27 = 2658 px (o mesmo que 5,4 mm com pixel de 2,04 µm)."""
+    import math
+
+    from nucleo.medicao.profundidade import abrir, fov_do_exif
+
+    img = Image.new("RGB", (1848, 4000), (90, 120, 200))
+    exif = Image.Exif()
+    exif.get_ifd(0x8769)[0xA405] = 23
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", exif=exif)
+    fov = fov_do_exif(abrir(buf.getvalue()))
+    f_px = 1848 / (2 * math.tan(math.radians(fov) / 2))
+    assert f_px == pytest.approx(23 * 5000 / 43.267, rel=1e-3)
