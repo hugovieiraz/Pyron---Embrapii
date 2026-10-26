@@ -17,7 +17,9 @@ Aprovada pelo Hugo em 25/10. Substitui a logo raster (`marca/pyron_logo.png`).
 | `pyron-logo-preto.svg`, `pyron-logo-branco.svg` | uma cor só (carimbo, impressão, marca-d'água) |
 | `pyron-simbolo-*.svg` | só o símbolo, nas mesmas quatro versões |
 | `pyron-palavra.svg` | só a palavra PYRON |
-| `pyron-icone.svg` | ícone do aplicativo: símbolo claro sobre ladrilho escuro, 256 px |
+| `pyron-icone.svg` | ícone da página (favicon, celular): símbolo claro sobre ladrilho escuro, 256 px |
+| `pyron-icone-sem-fundo.svg` | ícone do Windows (Pyron.exe e atalhos): só o símbolo, mão clara com contorno escuro fino; gerado |
+| `pyron-logo-vertical-escuro.svg` | logo vertical para fundo escuro (tela de abertura do Pyron.exe); gerado |
 | `prancha.png` | apresentação: versões, tamanhos reais, ícone e barra da interface |
 
 `scripts/`: como foi feito. `vetorizar.py` traça a imagem (OpenCV); `final.py` monta as versões a

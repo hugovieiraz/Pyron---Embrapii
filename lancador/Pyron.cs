@@ -15,6 +15,7 @@ using System.Drawing.Drawing2D;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Windows.Forms;
@@ -150,9 +151,8 @@ namespace Pyron
 
                 Directory.CreateDirectory(PastaDados);
                 using (var abertura = new Abertura(porta, servidor))
-                using (var imagem = new Bitmap(abertura.ClientSize.Width, abertura.ClientSize.Height))
+                using (var imagem = abertura.Desenhar())
                 {
-                    abertura.DrawToBitmap(imagem, new Rectangle(Point.Empty, abertura.ClientSize));
                     imagem.Save(Path.Combine(PastaDados, "verificacao.png"), System.Drawing.Imaging.ImageFormat.Png);
                 }
                 codigo = ok ? 0 : 1;
@@ -375,18 +375,18 @@ namespace Pyron
         }
     }
 
-    /// <summary>Tela de abertura: a logo, o que está carregando e uma barra em movimento.</summary>
+    /// <summary>
+    /// Tela de abertura: só a logo, solta sobre a área de trabalho, com a linha do que está carregando e uma
+    /// barra fina. Janela em camadas (transparência por pixel): sem caixa nem fundo; a sombra suave que vem
+    /// desenhada em abertura.png deixa a logo clara legível sobre qualquer papel de parede.
+    /// </summary>
     class Abertura : Form
     {
-        // Cores dos tokens da interface (app/estatico/tokens.css). Fundo branco: a mão da logo é escura.
-        static readonly Color Fundo = Color.White;
-        static readonly Color Borda = Color.FromArgb(0xDF, 0xE3, 0xEE);        // --n-300
-        static readonly Color Acao = Color.FromArgb(0x3F, 0x50, 0xD6);         // --azul-600
-        static readonly Color FaixaTopo = Color.FromArgb(0x33, 0x41, 0xB3);    // --azul-700 (barra lateral)
-        static readonly Color FaixaBase = Color.FromArgb(0x2C, 0x27, 0x87);    // --violeta-900
-        static readonly Color Texto2 = Color.FromArgb(0x4A, 0x52, 0x70);       // --n-700
-        static readonly Color Texto3 = Color.FromArgb(0x5F, 0x68, 0x86);       // --n-600
-        static readonly Color Trilho = Color.FromArgb(0xED, 0xEF, 0xF6);       // --n-200
+        // Cores da marca (marca/vetor/LEIA-ME.md): logo para fundo escuro e a chama.
+        static readonly Color Claro = Color.FromArgb(0xE6, 0xEA, 0xF0);
+        static readonly Color Claro2 = Color.FromArgb(0xC8, 0xCD, 0xD6);       // --palco-texto
+        static readonly Color Chama = Color.FromArgb(0xEF, 0x5F, 0x0C);
+        static readonly Color Contorno = Color.FromArgb(170, 0x0A, 0x0A, 0x0A);
 
         readonly int porta;
         readonly Process servidor;
@@ -410,15 +410,13 @@ namespace Pyron
             Text = Programa.Nome;
             FormBorderStyle = FormBorderStyle.None;
             StartPosition = FormStartPosition.CenterScreen;
-            ClientSize = new Size((int)(420 * k), (int)(372 * k));
-            BackColor = Fundo;
+            ClientSize = new Size((int)(360 * k), (int)(376 * k));
             ShowInTaskbar = true;
-            DoubleBuffered = true;
             KeyPreview = true;
             try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch (Exception) { }
 
-            quadro.Interval = 16;
-            quadro.Tick += delegate { AtualizarEstado(); Invalidate(); };
+            quadro.Interval = 33;
+            quadro.Tick += delegate { AtualizarEstado(); Mostrar(); };
             KeyDown += delegate (object s, KeyEventArgs e) { if (e.KeyCode == Keys.Escape) Cancelar(); };
         }
 
@@ -430,7 +428,7 @@ namespace Pyron
         {
             try
             {
-                string arquivo = Path.Combine(Programa.Projeto, "app", "estatico", "marca", "logo.png");
+                string arquivo = Path.Combine(Programa.Projeto, "app", "estatico", "marca", "abertura.png");
                 if (!File.Exists(arquivo)) return null;
                 using (var original = Image.FromFile(arquivo))
                     return new Bitmap(original);  // cópia: não deixa o arquivo preso
@@ -443,7 +441,7 @@ namespace Pyron
             get
             {
                 var p = base.CreateParams;
-                p.ClassStyle |= 0x20000;  // CS_DROPSHADOW: sombra discreta sob a janela sem borda
+                p.ExStyle |= 0x80000;  // WS_EX_LAYERED: a janela é a própria imagem, com transparência por pixel
                 return p;
             }
         }
@@ -451,6 +449,8 @@ namespace Pyron
         protected override void OnShown(EventArgs e)
         {
             base.OnShown(e);
+            Mostrar();
+            Activate();
             quadro.Start();
             var vigia = new Thread(Esperar);
             vigia.IsBackground = true;
@@ -531,53 +531,73 @@ namespace Pyron
             else if (s > 1.5) estado = "Carregando o motor de análise térmica…";
         }
 
-        protected override void OnPaint(PaintEventArgs e)
+        /// <summary>Desenha um quadro da abertura com fundo transparente (também usado por --verificar).</summary>
+        public Bitmap Desenhar()
         {
-            var g = e.Graphics;
-            g.SmoothingMode = SmoothingMode.AntiAlias;
-            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
-            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
-            float w = ClientSize.Width, h = ClientSize.Height;
-
-            using (var borda = new Pen(Borda, 1))
-                g.DrawRectangle(borda, 0, 0, w - 1, h - 1);
-            // Faixa fina no topo, azul com subtom violeta, como a barra lateral do aplicativo.
-            using (var faixa = new LinearGradientBrush(new RectangleF(0, 0, w, 4 * k), FaixaTopo, FaixaBase, LinearGradientMode.Horizontal))
-                g.FillRectangle(faixa, 0, 0, w, 4 * k);
-
-            if (logo != null)
+            int w = ClientSize.Width, h = ClientSize.Height;
+            var imagem = new Bitmap(w, h, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+            using (var g = Graphics.FromImage(imagem))
             {
-                float altura = 232 * k;
-                float largura = altura * logo.Width / logo.Height;
-                g.DrawImage(logo, (w - largura) / 2, 30 * k, largura, altura);
-            }
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                g.Clear(Color.Transparent);
 
-            using (var centro = new StringFormat { Alignment = StringAlignment.Center, Trimming = StringTrimming.EllipsisCharacter })
-            using (var pequeno = new Font("Segoe UI", 9.5f))
-            using (var menor = new Font("Segoe UI", 8.5f))
-            using (var corTexto2 = new SolidBrush(Texto2))
-            using (var corTexto3 = new SolidBrush(Texto3))
+                float base_ = 8 * k;
+                if (logo != null)
+                {
+                    float largura = w;
+                    float altura = largura * logo.Height / logo.Width;
+                    g.DrawImage(logo, 0, 0, largura, altura);
+                    base_ = altura;
+                }
+
+                using (var fonte = new FontFamily("Segoe UI"))
+                using (var centro = new StringFormat { Alignment = StringAlignment.Center })
+                {
+                    // Linha do estado: texto claro com contorno escuro (legível em fundo claro ou escuro).
+                    float y = base_ - 24 * k;  // sobe sobre a folga da sombra embaixo da logo
+                    Texto(g, estado, fonte, 13.5f * k, new RectangleF(0, y, w, 24 * k), centro, Claro);
+
+                    // Barra indeterminada: um trecho na cor da chama correndo sobre um trilho fino.
+                    float x0 = w * 0.22f, larguraBarra = w * 0.56f, yb = y + 34 * k, alturaBarra = 3 * k;
+                    using (var trilho = new SolidBrush(Color.FromArgb(150, 0x0A, 0x0A, 0x0A)))
+                        g.FillRectangle(trilho, x0 - k, yb - k, larguraBarra + 2 * k, alturaBarra + 2 * k);
+                    using (var claro = new SolidBrush(Color.FromArgb(90, Claro)))
+                        g.FillRectangle(claro, x0, yb, larguraBarra, alturaBarra);
+                    double t = (DateTime.Now - inicio).TotalSeconds;
+                    float trecho = larguraBarra * 0.3f;
+                    float fase = Pronto ? 1f : (float)((t * 0.55) % 1.0);
+                    float a = Pronto ? x0 : x0 - trecho + (larguraBarra + trecho) * fase;
+                    float b = Pronto ? x0 + larguraBarra : a + trecho;
+                    a = Math.Max(a, x0);
+                    b = Math.Min(b, x0 + larguraBarra);
+                    if (b > a)
+                        using (var chama = new SolidBrush(Chama)) g.FillRectangle(chama, a, yb, b - a, alturaBarra);
+
+                    Texto(g, "Esc cancela", fonte, 11.5f * k, new RectangleF(0, yb + 14 * k, w, 20 * k), centro, Claro2);
+                }
+            }
+            return imagem;
+        }
+
+        static void Texto(Graphics g, string texto, FontFamily fonte, float tamanho, RectangleF area, StringFormat formato, Color cor)
+        {
+            using (var caminho = new GraphicsPath())
             {
-                g.DrawString(estado, pequeno, corTexto2, new RectangleF(32 * k, 282 * k, w - 64 * k, 22 * k), centro);
-                var dica = "Esc cancela";
-                var tam = g.MeasureString(dica, menor);
-                g.DrawString(dica, menor, corTexto3, w - 32 * k - tam.Width, 338 * k);
-                g.DrawString("NBR 15866 · MTA · ΔT entre fases", menor, corTexto3, 32 * k, 338 * k);
+                caminho.AddString(texto, fonte, (int)FontStyle.Regular, tamanho, area, formato);
+                using (var contorno = new Pen(Contorno, tamanho * 0.28f) { LineJoin = LineJoin.Round })
+                    g.DrawPath(contorno, caminho);
+                using (var pincel = new SolidBrush(cor))
+                    g.FillPath(pincel, caminho);
             }
+        }
 
-            // Barra indeterminada: um trecho azul que corre sobre o trilho.
-            float x0 = 48 * k, larguraBarra = w - 96 * k, y = 314 * k, alturaBarra = 3 * k;
-            using (var trilho = new SolidBrush(Trilho)) g.FillRectangle(trilho, x0, y, larguraBarra, alturaBarra);
-            double t = (DateTime.Now - inicio).TotalSeconds;
-            float trecho = larguraBarra * 0.28f;
-            float fase = Pronto ? 1f : (float)((t * 0.55) % 1.0);
-            float inicioTrecho = Pronto ? x0 : x0 - trecho + (larguraBarra + trecho) * fase;
-            float fimTrecho = Pronto ? x0 + larguraBarra : inicioTrecho + trecho;
-            inicioTrecho = Math.Max(inicioTrecho, x0);
-            fimTrecho = Math.Min(fimTrecho, x0 + larguraBarra);
-            if (fimTrecho > inicioTrecho)
-                using (var acao = new SolidBrush(Acao)) g.FillRectangle(acao, inicioTrecho, y, fimTrecho - inicioTrecho, alturaBarra);
+        void Mostrar()
+        {
+            if (!IsHandleCreated || IsDisposed) return;
+            using (var imagem = Desenhar())
+                Camadas.Atualizar(this, imagem);
         }
 
         // Arrastar a janela sem borda.
@@ -589,6 +609,46 @@ namespace Pyron
                 Capture = false;
                 var m = Message.Create(Handle, 0xA1, new IntPtr(2), IntPtr.Zero);  // WM_NCLBUTTONDOWN, HTCAPTION
                 WndProc(ref m);
+            }
+        }
+    }
+
+    /// <summary>UpdateLayeredWindow: põe uma imagem com transparência por pixel como a própria janela.</summary>
+    static class Camadas
+    {
+        [StructLayout(LayoutKind.Sequential)] struct Ponto { public int X, Y; public Ponto(int x, int y) { X = x; Y = y; } }
+        [StructLayout(LayoutKind.Sequential)] struct Tamanho { public int L, A; public Tamanho(int l, int a) { L = l; A = a; } }
+        [StructLayout(LayoutKind.Sequential, Pack = 1)] struct Mistura { public byte Op, Flags, Alfa, Formato; }
+
+        [DllImport("user32.dll", SetLastError = true)]
+        static extern bool UpdateLayeredWindow(IntPtr janela, IntPtr dcTela, ref Ponto destino, ref Tamanho tamanho, IntPtr dcOrigem, ref Ponto origem, int chave, ref Mistura mistura, int flags);
+        [DllImport("user32.dll")] static extern IntPtr GetDC(IntPtr janela);
+        [DllImport("user32.dll")] static extern int ReleaseDC(IntPtr janela, IntPtr dc);
+        [DllImport("gdi32.dll")] static extern IntPtr CreateCompatibleDC(IntPtr dc);
+        [DllImport("gdi32.dll")] static extern bool DeleteDC(IntPtr dc);
+        [DllImport("gdi32.dll")] static extern IntPtr SelectObject(IntPtr dc, IntPtr objeto);
+        [DllImport("gdi32.dll")] static extern bool DeleteObject(IntPtr objeto);
+
+        public static void Atualizar(Form janela, Bitmap imagem)
+        {
+            IntPtr tela = GetDC(IntPtr.Zero);
+            IntPtr memoria = CreateCompatibleDC(tela);
+            IntPtr bitmap = IntPtr.Zero, antigo = IntPtr.Zero;
+            try
+            {
+                bitmap = imagem.GetHbitmap(Color.FromArgb(0));
+                antigo = SelectObject(memoria, bitmap);
+                var tamanho = new Tamanho(imagem.Width, imagem.Height);
+                var origem = new Ponto(0, 0);
+                var destino = new Ponto(janela.Left, janela.Top);
+                var mistura = new Mistura { Op = 0, Flags = 0, Alfa = 255, Formato = 1 };  // AC_SRC_OVER, AC_SRC_ALPHA
+                UpdateLayeredWindow(janela.Handle, tela, ref destino, ref tamanho, memoria, ref origem, 0, ref mistura, 2);  // ULW_ALPHA
+            }
+            finally
+            {
+                ReleaseDC(IntPtr.Zero, tela);
+                if (bitmap != IntPtr.Zero) { SelectObject(memoria, antigo); DeleteObject(bitmap); }
+                DeleteDC(memoria);
             }
         }
     }

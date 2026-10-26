@@ -63,7 +63,8 @@ núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Te
   `#0A0A0A`, chama `#EF5F0C` / `#FEC31F` / `#A70F3C`; em fundo escuro, mão e texto `#E6EAF0`
   (`*-escuro.svg`). Palavra em Chakra Petch Bold (SIL OFL) convertida em contornos. Os PNG, os SVG da
   barra e o `pyron.ico` saem de `python marca/gerar_marca.py` (rasteriza no Edge sem janela); não editar
-  os arquivos gerados à mão. O ícone dentro do `Pyron.exe` só muda ao recompilar (`lancador/construir.py`).
+  os arquivos gerados à mão. O ícone dentro do `Pyron.exe` só muda ao recompilar (`lancador/construir.py`); desde 26/10 é só o símbolo, sem fundo
+  (mão clara com contorno escuro), e a abertura do .exe é a logo solta com sombra (`marca/abertura.png`), sem janela.
   O palco do termograma é índigo profundo (`--palco`), inclusive no tema claro.
 
 ## 2. Hierarquia e estados

@@ -97,6 +97,7 @@ pulados (`pytest -q`), com o teste novo da pergunta ao sair e da versão igual n
 ## 7. Pendências (fora do critério)
 
 - Peak-End do fim do treino (5d): sem retorno próprio quando o treino acaba em outra tela.
-- Recompilar o `Pyron.exe` (`lancador/construir.py`): a abertura ainda usa as cores antigas (índigo) desenhadas no
-  .exe; a logo já é a nova, porque vem da pasta do projeto.
+- ~~Recompilar o `Pyron.exe`~~ feito no mesmo dia: ícone só com o símbolo (sem fundo) e abertura sem janela, só a
+  logo com sombra suave (`app/estatico/marca/abertura.png`); 52 KB; `--verificar` passou e o Controle Inteligente de
+  Aplicativos deixou rodar. Na área de trabalho ficou um só `Pyron.exe` ("Abrir Pyron" e o .exe antigo foram para a Lixeira).
 - Tirar `/antiga` e `app/estatico` na próxima versão.

@@ -3,13 +3,16 @@
 Saídas:
     marca/vetor/pyron-logo-vertical-cor.svg  símbolo sobre a palavra, montado dos vetores (sem redesenho)
     app/estatico/marca/simbolo.png           símbolo, 512 px, fundo transparente
-    app/estatico/marca/logo.png              logo vertical, 720 px de largura, fundo transparente
-                                             (tela de abertura do Pyron.exe, Sobre e README)
+    app/estatico/marca/logo.png              logo vertical, 720 px de largura, fundo transparente (README, manual)
+    marca/vetor/pyron-logo-vertical-escuro.svg  a mesma logo vertical para fundo escuro
+    app/estatico/marca/abertura.png          tela de abertura do Pyron.exe: logo vertical clara com sombra
+                                             suave, fundo transparente (aparece solta sobre a área de trabalho)
+    marca/vetor/pyron-icone-sem-fundo.svg    ícone do Windows: só o símbolo, sem ladrilho
     app/estatico/marca/logo-cor.svg          logo horizontal para fundo claro (barra da interface nova)
     app/estatico/marca/logo-escuro.svg       logo horizontal para fundo escuro
     app/estatico/marca/icone-64.png          ícone do aplicativo: favicon
     app/estatico/marca/icone-192.png         ícone do aplicativo: atalhos e página do celular
-    marca/pyron.ico e <destino_ico>          ícone do Windows multi-tamanho (atalhos e Pyron.exe)
+    marca/pyron.ico e <destino_ico>          ícone do Windows multi-tamanho (atalhos e Pyron.exe), sem fundo
     apresentacao/estatico/marca/             cópias usadas pela apresentação
 
 Os SVG viram PNG no Edge sem janela, com fundo transparente: o Edge é assinado pela Microsoft e passa pelo
@@ -28,7 +31,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageFilter
 
 AQUI = Path(__file__).resolve().parent
 PROJETO = AQUI.parent
@@ -47,17 +50,20 @@ def _conteudo(svg: Path) -> tuple[str, str]:
     return caixa, miolo
 
 
-def montar_vertical() -> Path:
-    """Símbolo centrado sobre a palavra PYRON, na largura da palavra (mesmas peças da logo horizontal)."""
-    caixa_s, simbolo = _conteudo(VETOR / "pyron-simbolo-cor.svg")
+def montar_vertical(versao: str = "cor") -> Path:
+    """Símbolo centrado sobre a palavra PYRON, na largura da palavra (mesmas peças da logo horizontal).
+    versao "escuro": mão e palavra claras, para fundo escuro."""
+    caixa_s, simbolo = _conteudo(VETOR / f"pyron-simbolo-{versao}.svg")
     caixa_p, palavra = _conteudo(VETOR / "pyron-palavra.svg")
+    if versao == "escuro":
+        palavra = palavra.replace('fill="#0A0A0A"', 'fill="#E6EAF0"')
     _, _, sw, sh = (float(v) for v in caixa_s.split())
     _, _, pw, ph = (float(v) for v in caixa_p.split())
     alto_s = 220.0
     largo_s = alto_s * sw / sh
     vao = 26.0
     total = alto_s + vao + ph
-    saida = VETOR / "pyron-logo-vertical-cor.svg"
+    saida = VETOR / f"pyron-logo-vertical-{versao}.svg"
     saida.write_text(
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {pw:.1f} {total:.1f}" role="img" aria-label="Pyron">'
         f'<svg x="{(pw - largo_s) / 2:.2f}" y="0" width="{largo_s:.2f}" height="{alto_s:.2f}" viewBox="{caixa_s}">{simbolo}</svg>'
@@ -66,6 +72,44 @@ def montar_vertical() -> Path:
         encoding="utf-8",
     )
     return saida
+
+
+def montar_icone_sem_fundo() -> Path:
+    """Ícone do Windows só com o símbolo, sem ladrilho. A mão vem clara (a versão da marca para fundo escuro,
+    como o tema escuro do Windows e a barra de tarefas) com um contorno escuro fino por baixo, para continuar
+    visível quando o papel de parede é claro. O quadro é justo no desenho, para o símbolo encher o ícone."""
+    _, miolo = _conteudo(VETOR / "pyron-simbolo-escuro.svg")
+    miolo = miolo.replace('fill="#E6EAF0"', 'fill="#E6EAF0" stroke="#0A0A0A" stroke-width="6" stroke-linejoin="round" paint-order="stroke"')
+    x0, y0, x1, y1 = 25.73, 7.25, 171.75, 173.69  # extremos do desenho do símbolo
+    lado = max(x1 - x0, y1 - y0) + 8  # folga para o contorno
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    saida = VETOR / "pyron-icone-sem-fundo.svg"
+    saida.write_text(
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{cx - lado / 2:.2f} {cy - lado / 2:.2f} {lado:.2f} {lado:.2f}" '
+        f'role="img" aria-label="Pyron">{miolo}</svg>\n',
+        encoding="utf-8",
+    )
+    return saida
+
+
+def montar_abertura(vertical_escuro: Path) -> Image.Image:
+    """Logo vertical clara com uma sombra suave em volta: a tela de abertura não tem fundo, e a sombra deixa a
+    logo legível sobre qualquer papel de parede (claro ou escuro)."""
+    largura = 560
+    logo = rasterizar(vertical_escuro, largura, round(largura / _proporcao(vertical_escuro)))
+    folga = 72
+    quadro = Image.new("RGBA", (logo.width + 2 * folga, logo.height + 2 * folga), (0, 0, 0, 0))
+    alfa = Image.new("L", quadro.size, 0)
+    alfa.paste(logo.getchannel("A"), (folga, folga))
+    # duas sombras: uma larga e suave, que separa a logo do fundo, e uma justa e mais escura, que dá o contorno
+    # das letras claras quando o papel de parede também é claro
+    larga = alfa.filter(ImageFilter.MaxFilter(21)).filter(ImageFilter.GaussianBlur(28)).point(lambda v: round(v * 0.55))
+    justa = alfa.filter(ImageFilter.MaxFilter(9)).filter(ImageFilter.GaussianBlur(5)).point(lambda v: round(v * 0.8))
+    escuro = Image.new("RGBA", quadro.size, (10, 10, 10, 255))
+    quadro.paste(escuro, (0, 0), larga)
+    quadro.alpha_composite(Image.composite(escuro, Image.new("RGBA", quadro.size, (0, 0, 0, 0)), justa))
+    quadro.alpha_composite(logo, (folga, folga))
+    return quadro
 
 
 def _edge() -> Path:
@@ -109,7 +153,8 @@ def main() -> None:
 
     vertical = montar_vertical()
     simbolo = VETOR / "pyron-simbolo-cor.svg"
-    icone = VETOR / "pyron-icone.svg"
+    icone = VETOR / "pyron-icone.svg"           # ladrilho escuro: favicon e página do celular
+    icone_janela = montar_icone_sem_fundo()     # só o símbolo: Pyron.exe e atalhos
 
     # símbolo quadrado com o desenho centrado
     s = rasterizar(simbolo, round(512 * _proporcao(simbolo)), 512)
@@ -123,7 +168,9 @@ def main() -> None:
     shutil.copyfile(VETOR / "pyron-logo-cor.svg", ESTATICO / "logo-cor.svg")
     shutil.copyfile(VETOR / "pyron-logo-escuro.svg", ESTATICO / "logo-escuro.svg")
 
-    camadas = [rasterizar(icone, t, t) for t in TAMANHOS_ICO]
+    montar_abertura(montar_vertical("escuro")).save(ESTATICO / "abertura.png", optimize=True)
+
+    camadas = [rasterizar(icone_janela, t, t) for t in TAMANHOS_ICO]
     camadas[-1].save(destino_ico, format="ICO", sizes=[(t, t) for t in TAMANHOS_ICO], append_images=camadas[:-1])
     if destino_ico.resolve() != (AQUI / "pyron.ico").resolve():
         shutil.copyfile(destino_ico, AQUI / "pyron.ico")
