@@ -53,7 +53,7 @@ class Extensoes:
 
 
 def _validos(pontos: np.ndarray, mascara: np.ndarray) -> np.ndarray:
-    return mascara & np.all(np.isfinite(pontos), axis=-1)
+    return mascara & np.isfinite(pontos[..., 2])
 
 
 def _passos_pixel(pontos: np.ndarray, mascara: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -221,6 +221,20 @@ def plano(
     lados.sort(key=lambda m: -m.valor)
     resultado.comprimento, resultado.largura = lados
     return resultado
+
+
+def projetar_no_plano(pontos: np.ndarray, mascara: np.ndarray, pl: Plano) -> np.ndarray:
+    """Troca cada ponto da máscara pelo encontro do raio dele com o plano.
+
+    O raio de um pixel é a direção do próprio ponto (a câmera fica na origem), então a borda do objeto,
+    onde a profundidade estimada mistura objeto e fundo, cai no lugar certo do plano."""
+    saida = pontos.copy()
+    ok = _validos(pontos, mascara)
+    p = pontos[ok]
+    den = p @ pl.normal
+    t = np.where(np.abs(den) > 1e-9, (pl.centro @ pl.normal) / den, np.nan)
+    saida[ok] = p * t[:, None]
+    return saida
 
 
 def _angulos_casca(uv: np.ndarray, maximo: int = 180) -> np.ndarray:

@@ -143,3 +143,59 @@ def cenas_padrao(ruido: float = 0.0) -> dict[str, tuple[Cena, str, dict[str, flo
             {"altura": 2.10},
         ),
     }
+
+
+class ProfundidadeSintetica:
+    """Faz o papel do MoGe-2 numa cena sintética: devolve os pontos da cena (vezes ``escala``, para
+    simular o erro de escala de um modelo)."""
+
+    nome = "sintético"
+
+    def __init__(self, cena: Cena, escala: float = 1.0):
+        self.cena = cena
+        self.escala = escala
+
+    def estimar(self, imagem, **_):
+        from nucleo.medicao.profundidade import Geometria
+
+        pontos = self.cena.pontos * self.escala
+        return Geometria(
+            pontos=pontos,
+            validos=np.all(np.isfinite(pontos), axis=-1),
+            focal_px=self.cena.focal,
+            lente="estimada",
+            tempo_ms=0.0,
+            modelo=self.nome,
+        )
+
+
+class SegmentadorSintetico:
+    """Faz o papel do SAM: o ponto escolhe o objeto embaixo dele; a caixa, o que mais a ocupa."""
+
+    nome = "sintético"
+
+    def __init__(self, cena: Cena):
+        self.cena = cena
+
+    def mascara_por_ponto(self, imagem, ponto, chave=None, **_):
+        x, y = int(round(ponto[0])), int(round(ponto[1]))
+        for m in self.cena.mascaras.values():
+            if m[y, x]:
+                return m.copy(), 1.0
+        return np.zeros_like(next(iter(self.cena.mascaras.values()))), 0.0
+
+    def mascara_por_caixa(self, imagem, caixa, chave=None, **_):
+        x0, y0, x1, y1 = (int(round(c)) for c in caixa)
+        m = max(self.cena.mascaras.values(), key=lambda m: m[y0:y1, x0:x1].sum())
+        return m.copy(), 1.0
+
+
+def imagem_da_cena(cena: Cena):
+    """Imagem RGB (PIL) só para passar adiante: tons por objeto, do tamanho da cena."""
+    from PIL import Image
+
+    h, w = cena.pontos.shape[:2]
+    rgb = np.full((h, w, 3), 200, dtype=np.uint8)
+    for i, m in enumerate(cena.mascaras.values()):
+        rgb[m] = (40 + 50 * i) % 256
+    return Image.fromarray(rgb)
