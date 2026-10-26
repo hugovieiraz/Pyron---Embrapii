@@ -242,7 +242,7 @@ Cerca de 1 peça em 25 passa de 3 °C de erro (6 de 236 longe, 10 de 283 perto),
 A mira do ponto central e a moldura da área de medição desenhadas pela câmera podem cair em cima da
 peça; a mediana apaga as linhas finas, mas, borradas pelo celular, às vezes sobram: desligar a
 medição de ponto na câmera ao filmar ajuda. É estimativa: serve para ver qual peça está mais quente e se algo está fora do normal, não
-substitui o arquivo original da câmera. O mesmo caminho vale para imagens enviadas por **Nova análise**
+substitui o arquivo original da câmera. O mesmo caminho vale para termogramas importados
 fora do leiaute da FLIR C5 (outra câmera, captura de tela, foto da tela).
 
 ## Diagnóstico honesto
@@ -288,9 +288,9 @@ técnico com ART. Número do relatório (`RT-AAAAMMDD-XXXX`) e "Página x de y" 
   digitados errado. A ART é informada na hora de gerar.
 - **Logotipo da empresa** (Configurações › Empresa) no cabeçalho de cada laudo.
 
-## Vídeo ao vivo (simulação de câmera)
+## Vídeo da câmera (Captura › Vídeo)
 
-A tela **Vídeo ao vivo** recebe a gravação da tela da câmera (MP4, AVI, MOV, MKV) e analisa quadro a
+**Captura › Vídeo** recebe a gravação da tela da câmera (MP4, AVI, MOV, MKV) e analisa quadro a
 quadro com o mesmo caminho de uma foto sem dados radiométricos: barra de cores → temperatura
 estimada → detector → medição e severidade.
 
@@ -311,7 +311,7 @@ Vídeo de teste montado a partir das fotos do conjunto (a cena se move, a barra 
 .venv/Scripts/python.exe -m ml.video_demo --fotos dados/para_raios_dataset_v2/test dados/para_raios_dataset_v2/val --saida dados/video_demo.mp4
 ```
 
-## Monitoramento e alertas
+## Pasta monitorada e alertas (Captura)
 
 O Pyron vigia a pasta onde a câmera grava (cartão sincronizado, FTP da câmera fixa, FLIR Thermal
 Studio), analisa cada imagem nova e, quando a severidade atinge o mínimo configurado, cria um alerta
@@ -409,14 +409,20 @@ celular (cor puxada, reflexo e ângulo forte já davam 78–79 de 79 peças).
 
 ## Interface
 
-Tema claro industrial: fundo branco, azul-índigo nas ações, subtons de violeta, barra lateral azul.
-No termograma, as etiquetas das caixas nunca se sobrepõem (cada uma procura um lugar livre; sem
-lugar, mostra só a temperatura ou some, e o nome continua na lista). Com peças e pontos quentes na
-mesma imagem, o seletor **Tudo / Peças / Pontos quentes** separa as camadas, e **Rótulos** (tecla R)
-liga e desliga as etiquetas.
-Todos os valores visuais vêm de [`app/estatico/tokens.css`](app/estatico/tokens.css) e os textos
-montados pelo JavaScript de [`app/estatico/textos.js`](app/estatico/textos.js). As regras de design,
-estados e movimento estão em [`CLAUDE.md`](CLAUDE.md).
+Tema claro industrial: área de trabalho cinza-claro, barras e tabelas brancas com linha fina, neutros
+ardósia e o azul-cobalto só na ação principal e na seleção; a cor forte fica para o termograma e a
+severidade (tema escuro em Configurações › Aparência). Navegação no topo (Painel, Inspeções,
+Equipamentos, Pendências, Captura, Modelos; Alt + 1 a 6), busca com Ctrl + K e atalhos com **?**.
+A Análise tem barra de ferramentas (Selecionar V, Região R, Ponto P, Linha L; Paleta, Escala com
+isoterma, Camadas com foto), o termograma inteiro sem rolar, a faixa de regiões e o painel de detalhe;
+as edições salvam sozinhas e apagar tem Desfazer. As etiquetas das caixas nunca se sobrepõem.
+
+O código fica em [`app/interface`](app/interface) (módulos ES, sem build): valores visuais em
+[`tokens.css`](app/interface/tokens.css), textos em [`textos.js`](app/interface/textos.js), uma tela
+por arquivo em `js/telas/`. Contraste e alvos conferidos em claro, escuro e toque, e axe (WCAG 2.2 AA)
+sem violações. As decisões, etapa por etapa, estão em [`docs/plano-interface.md`](docs/plano-interface.md)
+e [`docs/interface/`](docs/interface); as regras, em [`CLAUDE.md`](CLAUDE.md). A interface anterior
+continua em `/antiga` nesta versão (Configurações › Sobre).
 
 Demonstração sem tocar nas inspeções reais:
 
@@ -429,7 +435,7 @@ Demonstração sem tocar nas inspeções reais:
 | Pasta | Conteúdo |
 |---|---|
 | `nucleo/` | Motor sem interface: leitura radiométrica FLIR (`flir.py`), inversão de paleta (`paleta.py`), entrada única (`entrada.py`), referências de temperatura (`referencias.py`), medição e severidade (`analise.py`), desenho (`render.py`), detectores (`detectores/`) |
-| `app/` | Servidor local (FastAPI), laudo em PDF, inspeções e alertas salvos, equipamentos e tendência (`equipamentos.py`), pendências (`pendencias.py`), vídeo (`videos.py`), monitoramento de pasta (`monitoramento.py`) e interface web (`estatico/`) |
+| `app/` | Servidor local (FastAPI), laudo em PDF, inspeções e alertas salvos, equipamentos e tendência (`equipamentos.py`), pendências (`pendencias.py`), vídeo (`videos.py`), monitoramento de pasta (`monitoramento.py`) e interface web (`interface/`; a anterior em `estatico/`) |
 | `lancador/` | `Pyron.exe`: fonte C# e script de construção; `atalho.py` cria o atalho que abre sem o `.exe` |
 | `apresentacao/` | aplicativo separado e enxuto para apresentação (análise, modelo e avaliação) |
 | `marca/` | Logo em vetor (`vetor/`) e o script que gera símbolo, logo, ícones e favicon a partir dela (`gerar_marca.py`) |

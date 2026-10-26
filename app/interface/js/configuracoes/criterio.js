@@ -3,7 +3,7 @@
 // NETA) e voltar ao padrão. Campo vazio = aquele nível não é usado no grupo.
 import { TEXTOS as T } from "../../textos.js";
 import { el, api, json, fmt, lerNumero } from "../base.js";
-import { botao, campo, marcar, selo, avisar, confirmar, ocupado } from "../componentes.js";
+import { botao, campo, marcar, selo, avisar, confirmar, ocupado, vigiarAlteracoes } from "../componentes.js";
 
 const C = T.config;
 const GRUPOS = { mta_faixas: "%", similares: "°C", dieletrico: "°C", ambiente: "°C" };
@@ -15,11 +15,19 @@ export async function montar(no) {
   const estado = el("span", { class: "nota" });
   const erro = el("p", { class: "erro-dialogo", role: "alert", hidden: true });
   const grupos = el("div", { class: "grade-criterio" });
+  const raiz = el("div", { class: "coluna-config larga" });
+  const alteracoes = vigiarAlteracoes(raiz);
   const nome = campo({ rotulo: C.critNome, valor: "", autocomplete: "off" });
   const expoente = campo({ rotulo: C.critExpoente, tipo: "number", valor: "", ajuda: C.critExpoenteAjuda });
   const carga = campo({ rotulo: C.critCarga, tipo: "number", valor: "", unidade: "%", ajuda: C.critCargaAjuda });
   const usarAmbiente = marcar({ rotulo: C.critUsarAmbiente });
-  usarAmbiente.querySelector("input").addEventListener("change", () => grupos.querySelector('[data-grupo="ambiente"]').classList.toggle("desligado", !usarAmbiente.querySelector("input").checked));
+  // grupo desligado: campos desabilitados (o valor fica guardado para quando ligar de novo)
+  const ligarAmbiente = (ligado) => {
+    const g = grupos.querySelector('[data-grupo="ambiente"]');
+    g.classList.toggle("desligado", !ligado);
+    for (const i of g.querySelectorAll("input[data-nivel]")) i.disabled = !ligado;
+  };
+  usarAmbiente.querySelector("input").addEventListener("change", (ev) => ligarAmbiente(ev.target.checked));
 
   function preencher(crit) {
     grupos.replaceChildren(...Object.entries(GRUPOS).map(([g, unidade]) => el("section", { class: `grupo-criterio${g === "ambiente" && !crit.usar_ambiente ? " desligado" : ""}`, dataset: { grupo: g } },
@@ -32,6 +40,7 @@ export async function montar(no) {
         return el("div", { class: "linha-criterio" }, selo(n), c);
       }))));
     usarAmbiente.querySelector("input").checked = Boolean(crit.usar_ambiente);
+    ligarAmbiente(Boolean(crit.usar_ambiente));
     nome.querySelector("input").value = crit.nome || "";
     expoente.querySelector("input").value = fmt(crit.expoente_carga, 1);
     carga.querySelector("input").value = fmt(crit.carga_minima_pct, 0);
@@ -50,6 +59,7 @@ export async function montar(no) {
         cfg = await api("/api/configuracoes", json("PUT", { criterio }));
         erro.hidden = true;
         preencher(cfg.criterio);
+        alteracoes.salvo();
         avisar(mensagem);
       } catch (e) { erro.textContent = e.message; erro.hidden = false; }
     });
@@ -60,15 +70,16 @@ export async function montar(no) {
     if (!(await confirmar({ titulo: C.critPadraoTitulo, texto: C.critPadraoTexto(cfg.criterio_padrao.nome), confirmar: C.restaurarPadrao }))) return;
     await salvar(null, padraoBtn, C.critRestaurado);
   } });
-  const modelo = (chave) => botao({ texto: C.modelosCriterio[chave], compacto: true, onclick: () => { preencher(cfg.modelos_criterio[chave]); avisar(C.modeloAplicado); } });
+  const modelo = (chave) => botao({ texto: C.modelosCriterio[chave], compacto: true, onclick: () => { preencher(cfg.modelos_criterio[chave]); alteracoes.marcar(); avisar(C.modeloAplicado); } });
 
   preencher(cfg.criterio);
-  no.append(el("div", { class: "coluna-config larga" },
+  raiz.append(
     el("div", { class: "titulo-bloco" }, el("h2", {}, C.critTitulo), estado),
     el("p", { class: "nota" }, C.critNota),
     el("div", { class: "barra-lista" }, el("span", { class: "nota" }, C.partirDe), modelo("brasil"), modelo("neta")),
     erro, grupos,
     el("div", { class: "grade-campos-3" }, nome, expoente, carga),
-    el("div", { class: "rodape-form" }, padraoBtn, salvarBtn)));
+    el("div", { class: "rodape-form" }, padraoBtn, salvarBtn));
+  no.append(raiz);
   return null;
 }

@@ -319,7 +319,7 @@ body.com-selecao .avisos { bottom: calc(var(--e-6) + var(--alvo) + var(--e-8)); 
 .area-lista { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
 .area-lista > .tabela-caixa { flex: 0 1 auto; }
 .area-lista > .vazio { flex: 1; }
-.painel-lateral { display: flex; flex-direction: column; min-height: 0; overflow: auto; border: 1px solid var(--borda); border-radius: var(--r-g); background: var(--superficie); }
+.painel-lateral { display: flex; flex-direction: column; min-height: 0; overflow: auto; overscroll-behavior: contain; border: 1px solid var(--borda); border-radius: var(--r-g); background: var(--superficie); }
 .painel-lateral > .vazio.compacto { flex: 1; border: 0; }
 .painel-lateral .corpo-secao > .grupo-btn { position: sticky; bottom: 0; margin: 0 calc(var(--e-4) * -1) calc(var(--e-4) * -1); padding: var(--e-3) var(--e-4); background: var(--superficie); border-top: 1px solid var(--borda); } /* Salvar sempre à vista */
 body:has(.painel-lateral) .avisos { right: calc(var(--detalhe) + var(--e-6) * 2); } /* o aviso não cobre o painel nem o Salvar */
@@ -500,7 +500,6 @@ body:has(.painel-lateral) .avisos { right: calc(var(--detalhe) + var(--e-6) * 2)
 .grade-criterio { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-4); }
 .grupo-criterio { display: grid; gap: var(--e-3); align-content: start; padding: var(--e-4); border: 1px solid var(--borda); border-radius: var(--r-g); background: var(--superficie); }
 .grupo-criterio h3 { font-size: var(--t-2); line-height: var(--a-2); }
-.grupo-criterio.desligado .linha-criterio { opacity: .5; }
 .linha-criterio { display: grid; grid-template-columns: var(--col-num) minmax(0, var(--col-m)); align-items: center; gap: var(--e-3); }
 .linha-criterio > .selo { justify-self: start; }
 .linha-criterio .campo > label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } /* o selo ao lado é o rótulo visível */

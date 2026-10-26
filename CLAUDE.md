@@ -3,11 +3,11 @@
 Software de manutenção preditiva por termografia (FastAPI local + interface web em `app/estatico/`,
 núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Textos em português do Brasil.
 
-## 0. Interface nova (em construção, `docs/plano-interface.md`)
+## 0. Interface principal (`app/interface`, em `/`; histórico em `docs/plano-interface.md`)
 
-- Código em `app/interface/`, servido em `/nova`; a interface atual (seções 1 a 3) continua em `/`
-  até a Etapa 6. Na interface atual, Ctrl+K › "Abrir a interface nova" leva até ela.
-- **Fonte única dela: `app/interface/tokens.css`** (direção em `docs/interface/2-direcao.md`, sistema
+- Código em `app/interface/`, servido em `/` desde a 0.8.0 (`/nova` redireciona para `/`). A interface
+  anterior (seções 1 a 3) fica em `/antiga` por esta versão, com link em Configurações › Sobre; sai na próxima.
+- **Fonte única: `app/interface/tokens.css`** (direção em `docs/interface/2-direcao.md`, sistema
   em `docs/interface/3-sistema.md`): cobalto só em ação e seleção, neutros ardósia, palco grafite,
   sem violeta nem índigo (no termograma significam frio), navegação no topo, nada abaixo de 14 px,
   alvo 44 px (compacto 36 px só com mouse).
@@ -40,10 +40,10 @@ núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Te
   em `js/captura/`, `js/modelos/` ou `js/configuracoes/` com `montar(no, ctx)` devolvendo a limpeza; trocar de aba
   não recarrega (endereço por `history.replaceState`). Critério e componentes salvam com botão (recalculam tudo). Só aparece fonte que funciona. Teste com o vídeo `dados/video_demo.mp4` em `pyron-vazio`. Estado vazio sem dados: pré-visualização `pyron-vazio` (porta 8791,
   `saida/dados_vazio`, apagar pela Lixeira depois).
-- Conferir: `testes/test_interface_nova.py` (regra dura do CSS, foco, módulos) e o catálogo
-  `/nova/catalogo.html` com "Conferir acessibilidade" (claro, `?tema=escuro`, `?toque`).
+- Conferir: `testes/test_interface_nova.py` (regra dura do CSS, foco, módulos), axe (WCAG 2.2 AA, Etapa 6) e o catálogo
+  `/catalogo.html` com "Conferir acessibilidade" (claro, `?tema=escuro`, `?toque`).
 
-## 1. Sistema de design da interface atual (fonte única: `app/estatico/tokens.css`)
+## 1. Sistema de design da interface anterior (`/antiga`; fonte única: `app/estatico/tokens.css`)
 
 - **Direção estética:** software industrial claro. Fundo branco e neutros frios levemente azulados;
   azul-índigo como cor de ação; violeta só em subtom (barra lateral, realces). A cor forte fica
@@ -121,9 +121,9 @@ núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Te
   (gera pasta + .zip na Área de Trabalho; apagar os anteriores antes). Nota técnica para o leitor:
   `apresentacao/LEIA-ME-TECNICO.txt`.
 
-**Git:** a interface nova vive no branch `interface-nova` (push só do branch; o `main` recebe na
-Etapa 6). O resto: trabalhar no branch `melhorias-0.7`; publicar com push do branch e fast-forward do `main`
-(`git push origin melhorias-0.7:main`). Antes de publicar, `git fetch` e conferir
+**Git:** a interface nova entrou no `main` na Etapa 6 (0.8.0, 26/10/2026). Trabalhar num branch
+(`interface-nova` ou um novo por assunto); publicar com push do branch e fast-forward do `main`
+(`git push origin <branch>:main`). Antes de publicar, `git fetch` e conferir
 `git log HEAD..origin/main`: o colaborador GS87 (Gabriel) também envia commits direto ao `main`
 (Postgres, Grafana, BI). Havendo commits dele, integrar com merge (nunca forçar) e rodar os testes.
 

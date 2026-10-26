@@ -141,6 +141,9 @@ export function montarPalco(ctx) {
     bc.putImageData(faixa, 0, 0);
     btnMax.textContent = temperatura(hi);
     btnMin.textContent = temperatura(lo);
+    // o nome começa pelo valor que aparece no botão (quem usa comando de voz diz o que vê)
+    btnMax.setAttribute("aria-label", `${btnMax.textContent}, ${A.escalaMax.toLowerCase()}`);
+    btnMin.setAttribute("aria-label", `${btnMin.textContent}, ${A.escalaMin.toLowerCase()}`);
     marcasMeio.replaceChildren(...[0.25, 0.5, 0.75].map((f) => el("span", { style: { top: `${(1 - f) * 100}%` } }, fmt(lo + f * (hi - lo), 1))));
     isoRotulo.hidden = iso == null;
     marcaIso.hidden = iso == null;

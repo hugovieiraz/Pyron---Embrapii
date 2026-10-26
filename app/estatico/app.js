@@ -7,7 +7,7 @@
 const $ = (s, raiz = document) => raiz.querySelector(s);
 const $$ = (s, raiz = document) => [...raiz.querySelectorAll(s)];
 const T = TEXTOS;
-const VERSAO_INTERFACE = "0.7.7"; // igual a VERSAO em app/servidor.py
+const VERSAO_INTERFACE = "0.8.0"; // igual a VERSAO em app/servidor.py
 
 function el(tag, props = {}, ...filhos) {
   const n = document.createElement(tag);
@@ -1443,7 +1443,7 @@ function itensDaBusca() {
     { rotulo: B.acaoPlanilha, icone: "baixar", executar: () => { const a = el("a", { href: "/api/inspecoes.csv", download: "" }); document.body.append(a); a.click(); a.remove(); } },
     { rotulo: B.acaoTema, icone: "config", executar: () => { const novo = document.documentElement.dataset.tema === "escuro" ? "claro" : "escuro"; aplicarTema(novo); salvarConfig({ tema: novo }); } },
     { rotulo: B.acaoAtalhos, icone: "info", executar: mostrarAtalhos },
-    { rotulo: B.acaoInterfaceNova, icone: "externo", executar: () => { location.href = "/nova/"; } },
+    { rotulo: B.acaoInterfaceNova, icone: "externo", executar: () => { location.href = "/"; } },
   ].map((a) => ({ ...a, tipo: B.grupoAcoes }));
   const equips = (estado.equipamentos || []).filter((e) => e.chave !== SEM_EQUIPAMENTO).map((e) => ({
     tipo: B.grupoEquipamentos, rotulo: e.equipamento, detalhe: e.instalacao, icone: "ativos", severidade: e.severidade,

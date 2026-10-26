@@ -160,10 +160,10 @@ Modelo: **Sonnet** ou Opus com esforço **médio** (o padrão já está decidido
 
 ## Etapa 6 · Troca e acabamento
 Modelo: Opus com esforço **médio**.
-- [ ] A interface nova passa a ser a principal (`/`); a antiga sai (ou fica em `/antiga` por uma versão).
-- [ ] Tema escuro; revisão final com `web-design-guidelines`; acessibilidade com axe e Lighthouse
+- [x] A interface nova passa a ser a principal (`/`); a antiga sai (ou fica em `/antiga` por uma versão).
+- [x] Tema escuro; revisão final com `web-design-guidelines`; acessibilidade com axe e Lighthouse
       (rodar por `npx`, pedir antes de baixar).
-- [ ] Testes, manual e capturas atualizados; merge no `main`; avisar o Gabriel.
+- [x] Testes, manual e capturas atualizados; merge no `main`; avisar o Gabriel (texto pronto, o usuário envia).
 - **Pronto quando:** todas as telas com nota ≥ 50/60 e checklist 12/12, testes passando.
 
 ## Registro
@@ -185,6 +185,7 @@ Modelo: Opus com esforço **médio**.
 | 5b | 25/10/2026 | Equipamentos em `/nova/#equipamentos` (tabela agrupada por instalação, filtros com contagem, tendência com linha pequena) e o detalhe `#equipamentos/<chave>` (migalhas, indicadores, gráfico da máxima com pontos na cor da severidade, peças, inspeções, relatório e adicionar imagens com destino); Pendências em `#pendencias` (filtro por situação, tabela, painel ao lado com o acompanhamento); `js/grafico.js`, `js/pendencia.js` e `campoBusca()` compartilhados | Cartões de contagem saem; pendência atualizada no painel, sem diálogo; formulário da pendência único (Análise e Pendências); relatório do equipamento pelo diálogo do laudo; Inspeções aceita `?equipamento=sem`; contraste e alvos 0 falhas; cor de estrutura 0,3 a 1,0 %; checklist 12/12; nota 53/54 aplicáveis | Etapa 5c; projeção até a MTA só com estimativa confiável (rever na Etapa 6) |
 | 5c | 26/10/2026 | Captura em `/nova/#captura` com quatro abas (`js/telas/captura.js` + `js/captura/pasta.js`, `video.js`, `celular.js`, `alertas.js`): pasta monitorada com salvamento automático, estado e prévia da mensagem; vídeo com envio, lista e o vídeo aberto (quadro com regiões, reprodução, máxima no tempo, momentos com anomalia, salvar quadro); celular com QR e espelho ao vivo; alertas com WhatsApp e Resolver com Desfazer; `js/rotulos.js` e `graficoSerie()` com eixo de tempo | Só a fonte que funciona (pasta); RTSP, SDK e envio automático fora; ilustração da pasta no bloco de estado; vídeo dimensionado pela altura da janela; contraste e alvos 0 falhas; cor de estrutura 0,2 a 1,0 % fora do quadro térmico; checklist 12/12; nota 58/58 aplicáveis | Etapa 5d; ligar o celular de verdade não foi testado (abre servidor na rede local) |
 | 5d | 26/10/2026 | Modelos em `/nova/#modelos` (Em uso com recomendado e versão rápida no detalhe, Treino com rótulos do CVAT e treinos, Avaliação com comparação no teste) e Configurações em `#configuracoes` (empresa e responsáveis, critério, componentes, aparência, dados e backup, sobre); `js/telaAbas.js` compartilhado com a Captura; tela provisória removida | Recomendado fecha a lacuna Choice Overload da Etapa 4; avaliação em tabelas, melhor em negrito; critério e componentes com Salvar explícito (recalculam tudo); contraste e alvos 0 falhas; cor de estrutura 0,1 a 0,8 %; checklist 12/12; nota 59/60 | Etapa 6; fim do treino sem retorno próprio (Peak-End) |
+| 6 | 26/10/2026 | Interface nova em `/` (0.8.0), anterior em `/antiga` com link em Sobre; revisão web-design-guidelines (theme-color, aspas curvas, toque, rolagem contida, pergunta ao sair do critério e dos componentes); axe em 21 telas × 2 temas e Lighthouse em 8; manual em PDF com as telas novas; README e CLAUDE.md | axe: 6 tipos de achado corrigidos, 0 violações em 42 rodadas; Lighthouse 100/100 (acessibilidade e boas práticas) nas 8; todas as telas ≥ 58/60 e 12/12; `docs/interface/6-troca.md` | Peak-End do fim do treino; recompilar o Pyron.exe (cores da abertura); tirar `/antiga` na próxima versão |
 
 ### Medição de equipamentos (Etapa 0)
 

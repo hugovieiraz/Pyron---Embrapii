@@ -3,7 +3,7 @@
 // Salvar é explícito porque recalcula todas as inspeções.
 import { TEXTOS as T } from "../../textos.js";
 import { el, api, json, fmt, lerNumero } from "../base.js";
-import { botao, campo, avisar, confirmar, ocupado } from "../componentes.js";
+import { botao, campo, avisar, confirmar, ocupado, vigiarAlteracoes } from "../componentes.js";
 
 const C = T.config;
 
@@ -11,6 +11,8 @@ export async function montar(no) {
   let cfg = await api("/api/configuracoes");
   const erro = el("p", { class: "erro-dialogo", role: "alert", hidden: true });
   const corpo = el("tbody");
+  const raiz = el("div", { class: "coluna-config larga" });
+  const alteracoes = vigiarAlteracoes(raiz);
 
   function preencher() {
     corpo.replaceChildren(...Object.entries(cfg.componentes).map(([classe, c]) => {
@@ -29,7 +31,7 @@ export async function montar(no) {
   const ler = () => Object.fromEntries([...corpo.querySelectorAll("input[data-classe]")].map((i) => [i.dataset.classe, { mta_c: lerNumero(i.value), fonte: cfg.componentes[i.dataset.classe]?.fonte }]));
   async function salvar(valor, b, mensagem) {
     await ocupado(b, async () => {
-      try { cfg = await api("/api/configuracoes", json("PUT", { componentes: valor })); erro.hidden = true; preencher(); avisar(mensagem); } catch (e) { erro.textContent = e.message; erro.hidden = false; }
+      try { cfg = await api("/api/configuracoes", json("PUT", { componentes: valor })); erro.hidden = true; preencher(); alteracoes.salvo(); avisar(mensagem); } catch (e) { erro.textContent = e.message; erro.hidden = false; }
     });
   }
   const salvarBtn = botao({ texto: C.compSalvar, variante: "primario", onclick: () => salvar(ler(), salvarBtn, C.compSalvo) });
@@ -39,12 +41,13 @@ export async function montar(no) {
   } });
 
   preencher();
-  no.append(el("div", { class: "coluna-config larga" },
+  raiz.append(
     el("div", { class: "titulo-bloco" }, el("h2", {}, C.compTitulo)),
     el("p", { class: "nota" }, C.compNota),
     erro,
     el("div", { class: "tabela-caixa" }, el("table", { class: "tabela tabela-componentes", "aria-label": C.compTitulo },
       el("thead", {}, el("tr", {}, [C.colComponente, C.colAquecimento, C.colMta, C.colFonte].map((t) => el("th", { scope: "col" }, t)))), corpo)),
-    el("div", { class: "rodape-form" }, padraoBtn, salvarBtn)));
+    el("div", { class: "rodape-form" }, padraoBtn, salvarBtn));
+  no.append(raiz);
   return null;
 }

@@ -3,7 +3,7 @@
 // acompanha (#tela/aba) com history.replaceState. Erro e falta de conexão aparecem dentro da aba.
 import { TEXTOS as T } from "../textos.js";
 import { el } from "./base.js";
-import { abas, esqueleto, estadoErro, estadoSemConexao } from "./componentes.js";
+import { abas, esqueleto, estadoErro, estadoSemConexao, podeSair } from "./componentes.js";
 import { endereco } from "./rotas.js";
 
 /**
@@ -18,7 +18,7 @@ export async function telaComAbas(pagina, rota, { tela, titulo, rotulo, abas: it
   let limpar = null;
   let geracao = 0;
 
-  const lista = abas({ rotulo, ativa, itens, aoMudar: (id) => mostrar(id, []) });
+  const lista = abas({ rotulo, ativa, itens, aoMudar: async (id) => { if (await podeSair()) mostrar(id, []); else lista.escolher(ativa); } });
   const area = el("div", { class: "area-abas", role: "tabpanel", id: `painel-${ativa}`, "aria-labelledby": `aba-${ativa}`, tabindex: "-1" });
   pagina.classList.add("tela-abas");
   pagina.append(el("header", { class: "cabecalho" }, el("div", { class: "titulo" }, el("h1", {}, titulo), meta)), lista, area);

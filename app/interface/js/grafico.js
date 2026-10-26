@@ -67,7 +67,7 @@ export function graficoSerie({ titulo, pontos, unidade = " °C", tendencia = fal
     const y = (v) => m.t + (1 - (v - lo) / (hi - lo || 1)) * (A - m.t - m.b);
     escalaX = { x, inverso: (px) => t0 + ((px - m.e) / (L - m.e - m.d)) * (t1 - t0) };
 
-    const svg = s("svg", { width: L, height: A, viewBox: `0 0 ${L} ${A}`, role: "img", "aria-label": titulo });
+    const svg = s("svg", { width: L, height: A, viewBox: `0 0 ${L} ${A}`, role: href || aoEscolher ? "group" : "img", "aria-label": titulo }); // com pontos que abrem a inspeção, é um grupo (img não pode ter botões dentro)
     for (const v of marcas) {
       svg.append(s("line", { x1: m.e, x2: L - m.d, y1: y(v), y2: y(v), class: "grade" }),
         s("text", { x: m.e - 8, y: y(v), class: "eixo", "text-anchor": "end", "dominant-baseline": "middle" }, fmt(v, 0)));

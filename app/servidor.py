@@ -39,7 +39,7 @@ from app.armazenamento import Armazenamento, _destaque
 from nucleo import analise, barra, detectores, enquadrar, entrada, referencias, render, video
 from nucleo.detectores import placa
 
-VERSAO = "0.7.7"
+VERSAO = "0.8.0"
 RAIZ = Path(__file__).resolve().parents[1]
 PASTA_APP = Path(__file__).resolve().parent
 # PYRON_DADOS (ou app.iniciar --dados) aponta outra pasta: demonstrações e testes sem tocar nas inspeções reais.
@@ -2183,11 +2183,20 @@ async def sem_cache_da_interface(request, chamar_proximo):
     return resposta
 
 
-# Interface nova, construída em paralelo (docs/plano-interface.md); a atual continua em "/" até a Etapa 6.
 @app.get("/nova", include_in_schema=False)
+@app.get("/nova/", include_in_schema=False)
 def interface_nova() -> RedirectResponse:
-    return RedirectResponse("/nova/")
+    """Endereço da interface nova enquanto ela era construída: agora ela é a principal."""
+    return RedirectResponse("/")
 
 
-app.mount("/nova", StaticFiles(directory=PASTA_APP / "interface", html=True), name="interface")
-app.mount("/", StaticFiles(directory=PASTA_APP / "estatico", html=True), name="estatico")
+@app.get("/antiga", include_in_schema=False)
+def interface_antiga() -> RedirectResponse:
+    return RedirectResponse("/antiga/")
+
+
+# Interface principal em "/" (app/interface); a antiga (app/estatico) fica em "/antiga" por uma versão.
+# A marca é servida das duas: a nova usa /marca/…, a antiga caminhos relativos.
+app.mount("/antiga", StaticFiles(directory=PASTA_APP / "estatico", html=True), name="estatico")
+app.mount("/marca", StaticFiles(directory=PASTA_APP / "estatico" / "marca"), name="marca")
+app.mount("/", StaticFiles(directory=PASTA_APP / "interface", html=True), name="interface")

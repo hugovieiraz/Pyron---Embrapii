@@ -1,7 +1,7 @@
 // Casca da interface nova: navegação, roteamento, atalhos, busca, importação por arrastar, conexão e tema.
 import { TEXTOS as T } from "../textos.js";
 import { $, $$, el, api, json, conexao, definirVersaoServidor, VERSAO_INTERFACE } from "./base.js";
-import { esqueleto, estadoVazio, estadoErro, estadoSemConexao, avisar, dialogo } from "./componentes.js";
+import { esqueleto, estadoVazio, estadoErro, estadoSemConexao, avisar, dialogo, podeSair } from "./componentes.js";
 import { instalarIcones } from "./icones.js";
 import { ilustracao } from "./ilustracoes.js";
 import { ROTAS, lerRota, endereco } from "./rotas.js";
@@ -25,7 +25,7 @@ async function mostrarRota() {
   if (!rota.tela) {
     document.title = T.casca.titulo(T.telas.painel);
     conteudo.replaceChildren(el("div", { class: "pagina entra" }, estadoVazio({
-      icone: "alerta", titulo: `#${rota.nome}`, texto: null,
+      icone: "alerta", titulo: T.casca.rotaInexistente, texto: T.casca.rotaInexistenteTexto(rota.nome), nivel: 1, // a tela não tem outro título
       acoes: [el("a", { class: "btn primario", href: endereco("painel") }, T.telas.painel)],
     })));
     return;
@@ -177,14 +177,16 @@ function ligarSinal() {
 }
 
 // ---------------------------------------------------------------- contadores da navegação
-/** Contador visível só quando há algo a fazer; o leitor de tela ouve "Pendências, 3 pendências vencidas". */
+/** Contador visível só quando há algo a fazer; o leitor de tela ouve "Pendências, 3 pendências vencidas" de um
+ * texto escondido dentro do link (sem aria-label, o nome continua sendo o texto visível, para quem usa comando de voz). */
 function mostrarContador(no, n, rotulo) {
   no.hidden = !n;
   no.textContent = n > 99 ? "99+" : String(n || "");
   no.setAttribute("aria-hidden", "true");
   const dono = no.closest("a");
-  if (n) dono.setAttribute("aria-label", `${dono.dataset.nome}, ${rotulo}`);
-  else dono.removeAttribute("aria-label");
+  let leitura = dono.querySelector(".leitura-contador");
+  if (!leitura) dono.append(leitura = el("span", { class: "so-leitor leitura-contador" }));
+  leitura.textContent = n ? `, ${rotulo}` : "";
 }
 
 async function atualizarContadores() {
@@ -208,6 +210,10 @@ function aplicarTema(tema = "claro") {
   const efetivo = tema === "sistema" ? (escuroDoSistema.matches ? "escuro" : "claro") : tema;
   document.documentElement.dataset.tema = efetivo;
   document.documentElement.dataset.temaEscolhido = tema;
+  // barra de título da janela do Edge (modo aplicativo) na cor do topo
+  let meta = $('meta[name="theme-color"]');
+  if (!meta) document.head.append(meta = el("meta", { name: "theme-color" }));
+  meta.content = getComputedStyle(document.documentElement).getPropertyValue("--superficie").trim();
 }
 escuroDoSistema.addEventListener("change", () => { if (document.documentElement.dataset.temaEscolhido === "sistema") aplicarTema("sistema"); });
 
@@ -219,7 +225,8 @@ async function iniciar() {
   ligarSoltar();
   ligarConexao();
   ligarSinal();
-  addEventListener("hashchange", mostrarRota);
+  // alteração sem salvar (critério, componentes): ficar devolve o endereço anterior sem remontar a tela
+  addEventListener("hashchange", async (ev) => { if (await podeSair()) mostrarRota(); else history.replaceState(null, "", ev.oldURL); });
   if (PARAMS.get("tema")) aplicarTema(PARAMS.get("tema"));
   else api("/api/configuracoes").then((c) => aplicarTema(c.tema)).catch(() => {});
   if (PARAMS.has("toque")) document.documentElement.style.setProperty("--alvo-compacto", "var(--alvo)");

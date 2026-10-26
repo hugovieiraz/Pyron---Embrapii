@@ -207,13 +207,13 @@ export function tabela({ rotulo, colunas, linhas, severidade, href, ordem, aoOrd
 // ---------------------------------------------------------------- estados de carregamento, vazio e erro
 const esq = (classe, estilo) => el("span", { class: `esq ${classe}`, style: estilo, "aria-hidden": "true" });
 export const esqueleto = {
-  linhas: (n = 3) => el("div", { class: "esqueleto", "aria-busy": "true", "aria-label": T.geral.carregando }, Array.from({ length: n }, (_, i) => esq("linha", { width: `${[92, 76, 84, 60][i % 4]}%` }))),
+  linhas: (n = 3) => el("div", { class: "esqueleto", role: "status", "aria-busy": "true", "aria-label": T.geral.carregando }, Array.from({ length: n }, (_, i) => esq("linha", { width: `${[92, 76, 84, 60][i % 4]}%` }))),
   indicadores: (n = 4) => el("div", { class: "esqueleto" }, el("div", { class: "grade" }, Array.from({ length: n }, () => esq("bloco")))),
-  tabela: (n = 6) => el("div", { class: "esqueleto tabela-caixa", "aria-busy": "true", "aria-label": T.geral.carregando },
+  tabela: (n = 6) => el("div", { class: "esqueleto tabela-caixa", role: "status", "aria-busy": "true", "aria-label": T.geral.carregando },
     Array.from({ length: n }, () => el("div", { class: "linha-tabela" }, esq("linha"), esq("linha"), esq("linha"), esq("linha")))),
-  lista: () => el("div", { class: "esqueleto", "aria-busy": "true", "aria-label": T.geral.carregando, style: { paddingTop: "var(--e-6)" } },
+  lista: () => el("div", { class: "esqueleto", role: "status", "aria-busy": "true", "aria-label": T.geral.carregando, style: { paddingTop: "var(--e-6)" } },
     esq("titulo"), esq("linha", { width: "40%" }), el("div", { class: "tabela-caixa" }, Array.from({ length: 8 }, () => el("div", { class: "linha-tabela" }, esq("linha"), esq("linha"), esq("linha"), esq("linha"))))),
-  pagina: () => el("div", { class: "esqueleto", "aria-busy": "true", "aria-label": T.geral.carregando, style: { paddingTop: "var(--e-6)" } },
+  pagina: () => el("div", { class: "esqueleto", role: "status", "aria-busy": "true", "aria-label": T.geral.carregando, style: { paddingTop: "var(--e-6)" } },
     esq("titulo"), el("div", { class: "grade" }, Array.from({ length: 4 }, () => esq("bloco"))), esq("cheio")),
 };
 
@@ -221,9 +221,9 @@ export const esqueleto = {
  * Vazio: uma frase útil e a ação que resolve. Com ilustracao (nome de js/ilustracoes.js), o desenho
  * da tela entra no lugar do ícone e a moldura tracejada sai (estado de tela inteira).
  */
-export function estadoVazio({ icone: ic = "inspecoes", ilustracao: ilu, procurando = false, titulo, texto, acoes = [], compacto = false }) {
+export function estadoVazio({ icone: ic = "inspecoes", ilustracao: ilu, procurando = false, titulo, texto, acoes = [], compacto = false, nivel = 2 }) {
   const figura = ilu ? ilustracao(ilu, { rotulo: titulo, procurando }) : icone(ic);
-  return el("div", { class: ["vazio", compacto && "compacto", ilu && "com-ilustracao"].filter(Boolean).join(" ") }, figura, el("h2", {}, titulo), texto ? el("p", {}, texto) : null,
+  return el("div", { class: ["vazio", compacto && "compacto", ilu && "com-ilustracao"].filter(Boolean).join(" ") }, figura, el(`h${nivel}`, {}, titulo), texto ? el("p", {}, texto) : null,
     acoes.length ? el("div", { class: "grupo-btn" }, acoes) : null);
 }
 
@@ -377,6 +377,27 @@ export function confirmar({ titulo, texto, confirmar: rotulo, perigo = false }) 
       aoFechar: () => resolver(ok),
     }).abrir();
   });
+}
+
+// ---------------------------------------------------------------- alterações não salvas
+// Só os formulários de Salvar explícito (critério, componentes) usam: o resto salva sozinho.
+let pendente = null;
+addEventListener("beforeunload", (ev) => { if (pendente?.()) ev.preventDefault(); });
+
+/** vigiarAlteracoes(raiz): digitar em raiz marca a tela como alterada. Devolve { marcar(), salvo() }. */
+export function vigiarAlteracoes(raiz) {
+  let alterada = false;
+  raiz.addEventListener("input", () => { alterada = true; });
+  pendente = () => alterada && raiz.isConnected;
+  return { marcar() { alterada = true; }, salvo() { alterada = false; } };
+}
+
+/** Antes de trocar de tela ou de aba: com alteração sem salvar, pergunta. Resolve true para seguir. */
+export async function podeSair() {
+  if (!pendente?.()) return true;
+  const ok = await confirmar({ titulo: T.geral.sairTitulo, texto: T.geral.sairTexto, confirmar: T.geral.sairConfirmar, perigo: true });
+  if (ok) pendente = null;
+  return ok;
 }
 
 // ---------------------------------------------------------------- menu

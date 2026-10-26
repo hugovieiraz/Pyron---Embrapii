@@ -18,13 +18,19 @@ def cliente():
     return TestClient(servidor.app)
 
 
-def test_nova_redireciona_e_entrega_a_casca(cliente):
-    r = cliente.get("/nova", follow_redirects=False)
-    assert r.status_code in (301, 302, 307, 308) and r.headers["location"].endswith("/nova/")
-    r = cliente.get("/nova/")
-    assert r.status_code == 200
-    assert '<script type="module" src="js/casca.js">' in r.text
-    assert cliente.get("/").status_code == 200  # a interface atual continua em /
+def test_interface_nova_e_a_principal_e_a_antiga_fica_em_antiga(cliente):
+    """Etapa 6: a interface nova em "/"; /nova (endereço antigo dela) leva para "/"; a antiga em /antiga."""
+    r = cliente.get("/")
+    assert r.status_code == 200 and '<script type="module" src="js/casca.js">' in r.text
+    for antigo in ("/nova", "/nova/"):
+        r = cliente.get(antigo, follow_redirects=False)
+        assert r.status_code in (301, 302, 307, 308) and r.headers["location"] == "/", antigo
+    r = cliente.get("/antiga", follow_redirects=False)
+    assert r.status_code in (301, 302, 307, 308) and r.headers["location"].endswith("/antiga/")
+    r = cliente.get("/antiga/")
+    assert r.status_code == 200 and 'src="app.js"' in r.text
+    assert cliente.get("/antiga/app.js").status_code == 200
+    assert cliente.get("/marca/logo-cor.svg").status_code == 200  # a casca nova usa a marca por caminho absoluto
 
 
 def _importados(arquivo: Path) -> set[Path]:
@@ -43,11 +49,13 @@ def _importados(arquivo: Path) -> set[Path]:
 
 
 def test_todo_modulo_importado_existe_e_e_servido(cliente):
-    raizes = [PASTA / "js" / "casca.js", PASTA / "js" / "catalogo.js", *(PASTA / "js" / "telas").glob("*.js")]  # telas: carregadas sob demanda
+    # telas e abas: carregadas sob demanda (import com caminho montado na hora)
+    raizes = [PASTA / "js" / "casca.js", PASTA / "js" / "catalogo.js", *(PASTA / "js" / "telas").glob("*.js"),
+              *(PASTA / "js" / "captura").glob("*.js"), *(PASTA / "js" / "modelos").glob("*.js"), *(PASTA / "js" / "configuracoes").glob("*.js")]
     modulos = set().union(*(_importados(r.resolve()) for r in raizes))
     for m in modulos:
         assert m.exists(), m
-        caminho = "/nova/" + m.relative_to(PASTA.resolve()).as_posix()
+        caminho = "/" + m.relative_to(PASTA.resolve()).as_posix()
         r = cliente.get(caminho)
         assert r.status_code == 200 and "javascript" in r.headers["content-type"], caminho
 
@@ -154,3 +162,16 @@ def test_modelos_e_configuracoes_usam_a_tela_com_abas():
         assert 'from "../telaAbas.js"' in (PASTA / "js" / "telas" / f"{tela}.js").read_text(encoding="utf-8"), tela
         for aba in abas:
             assert (PASTA / "js" / pasta / f"{aba}.js").exists(), f"{pasta}/{aba}"
+
+
+def test_salvar_explicito_pergunta_antes_de_sair_e_versoes_iguais():
+    """Etapa 6: critério e componentes (Salvar explícito, recalculam tudo) perguntam antes de trocar de tela ou de aba
+    com mudança sem salvar; o servidor e as duas interfaces estão na mesma versão (a interface confere ao dar 404)."""
+    js = PASTA / "js"
+    for aba in ("criterio", "componentes"):
+        assert "vigiarAlteracoes(" in (js / "configuracoes" / f"{aba}.js").read_text(encoding="utf-8"), aba
+    assert "podeSair()" in (js / "casca.js").read_text(encoding="utf-8")
+    assert "podeSair()" in (js / "telaAbas.js").read_text(encoding="utf-8")
+    versao = f'VERSAO_INTERFACE = "{servidor.VERSAO}"'
+    assert versao in (js / "base.js").read_text(encoding="utf-8")
+    assert versao in (Path(servidor.PASTA_APP) / "estatico" / "app.js").read_text(encoding="utf-8")

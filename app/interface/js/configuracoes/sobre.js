@@ -17,6 +17,9 @@ export async function montar(no) {
       el("dt", {}, C.detector), el("dd", {}, ativo ? ativo.nome : T.geral.semValor),
       el("dt", {}, C.pastaDados), el("dd", { class: "mono corta", title: s.pasta_dados }, s.pasta_dados),
       el("dt", {}, C.pastaModelos), el("dd", { class: "mono corta", title: s.pasta_modelos }, s.pasta_modelos)),
+    el("div", { class: "titulo-bloco" }, el("h2", {}, C.antigaTitulo)),
+    el("p", { class: "nota" }, C.antigaTexto),
+    el("div", { class: "grupo-btn" }, el("a", { class: "btn compacto", href: "/antiga/" }, C.antigaAbrir)),
     el("div", { class: "titulo-bloco" }, el("h2", {}, C.creditos)),
     el("ul", { class: "lista-avisos" }, C.listaCreditos.map((c) => el("li", {}, c)))));
   return null;

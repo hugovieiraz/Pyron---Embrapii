@@ -32,24 +32,22 @@ IMAGENS = AQUI / "imagens"
 LOGO = PROJETO / "app" / "estatico" / "marca" / "logo.png"
 SIMBOLO = PROJETO / "app" / "estatico" / "marca" / "simbolo.png"
 SAIDA = PROJETO / "docs" / "Pyron_Funcionalidades.pdf"
-VERSAO = "0.7.7"
+VERSAO = "0.8.0"
 
-# Cores dos tokens da interface (app/estatico/tokens.css).
-TINTA = colors.HexColor("#171B33")
-TEXTO_2 = colors.HexColor("#4A5270")
-TEXTO_3 = colors.HexColor("#5F6886")
-AZUL = colors.HexColor("#3F50D6")
-AZUL_800 = colors.HexColor("#2A358F")
-AZUL_700 = colors.HexColor("#3341B3")
-AZUL_50 = colors.HexColor("#EEF1FF")
-VIOLETA = colors.HexColor("#7D5CF0")
-VIOLETA_50 = colors.HexColor("#F5F2FF")
-VIOLETA_900 = colors.HexColor("#2C2787")
-BORDA = colors.HexColor("#DFE3EE")
-FUNDO = colors.HexColor("#F6F7FB")
+# Cores dos tokens da interface (app/interface/tokens.css): neutros ardósia, cobalto só onde a tela usa
+# (ação e seleção; aqui, os marcadores de lista), grafite do palco do termograma na capa.
+TINTA = colors.HexColor("#161B22")       # --n-900
+TEXTO_2 = colors.HexColor("#424B59")     # --n-700
+TEXTO_3 = colors.HexColor("#5A6474")     # --n-600
+ARDOSIA = colors.HexColor("#2A313C")     # --n-800
+COBALTO = colors.HexColor("#1F5BC4")     # --acao
+LINHA_FORTE = colors.HexColor("#8B95A5")  # --n-500
+BORDA = colors.HexColor("#DDE2E8")       # --n-300
+FUNDO = colors.HexColor("#F7F8FA")       # --n-100 (--fundo-trabalho)
+PALCO = colors.HexColor("#121418")       # --palco
 SEVERIDADE = {
-    "Normal": ("#179B67", "#E3F6EE"), "Atenção": ("#D9A40B", "#FDF4D6"), "Programar": ("#E8751A", "#FDEBDC"),
-    "Urgente": ("#DC3F26", "#FCE6E1"), "Imediato": ("#B0123A", "#FAE3EA"),
+    "Normal": ("#1E9E63", "#E3F6EE"), "Atenção": ("#B58900", "#FBF1D3"), "Programar": ("#E07012", "#FDEBDC"),
+    "Urgente": ("#D63A22", "#FCE6E1"), "Imediato": ("#A3123A", "#FAE3EA"),
 }
 
 LARGURA = A4[0] - 36 * mm
@@ -68,8 +66,8 @@ E = {
     "corpo": ParagraphStyle("corpo", fontName="Pyron", fontSize=10, leading=15, textColor=TINTA, spaceAfter=6),
     "nota": ParagraphStyle("nota", fontName="Pyron", fontSize=8.5, leading=12, textColor=TEXTO_3),
     "legenda": ParagraphStyle("legenda", fontName="Pyron", fontSize=8.5, leading=12, textColor=TEXTO_3, spaceBefore=3, spaceAfter=12, alignment=TA_CENTER),
-    "sobre": ParagraphStyle("sobre", fontName="Pyron-Bold", fontSize=8, leading=11, textColor=VIOLETA, spaceAfter=2),
-    "h1": ParagraphStyle("h1", fontName="Pyron-Bold", fontSize=20, leading=26, textColor=AZUL_800, spaceAfter=10),
+    "sobre": ParagraphStyle("sobre", fontName="Pyron-Bold", fontSize=8, leading=11, textColor=TEXTO_3, spaceAfter=2),
+    "h1": ParagraphStyle("h1", fontName="Pyron-Bold", fontSize=20, leading=26, textColor=TINTA, spaceAfter=10),
     "h2": ParagraphStyle("h2", fontName="Pyron-Semi", fontSize=13, leading=18, textColor=TINTA, spaceBefore=10, spaceAfter=4),
     "cel": ParagraphStyle("cel", fontName="Pyron", fontSize=9, leading=12.5, textColor=TINTA),
     "celb": ParagraphStyle("celb", fontName="Pyron-Bold", fontSize=8.5, leading=11, textColor=colors.white),
@@ -94,7 +92,7 @@ def secao(numero: int, titulo: str, sobre: str, nova_pagina: bool = True) -> lis
 def lista(itens: list[str]) -> ListFlowable:
     return ListFlowable(
         [ListItem(p(t), leftIndent=12, value="•") for t in itens],
-        bulletType="bullet", bulletColor=AZUL, bulletFontName="Pyron-Bold", leftIndent=12, spaceAfter=6,
+        bulletType="bullet", bulletColor=COBALTO, bulletFontName="Pyron-Bold", leftIndent=12, spaceAfter=6,
     )
 
 
@@ -121,7 +119,7 @@ def tabela(cabecalho: list[str], linhas: list[list], larguras: list[float], core
         dados.append([c if not isinstance(c, str) else Paragraph(c, E["cel"]) for c in linha])
     t = Table(dados, colWidths=[w * mm for w in larguras], repeatRows=1)
     estilo = [
-        ("BACKGROUND", (0, 0), (-1, 0), AZUL_800), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("BACKGROUND", (0, 0), (-1, 0), ARDOSIA), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("LINEBELOW", (0, 1), (-1, -1), 0.4, BORDA), ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
         ("LEFTPADDING", (0, 0), (-1, -1), 7), ("RIGHTPADDING", (0, 0), (-1, -1), 7),
     ]
@@ -136,7 +134,7 @@ def selo(nome: str) -> Paragraph:
     return Paragraph(f'<font color="{forte}">●</font> <b>{nome}</b>', E["cel"])
 
 
-def destaque(titulo: str, texto: str, cor=AZUL, fundo=AZUL_50) -> Table:
+def destaque(titulo: str, texto: str, cor=ARDOSIA, fundo=FUNDO) -> Table:
     t = Table([[Paragraph(f"<b>{titulo}</b><br/>{texto}", E["cel"])]], colWidths=[LARGURA])
     t.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), fundo), ("LINEBEFORE", (0, 0), (0, -1), 3, cor),
                            ("LEFTPADDING", (0, 0), (-1, -1), 12), ("RIGHTPADDING", (0, 0), (-1, -1), 12),
@@ -164,16 +162,12 @@ class Documento(BaseDocTemplate):
     def _capa(canvas, doc) -> None:
         w, h = A4
         canvas.saveState()
-        # faixa azul com subtom violeta, como a barra lateral do aplicativo
-        passos = 60
-        for i in range(passos):
-            f = i / (passos - 1)
-            cor = colors.Color(*(a + (b - a) * f for a, b in zip((0x33 / 255, 0x41 / 255, 0xB3 / 255), (0x2C / 255, 0x27 / 255, 0x87 / 255))))
-            canvas.setFillColor(cor)
-            canvas.rect(0, (i / passos) * 70 * mm, w, 70 * mm / passos + 0.5, stroke=0, fill=1)
+        # faixa grafite, a cor do palco onde o termograma aparece no aplicativo
+        canvas.setFillColor(PALCO)
+        canvas.rect(0, 0, w, 70 * mm, stroke=0, fill=1)
         lado = 118 * mm
         canvas.drawImage(str(LOGO), (w - lado * 0.85) / 2, h - 40 * mm - lado, width=lado * 0.85, height=lado, mask="auto", preserveAspectRatio=True)
-        canvas.setFillColor(AZUL_800)
+        canvas.setFillColor(TINTA)
         canvas.setFont("Pyron-Bold", 26)
         canvas.drawCentredString(w / 2, 108 * mm, "Manual de funcionalidades")
         canvas.setFillColor(TEXTO_3)
@@ -193,7 +187,7 @@ class Documento(BaseDocTemplate):
         canvas.saveState()
         canvas.drawImage(str(SIMBOLO), 18 * mm, h - 15 * mm, width=6 * mm, height=6 * mm, mask="auto")
         canvas.setFont("Pyron-Semi", 8.5)
-        canvas.setFillColor(AZUL_800)
+        canvas.setFillColor(TINTA)
         canvas.drawString(26 * mm, h - 13 * mm, "PYRON")
         canvas.setFont("Pyron", 8.5)
         canvas.setFillColor(TEXTO_3)
@@ -239,19 +233,17 @@ def conteudo() -> list:
             "<b>Tudo local.</b> Imagens, inspeções e laudos ficam neste computador. Nada é enviado para a internet sem o usuário mandar.",
             "<b>Critério explícito.</b> Os limites vêm de normas (ABNT NBR 15572, 15866 e 15424) e podem ser conferidos e ajustados.",
             "<b>O responsável assina.</b> O laudo sai pronto para revisar; o profissional habilitado revisa e assina com a ART.",
-            "<b>Interface industrial e clara.</b> Fundo claro, azul nas ações, cor forte só para os dados: termograma e severidade.",
+            "<b>Interface industrial e clara.</b> Fundo claro e neutros frios; o azul marca só a ação principal e a seleção. A cor forte fica para os dados: termograma e severidade.",
         ]),
         p("Mapa das funcionalidades", "h2"),
         tabela(["Área", "O que faz"], [
-            ["<b>Painel</b>", "Críticas, pendências e inspeções vencidas, distribuição por severidade, próximas inspeções e monitoramento."],
-            ["<b>Nova análise</b>", "Recebe um ou vários termogramas, já associados a um equipamento se quiser, e abre o resultado."],
-            ["<b>Análise</b>", "Visualizador térmico, regiões, ponto e linha de medição, escala manual, emissividade, comparação com a inspeção anterior."],
-            ["<b>Vídeo ao vivo</b>", "Analisa o vídeo da câmera quadro a quadro, como se estivesse ao vivo, e mede o ritmo do detector."],
-            ["<b>Inspeções</b>", "Histórico com filtros, seleção de várias imagens, relatório conjunto, equipamento em lote e planilha."],
+            ["<b>Painel</b>", "Críticas agora, pendências e inspeções vencidas, a situação de cada equipamento, distribuição por severidade e próximas inspeções."],
+            ["<b>Inspeções</b>", "Histórico com filtros e busca, <b>Importar termogramas</b>, várias marcadas para definir o equipamento ou gerar um relatório, e a planilha."],
+            ["<b>Análise</b>", "Abre de cada inspeção: visualizador térmico, regiões, ponto e linha de medição, escala, isoterma, condições, identificação e pendência."],
             ["<b>Equipamentos</b>", "Histórico de cada equipamento, tendência em °C por mês, projeção até o limite e próxima inspeção."],
             ["<b>Pendências</b>", "Cada anomalia com prazo, ordem de serviço, responsável e histórico até a correção verificada."],
-            ["<b>Monitoramento</b>", "Pasta vigiada da câmera (ou uma subpasta por equipamento), análise automática e alerta para o WhatsApp."],
-            ["<b>Modelos e Avaliação</b>", "Detectores instalados (regra, IA e combinado), treino e comparação de modelos."],
+            ["<b>Captura</b>", "Pasta monitorada com alerta para o WhatsApp, vídeo da câmera analisado quadro a quadro, câmera do celular e a lista de alertas."],
+            ["<b>Modelos</b>", "Detectores instalados com o recomendado marcado, treino com as anotações do CVAT e avaliação dos modelos."],
             ["<b>Configurações</b>", "Empresa, logotipo, responsáveis, critério, limites por componente, aparência, dados e backup."],
         ], [38, LARGURA / mm - 38]),
     ]
@@ -268,7 +260,6 @@ def conteudo() -> list:
             f"O resultado fica em {mono('app/dados_app/verificacao.txt')}.",
         ]),
     ]
-    c += figura("m_abertura.png", "Tela de abertura do Pyron.exe enquanto o motor de análise carrega.", 110 * mm)
     c += [
         p("Requisitos", "h2"),
         lista([
@@ -281,31 +272,36 @@ def conteudo() -> list:
     # 3
     c += secao(3, "A interface", "Como está organizada")
     c += [
-        p("Todas as telas têm a mesma estrutura: a <b>barra lateral azul</b> à esquerda, a <b>barra superior</b> com a busca e o estado, e o conteúdo no centro."),
-        p("Barra lateral", "h2"),
+        p("Todas as telas têm a mesma estrutura: a <b>barra de navegação no topo</b>, com as seções, a busca, os alertas e as "
+          "configurações, e a área de trabalho embaixo. As telas de trabalho (a análise, por exemplo) têm uma barra de ferramentas, "
+          "a área principal e um painel de detalhe à direita."),
+        p("Navegação", "h2"),
         lista([
-            "<b>Operação:</b> Painel, Nova análise, Vídeo ao vivo, Inspeções (com a quantidade), Equipamentos (com as inspeções vencidas), "
-            "Pendências (com as de prazo vencido) e Monitoramento (com o ponto de estado e os alertas pendentes).",
-            "<b>Sistema:</b> Modelos, Avaliação e Configurações. No rodapé, o detector em uso e a página Sobre, com a versão.",
+            "<b>Seções:</b> Painel, Inspeções, Equipamentos, Pendências (com o número das de prazo vencido), Captura e Modelos. "
+            "Alt + 1 a 6 levam a cada uma; Alt + 0 abre as Configurações (ícone no canto direito).",
+            "<b>Sino:</b> alertas da pasta monitorada ainda não resolvidos; leva a Captura › Alertas.",
+            "Captura, Modelos e Configurações têm abas logo abaixo do título; o endereço acompanha a aba.",
         ]),
-        p("Barra superior e busca rápida", "h2"),
+        p("Busca rápida", "h2"),
         lista([
-            "Trilha de navegação: onde você está (por exemplo, Operação › Equipamentos › TR-01).",
-            "<b>Buscar</b> (ou Ctrl + K): acha inspeções pelo arquivo, equipamento, instalação, data ou severidade, equipamentos, telas e ações "
-            "como exportar a planilha ou trocar o tema. Setas para escolher, Enter para abrir.",
-            "Estado do servidor local e do monitoramento, sino de alertas e o botão <b>Nova análise</b>.",
-            "A tecla <b>?</b> mostra todos os atalhos de teclado.",
+            "<b>Buscar</b> (ou Ctrl + K): acha telas, inspeções pelo arquivo, equipamento, instalação ou data, equipamentos e ações como "
+            "exportar a planilha ou trocar o tema. Setas para escolher, Enter para abrir.",
+            "A tecla <b>?</b> mostra os atalhos de teclado.",
         ]),
     ]
-    c += figura("m_busca.png", "Busca rápida (Ctrl + K) com o equipamento TR-01 digitado: telas, equipamentos e inspeções no mesmo lugar.")
+    c += figura("m_busca.png", "Busca rápida (Ctrl + K) com “CS-12” digitado: o equipamento e as inspeções dele no mesmo lugar.")
     c += [
         p("Comportamento de todas as telas", "h2"),
         lista([
             "<b>Carregando:</b> a tela mostra a forma do conteúdo (esqueleto) enquanto os dados chegam.",
-            "<b>Vazio:</b> uma explicação do que vai aparecer ali e o botão da próxima ação.",
+            "<b>Vazio:</b> uma ilustração, o que vai aparecer ali e o botão da próxima ação.",
             "<b>Erro:</b> o que aconteceu e o botão Tentar de novo. <b>Sem conexão:</b> uma faixa no topo, se o servidor parar de responder.",
-            "Avisos rápidos no canto inferior direito confirmam cada ação; alguns têm Desfazer ou um atalho (Abrir, Ver equipamento).",
-            "Tema claro (padrão) ou escuro, em Configurações › Aparência ou pela busca. O termograma fica sempre sobre fundo índigo escuro.",
+            "Avisos rápidos no canto inferior confirmam cada ação. Apagar tem <b>Desfazer</b> no aviso, em vez de pedir confirmação; "
+            "só o que não volta (restaurar backup, apagar a inspeção) pergunta antes.",
+            "<b>Salvamento automático</b> na análise, na empresa e na pasta monitorada (“Salvo às 14:32” ao lado do título). Critério e "
+            "componentes têm o botão Salvar, porque recalculam todas as inspeções; sair com mudança sem salvar pergunta antes.",
+            "Tema claro (padrão) ou escuro, em Configurações › Aparência ou pela busca. O termograma fica sempre sobre fundo grafite.",
+            "A interface anterior continua disponível nesta versão: Configurações › Sobre › Abrir a interface anterior.",
         ]),
     ]
 
@@ -320,20 +316,20 @@ def conteudo() -> list:
             "grave quer dizer que ele está normal agora; a anomalia antiga segue em Pendências). Mostra a região crítica e o valor que decidiu.",
             "<b>Distribuição por severidade:</b> barra empilhada e contagem de cada nível.",
             "<b>Próximas inspeções:</b> os equipamentos pela data da próxima inspeção, vencidos primeiro.",
-            "<b>Monitoramento:</b> estado, pasta vigiada, última verificação e os alertas mais recentes.",
+            "<b>Aviso de configuração:</b> enquanto faltar o nome da empresa ou um responsável técnico, o painel avisa e leva às Configurações.",
         ]),
     ]
 
     # 5
-    c += secao(5, "Nova análise", "Operação")
-    c += figura("m_nova.png", "Área para soltar os termogramas, o fluxo da análise, a instalação e o equipamento opcionais e as inspeções recentes.")
+    c += secao(5, "Importar termogramas", "Operação")
     c += [
         lista([
-            "Arraste as imagens para a área tracejada ou use <b>Escolher arquivos</b> (Ctrl + O, em qualquer tela). Também dá para soltar "
-            "imagens em qualquer lugar da janela; um vídeo solto vai para o Vídeo ao vivo.",
-            "<b>Já sabe de onde são as imagens?</b> Preencha a instalação e o equipamento (com sugestões dos nomes já usados) e as imagens "
-            "entram direto no histórico daquele equipamento.",
-            "<b>Uma imagem</b> abre direto para revisão; <b>várias</b> são analisadas em lote, com a severidade de cada uma.",
+            "Em <b>Inspeções › Importar termogramas</b> (ou Ctrl + O, em qualquer tela), escolha uma ou várias imagens. Também dá para "
+            "soltar as imagens em qualquer lugar da janela; um vídeo solto vai para Captura › Vídeo.",
+            "Uma faixa acima da lista mostra o andamento (Importando 3 de 5) e o aviso do fim leva às inspeções novas. "
+            "<b>Uma imagem</b> só abre direto na análise.",
+            "Para as imagens entrarem no histórico de um equipamento, importe pela página dele (<b>Adicionar imagens</b>) ou defina o "
+            "equipamento depois, na análise ou com várias inspeções marcadas.",
         ]),
         p("Três tipos de imagem", "h2"),
         tabela(["Tipo", "Como o Pyron lê", "Como aparece"], [
@@ -350,58 +346,57 @@ def conteudo() -> list:
         p("Aceita JPEG, PNG, WebP e BMP. Para medir de verdade, use o arquivo original da câmera (FLIRxxxx.jpg). No WhatsApp, mande como "
           "documento: como foto, ele recomprime e apaga os dados de temperatura.", "nota"),
     ]
-    c += figura("m_sem_temperatura.png", "Imagem sem dados radiométricos (gerada por IA): os componentes foram identificados e a análise parou antes "
-                                         "da temperatura; o cartão pede o mínimo e o máximo da barra de cores para estimá-la.")
 
     # 6
     c += secao(6, "Análise de uma imagem", "Operação")
-    c += figura("m_analise.png", "Análise aberta: termograma com regiões, ponto P2, linha L1 e escala manual; à direita o resultado, "
-                                 "o acompanhamento da anomalia e a comparação com a inspeção anterior.")
+    c += figura("m_analise.png", "Análise aberta: barra de ferramentas, termograma com as regiões, a faixa de regiões embaixo e o painel "
+                                 "de detalhe com o resumo da inspeção.")
     c += [
         p("Visualizador térmico", "h2"),
         lista([
-            "<b>Paletas:</b> Ferro, Arco-íris e Cinza. <b>Escala:</b> Equipamento (realça o equipamento), Cena (da menor à maior temperatura) "
-            "ou <b>Manual</b> (você escolhe o mínimo e o máximo). A paleta e a escala ficam guardadas e o laudo sai igual à tela.",
-            "<b>Temperatura sob o cursor</b>, marcada também na barra de cores. <b>Isoterma:</b> destaca tudo acima de uma temperatura. "
-            "<b>Foto:</b> mostra a foto visível da câmera ao lado.",
-            "<b>Camadas:</b> com peças (modelo de IA) e pontos quentes juntos, escolha Tudo, Peças ou Pontos quentes. "
-            "<b>Rótulos</b> (tecla R) liga e desliga os nomes; eles nunca se sobrepõem.",
+            "<b>Paleta</b> (Ferro, Arco-íris ou Cinza) e <b>Escala</b>: Equipamento (realça o equipamento), Cena inteira ou Manual (clique "
+            "no máximo ou no mínimo da barra de cores e digite). Paleta e escala ficam guardadas e o laudo sai igual à tela.",
+            "<b>Temperatura sob o cursor</b>, junto da mira e marcada na barra de cores. <b>Isoterma</b> (no menu Escala ou tecla I): "
+            "destaca o que está acima de uma temperatura; clique na barra de cores para escolher o valor.",
+            "<b>Camadas:</b> regiões, rótulos, pontos quentes e contornos, cada um liga e desliga. <b>Foto</b> (tecla F) troca para a foto "
+            "visível da câmera.",
+            "<b>Zoom</b> pela roda do mouse, no ponto do cursor; espaço + arrastar move; 0 encaixa a imagem. Acima de 300% cada pixel fica nítido.",
         ]),
         p("Ferramentas de medição", "h2"),
         tabela(["Ferramenta", "Tecla", "O que faz"], [
-            ["Selecionar", "S", "Escolhe uma região na imagem ou na lista."],
-            ["Região", "D", "Arraste uma caixa: a região é medida e classificada como as do detector."],
-            ["Ponto", "P", "Clique: lê a temperatura daquele pixel (P1, P2...)."],
-            ["Linha", "L", "Arraste: mostra o perfil de temperatura ao longo da linha, com máxima, mínima e média (L1, L2...)."],
+            ["Selecionar", "V", "Escolhe uma região na imagem ou na faixa de regiões; arrastar move a caixa e as alças mudam o tamanho."],
+            ["Região", "R", "Arraste uma caixa: a região é medida e classificada como as do detector."],
+            ["Ponto", "P", "Clique: lê a temperatura daquele pixel (P1, P2…)."],
+            ["Linha", "L", "Arraste: mostra o perfil de temperatura ao longo da linha, com máxima, mínima e média (L1, L2…)."],
         ], [30, 16, LARGURA / mm - 46]),
         Spacer(1, 6),
-        p("Pontos e linhas ficam guardados na inspeção, aparecem na lista Pontos e linhas (com o gráfico do perfil) e vão para o laudo.", "nota"),
+        p("Pontos e linhas ficam guardados na inspeção, aparecem no painel e vão para o laudo. Delete apaga a região selecionada, "
+          "com Desfazer no aviso.", "nota"),
     ]
-    c += figura("m_camadas.png", "Para-raios analisados pelo modelo de IA combinado com a regra de pontos quentes, mostrando só a camada Peças.")
-    c += figura("m_isoterma.png", "Isoterma ligada: tudo abaixo da temperatura escolhida fica cinza.")
+    c += figura("m_camadas.png", "Menu Camadas aberto: cada camada liga e desliga; a Foto troca o termograma pela imagem visível.")
+    c += figura("m_isoterma.png", "Isoterma ligada: só o que está acima da temperatura escolhida mantém a cor.")
     c += [
-        p("Resultado", "h2"),
+        p("Regiões e painel de detalhe", "h2"),
         lista([
-            "<b>Veredito:</b> o nível mais grave, onde está, por qual critério e o que fazer.",
-            "<b>Indicadores:</b> máxima da cena, a região mais perto do limite (% da MTA) ou o maior ΔT entre fases, e a quantidade de regiões.",
-            "<b>Ponto mais quente nas peças</b> e a <b>comparação entre peças iguais</b> das três fases.",
-            "<b>Acompanhamento da anomalia:</b> situação, prazo e ordem de serviço (veja Pendências).",
-            "<b>Inspeção anterior deste equipamento:</b> quanto a máxima mudou desde a última e o botão <b>Lado a lado</b>.",
-            "<b>Setas no cabeçalho</b> (por exemplo, 5 de 7) para andar pelas inspeções do mesmo equipamento.",
+            "<b>Faixa de regiões</b> embaixo do termograma: uma ficha por região, da mais grave para a mais fria. Clicar na ficha ou na "
+            "caixa seleciona; ← e → percorrem.",
+            "<b>Resumo</b> (sem região selecionada): o nível mais grave, onde está, por qual critério e o que fazer; a máxima da cena, a "
+            "região mais perto do limite (% da MTA) ou o maior ΔT entre fases, e a comparação entre peças iguais das três fases.",
+            "<b>Região selecionada:</b> leituras, diagnóstico e, com o SAM 2 instalado, <b>Dimensões estimadas</b> (botão Medir).",
+            "<b>Condições</b>, <b>Identificação</b> e <b>Pendência</b> ficam no trilho de ícones do painel.",
+            "<b>Cabeçalho:</b> equipamento, severidade, data e arquivo; setas (por exemplo, 2 de 3) para andar pelas inspeções do mesmo "
+            "equipamento; Detectar de novo, Mais e <b>Gerar laudo</b>. As edições salvam sozinhas.",
         ]),
     ]
-    c += figura("m_lado_a_lado.png", "Lado a lado: a inspeção anterior e a atual do mesmo equipamento, cada uma com a severidade e a máxima.")
-    c += figura("m_condicoes.png", "Aba Condições: ambiente e carga, parâmetros de medição com a tabela de materiais e os dados da câmera.")
+    c += figura("m_condicoes.png", "Painel Condições: ambiente e carga, e os parâmetros da câmera (emissividade, temperatura refletida, distância, umidade e ar).")
     c += [
         lista([
             "<b>Condições:</b> com a temperatura ambiente e a carga no momento, cada região é projetada para plena carga e comparada com a MTA.",
-            "<b>Parâmetros de medição</b> (só termograma radiométrico): emissividade (com uma tabela de materiais: porcelana, polímero, cobre "
-            "oxidado, aço galvanizado...), temperatura refletida, distância, umidade e temperatura do ar. A temperatura é recalculada a partir "
-            "do arquivo original; <b>Voltar aos valores da câmera</b> desfaz.",
-            "<b>Laudo:</b> instalação, equipamento, responsável (do cadastro), ART e observações.",
-            "<b>Exportar</b> (botão com a seta para baixo): imagem PNG com regiões, pontos e linhas; temperaturas de todos os pixels em CSV "
-            "(abre no Excel); ou o laudo.",
-            "<b>Detectar de novo:</b> escolha outro detector no topo; as regiões desenhadas à mão são mantidas.",
+            "<b>Parâmetros da câmera</b> (só termograma radiométrico): emissividade, temperatura refletida, distância, umidade e temperatura "
+            "do ar. <b>Aplicar</b> recalcula a temperatura a partir do arquivo original; <b>Voltar aos da câmera</b> desfaz.",
+            "<b>Identificação:</b> instalação, equipamento, ART e observações do laudo.",
+            "<b>Mais › Exportar:</b> imagem PNG com regiões, pontos e linhas, ou as temperaturas de todos os pixels em CSV (abre no Excel).",
+            "<b>Detectar de novo:</b> escolha outro detector; as regiões desenhadas à mão são mantidas.",
         ]),
     ]
 
@@ -416,7 +411,7 @@ def conteudo() -> list:
         Spacer(1, 6),
         destaque("2. ΔT entre componentes semelhantes",
                  "A mesma peça nas três fases, sob a mesma carga, deveria ter a mesma temperatura. A diferença para a mediana das fases indica defeito.",
-                 VIOLETA, VIOLETA_50),
+                 LINHA_FORTE, FUNDO),
         p("Faixas de prioridade (modelo brasileiro)", "h2"),
         tabela(["Nível", "% da MTA", "ΔT entre fases (condutores)", "Para-raios e isoladores", "O que fazer"], [
             [selo("Atenção"), "acima de 60%", "5 a 10 °C", "2 a 5 °C", "Corrigir na próxima manutenção."],
@@ -447,8 +442,7 @@ def conteudo() -> list:
         Spacer(1, 6),
         p("Os valores são de partida e ficam editáveis. Confira sempre com o dado do fabricante, a edição vigente da NBR 15866 e o termografista responsável.", "nota"),
     ]
-    c += figura("m_conferir.png", "Selo Conferir: a classificação Imediato vem de um ponto a 240 °C fora das peças identificadas (provável sol ou reflexo).")
-    c += figura("m_nao_avaliado.png", "Para-raio sozinho na imagem: o para-raio e as aletas ficam sem avaliação e o aviso pede as três fases juntas.")
+    c += figura("m_nao_avaliado.png", "Para-raio sozinho na imagem: a região fica Não avaliado e o diagnóstico pede para fotografar junto a mesma peça das outras fases.")
 
     # 8
     c += secao(8, "Relatório de inspeção (PDF)", "Documento técnico")
@@ -475,13 +469,13 @@ def conteudo() -> list:
     c += figura("m_inspecoes.png", "Lista de inspeções com três marcadas: a barra de seleção oferece definir o equipamento e gerar o relatório.")
     c += [
         lista([
-            "<b>Tabela</b> (padrão) ou <b>miniaturas</b>; colunas com termograma, arquivo, data da captura, equipamento (link para a página "
-            "dele), região crítica, máxima e severidade.",
-            "<b>Indicadores clicáveis</b> e o filtro (Críticas, Programar, Atenção, Normais, <b>Sem medida</b>) filtram por severidade; "
-            "<b>busca</b> por arquivo, instalação ou equipamento; <b>ordem</b> por data da captura, gravidade ou nome. O selo <b>Conferir</b> "
-            "aparece ao lado da severidade quando ela vem de calor fora das peças identificadas.",
+            "<b>Tabela</b> com miniatura, arquivo e data da captura, equipamento (link para a página dele), região crítica, máxima e "
+            "severidade; a pendência vencida aparece embaixo do selo. Clique no cabeçalho de uma coluna para ordenar.",
+            "<b>Filtros</b> Todas, Críticas, Programar, Atenção, Normais e <b>Sem medida</b>, com a contagem de cada um; <b>busca</b> por "
+            "arquivo, instalação ou equipamento. Quando a severidade vem de calor fora das peças identificadas, o selo aparece marcado "
+            "para conferir.",
             "<b>Marque várias</b> (caixa de seleção) para <b>Definir equipamento</b> de todas de uma vez ou <b>Gerar relatório</b> com todas.",
-            "<b>Exportar planilha</b>: todas as inspeções em CSV que abre direto no Excel.",
+            "<b>Exportar planilha</b>: todas as inspeções em CSV, que abre direto no Excel.",
         ]),
     ]
 
@@ -499,7 +493,7 @@ def conteudo() -> list:
             f"projetada para plena carga, {mono('ΔT × (100 / carga)²')}, que compara inspeções feitas com cargas diferentes.",
             "<b>Projeção até a MTA:</b> se o % da MTA sobe, em quanto tempo chegaria a 100% mantida a tendência (estimativa, até 5 anos).",
             "<b>Próxima inspeção</b> pela severidade atual: 1 ano quando normal (a NFPA 70B pede ao menos uma vez por ano), 90 dias em atenção, "
-            "30 em programar, 7 em urgente e 1 em imediato. O menu mostra quantas estão vencidas.",
+            "30 em programar, 7 em urgente e 1 em imediato. Filtros na lista: Todos, Com anomalia, Inspeção vencida e Esquentando.",
             "<b>Peças:</b> a máxima de cada tipo de peça ao longo do tempo, para ver qual está esquentando.",
             "<b>Adicionar imagens</b> analisa imagens novas já como inspeções do equipamento; <b>Relatório do equipamento</b> junta todas.",
         ]),
@@ -508,7 +502,7 @@ def conteudo() -> list:
 
     # 11
     c += secao(11, "Pendências", "Da anomalia à correção")
-    c += figura("m_pendencias.png", "Pendências com severidade, equipamento, data, prazo, situação e ordem de serviço.")
+    c += figura("m_pendencias.png", "Pendências: a lista e, ao lado, a escolhida com situação, prazo, ordem de serviço, responsável e o histórico.")
     c += [
         p("Toda inspeção fora do normal vira uma pendência. O fluxo é o de uma equipe de manutenção:"),
         tabela(["Situação", "Quando usar"], [
@@ -519,16 +513,16 @@ def conteudo() -> list:
             ["<b>Descartada</b>", "Falso alarme (reflexo do sol, por exemplo) ou peça já substituída."],
         ], [32, LARGURA / mm - 32]),
         Spacer(1, 6),
-        p("Cada mudança vai para o histórico, com data e nota. As pendências vencidas aparecem no Painel e no menu.", "nota"),
+        p("Cada mudança vai para o histórico, com data e nota. Filtros: Em andamento, Vencidas, Aguardando reinspeção, Concluídas e "
+          "Todas; ↑ e ↓ passam de uma pendência para a outra. As vencidas aparecem no Painel e na navegação.", "nota"),
     ]
-    c += figura("m_pendencia_dialogo.png", "Atualizar uma pendência: situação, prazo, ordem de serviço, responsável, nota e o histórico.", 130 * mm)
 
     # 12
-    c += secao(12, "Vídeo ao vivo", "Simulação de câmera")
-    c += figura("m_video.png", "Vídeo analisado quadro a quadro: caixas sobre a imagem, ritmo real, tempo por quadro, gráfico da máxima e anomalias.")
+    c += secao(12, "Vídeo da câmera", "Captura")
+    c += figura("m_video.png", "Vídeo analisado: o quadro com as caixas, a leitura acima dele, o gráfico da máxima no tempo e os momentos com anomalia.")
     c += [
         lista([
-            "Envie a gravação da tela da câmera (MP4, AVI, MOV ou MKV, com a barra de escala visível). Cada quadro passa pelo mesmo caminho "
+            "Em <b>Captura › Vídeo</b>, envie a gravação da tela da câmera (MP4, AVI, MOV ou MKV, com a barra de escala visível). Cada quadro passa pelo mesmo caminho "
             "de uma foto: escala, temperatura, detector, medição e severidade.",
             "<b>Ao vivo:</b> o vídeo corre no relógio, como a câmera; enquanto o detector trabalha, os quadros que passam se perdem. "
             "Mostra o que o sistema acompanharia de verdade neste computador. <b>Um quadro a cada intervalo:</b> analisa sem perder nenhum.",
@@ -540,22 +534,22 @@ def conteudo() -> list:
     ]
 
     # 13
-    c += secao(13, "Câmera do celular", "Identificação e temperatura ao vivo")
+    c += secao(13, "Câmera do celular", "Captura")
     c += [
         p("Aponte a câmera do celular para uma imagem térmica (na tela do computador, por exemplo) e o Pyron marca os componentes ao vivo, "
           "sem instalar nada no celular. A foto do celular não traz os números do sensor; <b>com a barra de cores no quadro</b>, o Pyron "
           "estima a temperatura de cada peça pelas cores dela."),
         tabela(["Passo", "O que fazer"], [
             ["1", "Celular e computador no mesmo Wi-Fi."],
-            ["2", "No Pyron, <b>Câmera do celular › Ligar conexão com o celular</b> e leia o QR code com o celular."],
+            ["2", "No Pyron, <b>Captura › Celular › Ligar</b> e leia o QR code com o celular."],
             ["3", "O celular avisa que a conexão não é particular (o certificado é do próprio Pyron): <b>Avançado › Continuar</b>."],
             ["4", "Permita a câmera e aponte, com a barra de cores no quadro. <b>Capturar</b> salva o quadro como inspeção: com a temperatura "
                   "estimada quando a barra foi lida, Sem medida quando não."],
         ], [16, LARGURA / mm - 16]),
         Spacer(1, 6),
     ]
-    c += figura("m_celular_pc.png", "No computador: o QR code e o link do celular, e o vídeo ao vivo do celular, com as peças, a máxima "
-                "estimada de cada uma, a escala lida e o ritmo (quadros de vídeo e análises por segundo).")
+    c += figura("m_celular_pc.png", "Captura › Celular antes de ligar. Ligado, a tela mostra o QR code, o link e o vídeo do celular "
+                "com as peças, a máxima estimada de cada uma e o ritmo.")
     c += figura("m_celular.png", "No celular: área do termograma tracejada, a barra de cores achada, peças com a máxima estimada e a escala lida.", 70 * mm)
     c += [
         lista([
@@ -582,63 +576,63 @@ def conteudo() -> list:
     ]
 
     # 14
-    c += secao(14, "Monitoramento e alertas", "Operação")
-    c += figura("m_monitor.png", "Estado do monitoramento, fonte das imagens, regra de alerta, responsáveis e a prévia da mensagem.")
+    c += secao(14, "Pasta monitorada e alertas", "Captura")
+    c += figura("m_monitor.png", "Captura › Pasta monitorada: estado, pasta, equipamento por subpasta, regra de alerta e responsáveis.")
     c += [
         lista([
-            "<b>Fonte das imagens:</b> a pasta onde a câmera, o cartão sincronizado, o FTP da câmera fixa ou o FLIR Thermal Studio gravam. "
-            "Ao ligar, o que já estava na pasta fica de fora.",
+            "<b>Pasta:</b> onde a câmera, o cartão sincronizado, o FTP da câmera fixa ou o FLIR Thermal Studio gravam. A configuração "
+            "salva sozinha; <b>Ligar</b> começa a vigiar e o que já estava na pasta fica de fora. <b>Verificar agora</b> não espera o intervalo.",
             "<b>Cada subpasta é um equipamento:</b> com a opção marcada, uma imagem em Entrada\\TR-01 entra no histórico do TR-01. "
             "Bom para câmeras fixas, uma pasta por câmera.",
             "<b>Regra de alerta:</b> severidade mínima e intervalo para não repetir o mesmo nível; se piorar, o alerta sai na hora.",
             "<b>Responsáveis:</b> nome e WhatsApp. O Pyron prepara a mensagem e um clique abre o WhatsApp com ela pronta.",
-            "Os alertas ficam com a situação pendente, enviado ou resolvido; o sino do topo mostra os pendentes.",
+            "<b>Captura › Alertas:</b> pendentes, enviados e resolvidos; <b>Resolver</b> tem Desfazer. O sino do topo mostra os pendentes.",
         ]),
-        p("Em desenvolvimento", "h2"),
-        tabela(["Item", "O que vai fazer"], [
-            ["Conexão direta com a câmera", "RTSP/ONVIF e FLIR Atlas SDK, sem depender de pasta."],
-            ["WhatsApp automático", "Envio pela API oficial do WhatsApp Business."],
-            ["Serviço do Windows", "Monitoramento rodando mesmo com a janela do Pyron fechada."],
-        ], [52, LARGURA / mm - 52]),
     ]
+    c += figura("m_alertas.png", "Captura › Alertas: cada alerta com a inspeção, a severidade, o WhatsApp e Resolver.")
 
     # 15
-    c += secao(15, "Modelos e avaliação", "Sistema")
-    c += figura("m_modelos.png", "Detectores: a regra de pontos quentes, o modelo de para-raios e o combinado (recomendado), cada um com a versão rápida (INT8).")
+    c += secao(15, "Modelos", "Sistema")
+    c += figura("m_modelos.png", "Modelos › Em uso: os detectores, com o recomendado marcado, e ao lado o detalhe do escolhido.")
     c += [
         lista([
             "<b>Pontos quentes (regra):</b> embutido, sem IA. Aponta trechos mais quentes que o equipamento em volta.",
             "<b>Modelos treinados (IA):</b> por exemplo, o RF-DETR de para-raios (terminal superior, aletas isoladoras, terminal inferior), "
             "com mAP50 de 0,89 no teste. <b>Modelo + pontos quentes</b> junta os dois: diz em qual peça está o calor e compara as fases.",
-            "<b>Recomendado:</b> o combinado (peças + pontos quentes). A regra sozinha não sabe o que é cada coisa e marca lâmpadas e estruturas.",
+            "<b>Recomendado</b> (marcado na lista): o combinado, peças e pontos quentes. A regra sozinha não sabe o que é cada coisa e marca "
+            "lâmpadas e estruturas. <b>Usar este modelo</b> fica no detalhe do escolhido.",
             "<b>Versão rápida (INT8):</b> os pesos do modelo em 8 bits ({0}), sem treinar de novo: 1,5 vez mais rápida no processador, com o "
-            "mesmo acerto no teste (mAP50 0,859 nas duas). Aparece dentro do cartão do modelo; a câmera do celular e o vídeo já a usam.".format(
+            "mesmo acerto no teste (mAP50 0,859 nas duas). Aparece no detalhe do modelo original; a câmera do celular e o vídeo já a usam.".format(
                 mono("python -m ml.otimizar modelos/&lt;id&gt; --dados &lt;dataset&gt;")),
-            "<b>Treino:</b> rotule com caixas no CVAT, exporte em COCO 1.0 e siga o passo a passo da tela, aqui (com placa NVIDIA) ou no Colab.",
+            "<b>Treino:</b> rotule com caixas no CVAT, exporte em COCO 1.0 e envie o .zip: o Pyron confere imagens e rótulos por classe, "
+            "avisa o que falta e monta o pacote para o Colab (o passo a passo vai no LEIA-ME do pacote). Com placa NVIDIA, dá para treinar aqui.",
+            "<b>Avaliação:</b> importe os resultados do caderno do Colab: o melhor modelo no teste, as peças que escaparam, a comparação com o "
+            "melhor de cada coluna em negrito e o AP50 por componente.",
         ]),
     ]
-    c += figura("m_avaliacao.png", "Avaliação: comparação dos detectores treinados (acertos, peças perdidas, curvas de treino e exemplos).")
+    c += figura("m_avaliacao.png", "Modelos › Avaliação: três detectores comparados no mesmo conjunto de teste.")
 
     # 16
     c += secao(16, "Configurações", "Sistema")
-    c += figura("m_identidade.png", "Empresa, logotipo e responsáveis técnicos cadastrados.")
+    c += figura("m_identidade.png", "Configurações › Empresa e responsáveis: salva sozinho; o marcado à esquerda é o responsável padrão do laudo.")
     c += [
         tabela(["Aba", "O que dá para ajustar"], [
-            ["Empresa e responsáveis", "Nome, subtítulo e <b>logotipo</b> no cabeçalho dos laudos; <b>responsáveis técnicos</b> (nome, função, registro). "
-             "O laudo só sai com um responsável deste cadastro, para o nome e o registro nunca saírem digitados errado."],
-            ["Critério de severidade", "Limites de % da MTA, ΔT entre semelhantes (condutores e dielétricos), ΔT sobre o ambiente (NETA, opcional), "
-             "expoente da correção de carga e carga mínima; modelos Brasil e NETA."],
-            ["Biblioteca de componentes", "MTA de cada classe de componente, com a fonte do valor."],
+            ["Empresa e responsáveis", "Nome, subtítulo e <b>logotipo</b> no cabeçalho dos laudos; <b>responsáveis técnicos</b> (nome, função, registro) "
+             "e o padrão. O laudo só sai com um responsável deste cadastro, para o nome e o registro nunca saírem digitados errado."],
+            ["Critério", "Limites de % da MTA, ΔT entre semelhantes (condutores e dielétricos), ΔT sobre o ambiente (NETA, opcional), "
+             "expoente da correção de carga e carga mínima; partir dos modelos Brasil ou NETA; <b>Salvar critério</b> recalcula tudo."],
+            ["Componentes", "MTA de cada classe de componente, com a fonte do valor e o padrão ao lado quando mudou."],
             ["Aparência", "Tema claro (padrão), escuro ou seguir o Windows."],
-            ["Dados e sistema", "Onde ficam os dados, espaço ocupado, <b>backup</b> e restauração."],
+            ["Dados e backup", "Onde ficam os dados, número de inspeções, espaço ocupado, <b>backup</b> e restauração."],
+            ["Sobre", "Versão, detector em uso, pastas de dados e de modelos, créditos e o link para a interface anterior."],
         ], [44, LARGURA / mm - 44]),
     ]
-    c += figura("m_criterio.png", "Critério de severidade em quatro grupos, com os modelos Brasil (NBR 15866) e NETA MTS.")
-    c += figura("m_componentes.png", "Biblioteca de componentes: tipo de aquecimento, MTA editável e a fonte de cada valor.")
+    c += figura("m_criterio.png", "Configurações › Critério: quatro grupos, um valor por nível, e os modelos Brasil (NBR 15866) e NETA MTS.")
+    c += figura("m_componentes.png", "Configurações › Componentes: tipo de aquecimento, MTA editável e a fonte de cada valor.")
 
     # 17
     c += secao(17, "Dados, backup e instalação", "Sistema")
-    c += figura("m_dados.png", "Dados e sistema: pastas, espaço ocupado, versão e o backup.")
+    c += figura("m_dados.png", "Configurações › Dados e backup: pasta, inspeções, espaço ocupado e o backup.")
     c += [
         lista([
             f"Inspeções, imagens, equipamentos, pendências, alertas e configurações ficam em {mono('app/dados_app')}, na pasta do projeto.",
@@ -678,13 +672,18 @@ def conteudo() -> list:
     cab.toc = "Apêndice: atalhos e glossário"
     c += [cab,
           tabela(["Atalho", "Onde", "O que faz"], [
-              ["Ctrl + K", "Qualquer tela", "Busca rápida: inspeções, equipamentos, telas e ações."],
-              ["Ctrl + O", "Qualquer tela", "Escolher imagens para analisar."],
+              ["Ctrl + K", "Qualquer tela", "Busca rápida: telas, inspeções, equipamentos e ações."],
+              ["Ctrl + O", "Qualquer tela", "Importar termogramas."],
+              ["Alt + 1 a 6", "Qualquer tela", "Painel, Inspeções, Equipamentos, Pendências, Captura, Modelos."],
+              ["Alt + 0", "Qualquer tela", "Configurações."],
               ["?", "Qualquer tela", "Lista de atalhos."],
-              ["S, D, P, L", "Análise aberta", "Selecionar, desenhar região, medir ponto, traçar linha."],
-              ["R", "Análise e vídeo", "Rótulos sobre as caixas."],
-              ["Esc", "Análise aberta", "Cancelar e voltar à seleção."],
-              ["Delete", "Análise aberta", "Remover a região selecionada (com Desfazer)."],
+              ["Esc", "Qualquer tela", "Fechar menu, diálogo ou busca; na análise, voltar a Selecionar."],
+              ["V, R, P, L", "Análise", "Selecionar, desenhar região, medir ponto, traçar linha."],
+              ["I, F", "Análise", "Isoterma; foto visível."],
+              ["0, + e −", "Análise", "Encaixar a imagem; aproximar e afastar (também pela roda do mouse)."],
+              ["← →", "Análise", "Região anterior e seguinte."],
+              ["Delete", "Análise", "Apagar a região selecionada (com Desfazer)."],
+              ["↑ ↓", "Pendências", "Pendência anterior e seguinte."],
               ["Espaço, ← →", "Vídeo", "Reproduzir ou pausar; quadro anterior e seguinte."],
           ], [28, 34, LARGURA / mm - 62]),
           Spacer(1, 10),

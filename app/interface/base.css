@@ -3,7 +3,7 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 * { margin: 0; }
-html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; touch-action: manipulation; -webkit-tap-highlight-color: transparent; } /* toque: sem espera do toque duplo; o retorno é o :active de cada controle */
 body {
   font: var(--p-normal) var(--t-2) / var(--a-2) var(--fonte);
   color: var(--texto);
