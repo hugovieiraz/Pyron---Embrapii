@@ -290,3 +290,43 @@ def test_celular_para_medir_liga_sem_detector_e_mede_a_foto(comparacao, monkeypa
     assert servidor._celular_previa(codigo)[:3] == b"\xff\xd8\xff"
     r = cli.post("/api/medicao/previa", files={"arquivo": ("f.png", foto, "image/png")})
     assert r.status_code == 200 and r.content[:3] == b"\xff\xd8\xff"
+
+def test_api_video_keyframes_e_medir(cliente, tmp_path):
+    cli, _ = cliente
+    import cv2
+    import numpy as np
+
+    # Cria vídeo sintético rápido (10 quadros)
+    video_path = tmp_path / "vid.mp4"
+    h, w = 120, 160
+    out = cv2.VideoWriter(str(video_path), cv2.VideoWriter_fourcc(*"mp4v"), 10.0, (w, h))
+    for i in range(10):
+        frame = np.full((h, w, 3), 100, dtype=np.uint8)
+        cv2.rectangle(frame, (20 + i, 20), (60 + i, 80), (255, 255, 255), -1)
+        out.write(frame)
+    out.release()
+    dados_video = video_path.read_bytes()
+
+    # 1. Endpoint /api/medicao/video/keyframes
+    r_kf = cli.post(
+        "/api/medicao/video/keyframes",
+        files={"arquivo": ("vid.mp4", dados_video, "video/mp4")},
+        data={"max_keyframes": 3},
+    )
+    assert r_kf.status_code == 200, r_kf.text
+    resp = r_kf.json()
+    assert resp["total"] >= 1
+    assert "imagem_base64" in resp["keyframes"][0]
+
+    # 2. Endpoint /api/medicao/video/medir
+    r_med = cli.post(
+        "/api/medicao/video/medir",
+        files={"arquivo": ("vid.mp4", dados_video, "video/mp4")},
+        data={"pista": json.dumps({"ponto": [_px(-0.6, 0.0, 3.0)[0], _px(-0.6, 0.0, 3.0)[1]]}), "max_keyframes": 2},
+    )
+    assert r_med.status_code == 200, r_med.text
+    dados_med = r_med.json()
+    assert "consenso" in dados_med
+    assert "comprimento_cm" in dados_med["consenso"]
+    assert dados_med["n_keyframes"] >= 1
+

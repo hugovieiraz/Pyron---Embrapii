@@ -408,3 +408,12 @@ def comparar(imagem, pista: dict, referencia: dict | None = None, modelos: list[
     if all("erro" in r and r["sem_referencia"] is None for r in saida["resultados"].values()):
         raise ValueError(next(iter(saida["resultados"].values()))["erro"])
     return saida
+
+def selecionar_keyframes(*args, **kwargs):
+    from nucleo.medicao.video_keyframes import selecionar_keyframes as _sk
+    return _sk(*args, **kwargs)
+
+
+def medir_video(*args, **kwargs):
+    from nucleo.medicao.video_keyframes import medir_video as _mv
+    return _mv(*args, **kwargs)

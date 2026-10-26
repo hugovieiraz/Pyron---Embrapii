@@ -2227,6 +2227,64 @@ def medicao_plano(corpo: dict = Body(...)) -> dict:
         raise HTTPException(422, str(e))
 
 
+@app.post("/api/medicao/video/keyframes")
+async def medicao_video_keyframes(arquivo: UploadFile = File(...), max_keyframes: int = Form(5)) -> dict:
+    """Extrai os quadros-chave mais nítidos e espaçados no tempo de um vídeo gravado."""
+    dados = await arquivo.read()
+    if not dados:
+        raise HTTPException(422, "O arquivo de vídeo está vazio.")
+    if len(dados) > 100 * 1024 * 1024:
+        raise HTTPException(413, "O vídeo passa de 100 MB.")
+    from nucleo.medicao import video_keyframes as vk
+
+    try:
+        keyframes = vk.selecionar_keyframes(dados, max_keyframes=max_keyframes)
+    except Exception as e:
+        raise HTTPException(422, f"Erro ao processar vídeo: {e}")
+
+    import base64
+    quadros = []
+    for kf in keyframes:
+        b64 = base64.b64encode(kf.bytes_jpeg).decode("ascii")
+        quadros.append({
+            **kf.para_dict(),
+            "imagem_base64": f"data:image/jpeg;base64,{b64}",
+        })
+    return {"total": len(quadros), "keyframes": quadros}
+
+
+@app.post("/api/medicao/video/medir")
+async def medicao_video_medir(
+    arquivo: UploadFile = File(...),
+    pista: str = Form(...),
+    referencia: str | None = Form(None),
+    max_keyframes: int = Form(4),
+) -> dict:
+    """Mede objeto ao longo do vídeo com propagação de pista nos keyframes e consenso estatístico."""
+    dados = await arquivo.read()
+    if not dados:
+        raise HTTPException(422, "O arquivo de vídeo está vazio.")
+    if len(dados) > 100 * 1024 * 1024:
+        raise HTTPException(413, "O vídeo passa de 100 MB.")
+    p = _validar_pista_medicao(_json_form(pista, "pista"), "a pista")
+    ref_bruta = _json_form(referencia, "referencia")
+    ref = _validar_pista_medicao(ref_bruta, "a referência", exige_tamanho=True) if ref_bruta else None
+
+    from nucleo.medicao import video_keyframes as vk
+
+    def rodar():
+        with _trava_medicao:
+            return vk.medir_video(dados, p, ref, max_keyframes=max_keyframes)
+
+    from starlette.concurrency import run_in_threadpool
+    try:
+        return await run_in_threadpool(rodar)
+    except (ImportError, OSError) as e:
+        raise HTTPException(503, f"Os modelos de medição não estão instalados ({type(e).__name__}: {e}).")
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+
 # ---------------------------------------------------------------- cadastro de medidas e câmeras (app/cadastro_medidas.py)
 
 
