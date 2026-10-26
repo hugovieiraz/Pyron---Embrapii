@@ -36,55 +36,75 @@ function reta(pts) {
   return (t) => my + k * (t - mx);
 }
 
+/** Eixo x em datas (padrão): o valor é o instante em ms; uma data só abre meio mês para cada lado. */
+const EIXO_DATAS = { de: (p) => Date.parse(p.data), rotulo: (t) => dataCurta(new Date(t).toISOString()), folga: 864e5 * 15 };
+
 /**
- * graficoSerie({ titulo, pontos: [{ id, data, valor, severidade, rotulo }], unidade, tendencia, href(p) })
- * Devolve { no, encerrar }. Pontos sem valor ficam de fora (inspeção sem temperatura).
+ * graficoSerie({ titulo, pontos: [{ id, data, valor, severidade, rotulo }], unidade, tendencia, href(p), aoEscolher(p),
+ *                eixo: { de(p), rotulo(v), folga }, comPonto(p), aoClicar(x) })
+ * Devolve { no, encerrar, cursor(x) }. Pontos sem valor ficam de fora (inspeção sem temperatura).
+ * comPonto escolhe quais pontos ganham marca (vídeo: só os fora do normal); aoClicar recebe o x do clique no traçado.
  */
-export function graficoSerie({ titulo, pontos, unidade = " °C", tendencia = false, href }) {
+export function graficoSerie({ titulo, pontos, unidade = " °C", tendencia = false, href, aoEscolher, eixo = EIXO_DATAS, comPonto = () => true, aoClicar }) {
   const area = el("div", { class: "grafico-area" });
   const dica = el("div", { class: "dica-grafico", role: "status", hidden: true });
   const no = el("figure", { class: "grafico" }, area, dica);
-  const pts = pontos.filter((p) => p.valor != null).map((p) => ({ ...p, t: Date.parse(p.data) })).sort((a, b) => a.t - b.t);
+  const pts = pontos.filter((p) => p.valor != null).map((p) => ({ ...p, t: eixo.de(p) })).sort((a, b) => a.t - b.t);
+  let escalaX = null;
+  let marcaCursor = null;
+  let posCursor = null;
 
   function desenhar() {
     const L = Math.round(area.clientWidth), A = Math.round(area.clientHeight);
     if (!L || !A || !pts.length) { area.replaceChildren(); return; }
     const m = { e: 52, d: 72, t: 16, b: 36 };
     let [t0, t1] = [pts[0].t, pts[pts.length - 1].t];
-    if (t1 - t0 < 864e5) { t0 -= 864e5 * 15; t1 += 864e5 * 15; } // uma data só: abre meio mês para cada lado
+    if (t1 - t0 < (eixo.folga || 1) / 15) { t0 -= eixo.folga || 1; t1 += eixo.folga || 1; }
     const vs = pts.map((p) => p.valor);
     const marcas = marcasY(Math.min(...vs), Math.max(...vs));
     const [lo, hi] = [marcas[0], marcas[marcas.length - 1]];
     const x = (t) => m.e + ((t - t0) / (t1 - t0)) * (L - m.e - m.d);
     const y = (v) => m.t + (1 - (v - lo) / (hi - lo || 1)) * (A - m.t - m.b);
+    escalaX = { x, inverso: (px) => t0 + ((px - m.e) / (L - m.e - m.d)) * (t1 - t0) };
 
     const svg = s("svg", { width: L, height: A, viewBox: `0 0 ${L} ${A}`, role: "img", "aria-label": titulo });
     for (const v of marcas) {
       svg.append(s("line", { x1: m.e, x2: L - m.d, y1: y(v), y2: y(v), class: "grade" }),
         s("text", { x: m.e - 8, y: y(v), class: "eixo", "text-anchor": "end", "dominant-baseline": "middle" }, fmt(v, 0)));
     }
-    // datas: as das inspeções quando cabem; senão início, meio e fim
-    // datas: as das inspeções (uma por dia), pulando as que ficariam a menos de 96 px da anterior; a última sempre entra
-    const dias = [...new Map(pts.map((p) => [dataCurta(p.data), p.t])).values()];
-    const datas = [];
-    for (const t of dias) if (!datas.length || x(t) - x(datas[datas.length - 1]) >= 96) datas.push(t);
-    if (datas.length > 1 && x(dias[dias.length - 1]) - x(datas[datas.length - 2]) >= 96) datas[datas.length - 1] = dias[dias.length - 1];
-    datas.forEach((t, i) => svg.append(s("text", { x: x(t), y: A - 10, class: "eixo", "text-anchor": datas.length > 1 && i === 0 ? "start" : i === datas.length - 1 && datas.length > 1 ? "end" : "middle" }, dataCurta(new Date(t).toISOString()))));
+    // rótulos do eixo x: os dos pontos (um por rótulo), pulando os que ficariam a menos de 96 px do anterior;
+    // com muitos pontos (vídeo), início, meio e fim
+    const unicos = pts.length > 60 ? [t0, (t0 + t1) / 2, t1] : [...new Map(pts.map((p) => [eixo.rotulo(p.t), p.t])).values()];
+    const rotulos = [];
+    for (const t of unicos) if (!rotulos.length || x(t) - x(rotulos[rotulos.length - 1]) >= 96) rotulos.push(t);
+    if (rotulos.length > 1 && x(unicos[unicos.length - 1]) - x(rotulos[rotulos.length - 2]) >= 96) rotulos[rotulos.length - 1] = unicos[unicos.length - 1];
+    rotulos.forEach((t, i) => svg.append(s("text", { x: x(t), y: A - 10, class: "eixo", "text-anchor": rotulos.length > 1 && i === 0 ? "start" : i === rotulos.length - 1 && rotulos.length > 1 ? "end" : "middle" }, eixo.rotulo(t))));
 
     const f = tendencia ? reta(pts) : null;
     if (f) svg.append(s("line", { x1: x(pts[0].t), y1: y(f(pts[0].t)), x2: x(pts[pts.length - 1].t), y2: y(f(pts[pts.length - 1].t)), class: "reta-tendencia" }));
     if (pts.length > 1) svg.append(s("path", { d: pts.map((p, i) => `${i ? "L" : "M"}${x(p.t).toFixed(1)} ${y(p.valor).toFixed(1)}`).join(" "), class: "linha-serie" }));
+    if (aoClicar) {
+      const fundo = s("rect", { x: m.e, y: m.t, width: L - m.e - m.d, height: A - m.t - m.b, class: "fundo-clicavel" });
+      fundo.addEventListener("click", (ev) => aoClicar(escalaX.inverso(ev.clientX - svg.getBoundingClientRect().left)));
+      svg.append(fundo);
+    }
     const cruz = s("line", { y1: m.t, y2: A - m.b, class: "cruz", visibility: "hidden" });
-    svg.append(cruz);
+    marcaCursor = s("line", { y1: m.t, y2: A - m.b, class: "cursor-grafico", visibility: "hidden" });
+    svg.append(cruz, marcaCursor);
 
-    for (const p of pts) {
-      const texto = T.grafico.ponto(dataCurta(p.data), fmt(p.valor, 1, unidade), T.niveis[p.severidade] || p.severidade);
+    for (const p of pts.filter(comPonto)) {
+      const texto = T.grafico.ponto(eixo.rotulo(p.t), fmt(p.valor, 1, unidade), T.niveis[p.severidade] || p.severidade);
       const ponto = s("circle", { cx: x(p.t), cy: y(p.valor), r: 5, class: "ponto-serie", style: `--sev: var(--${p.severidade || "sem_medida"})` });
       const alvo = s("circle", { cx: x(p.t), cy: y(p.valor), r: 22, class: "alvo-ponto" }); // 44 px de alvo
-      const g = href ? s("a", { href: href(p), "aria-label": texto }, alvo, ponto) : s("g", {}, alvo, ponto);
+      const g = href ? s("a", { href: href(p), "aria-label": texto }, alvo, ponto)
+        : aoEscolher ? s("g", { tabindex: "0", role: "button", "aria-label": texto, class: "ponto-escolher" }, alvo, ponto) : s("g", {}, alvo, ponto);
+      if (aoEscolher && !href) {
+        g.addEventListener("click", () => aoEscolher(p));
+        g.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); aoEscolher(p); } });
+      }
       const mostrar = () => {
         cruz.setAttribute("x1", x(p.t)); cruz.setAttribute("x2", x(p.t)); cruz.setAttribute("visibility", "visible");
-        dica.replaceChildren(el("b", {}, fmt(p.valor, 1, unidade)), el("span", {}, dataCurta(p.data)), el("span", {}, [T.niveis[p.severidade], p.rotulo].filter(Boolean).join(", ")));
+        dica.replaceChildren(el("b", {}, fmt(p.valor, 1, unidade)), el("span", {}, eixo.rotulo(p.t)), el("span", {}, [T.niveis[p.severidade], p.rotulo].filter(Boolean).join(", ")));
         dica.hidden = false;
         const esq = x(p.t) + 12 + dica.offsetWidth > L ? x(p.t) - 12 - dica.offsetWidth : x(p.t) + 12;
         dica.style.transform = `translate(${Math.round(esq)}px, ${Math.round(Math.max(0, y(p.valor) - dica.offsetHeight / 2))}px)`;
@@ -100,11 +120,21 @@ export function graficoSerie({ titulo, pontos, unidade = " °C", tendencia = fal
     const u = pts[pts.length - 1];
     svg.append(s("text", { x: x(u.t) + 12, y: y(u.valor), class: "rotulo-fim", "dominant-baseline": "middle" }, fmt(u.valor, 1, unidade)));
     area.replaceChildren(svg);
+    if (posCursor != null) cursor(posCursor);
+  }
+
+  /** Linha vertical no instante x (o quadro na tela do vídeo); null esconde. */
+  function cursor(t) {
+    posCursor = t;
+    if (!marcaCursor || !escalaX) return;
+    if (t == null) { marcaCursor.setAttribute("visibility", "hidden"); return; }
+    const px = escalaX.x(t);
+    marcaCursor.setAttribute("x1", px); marcaCursor.setAttribute("x2", px); marcaCursor.setAttribute("visibility", "visible");
   }
 
   const observador = new ResizeObserver(() => desenhar());
   observador.observe(area);
-  return { no, encerrar: () => observador.disconnect() };
+  return { no, cursor, encerrar: () => observador.disconnect() };
 }
 
 /** Tendência da máxima em °C por mês, com seta; sem pontos suficientes, diz por quê no title. */

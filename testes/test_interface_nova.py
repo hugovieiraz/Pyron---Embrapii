@@ -129,3 +129,15 @@ def test_equipamentos_e_pendencias_tem_tela_propria_e_formulario_compartilhado()
     assert "/acompanhamento" not in (PASTA / "js" / "analise" / "painel.js").read_text(encoding="utf-8")
     for tela in ("inspecoes", "equipamentos", "pendencias"):
         assert "campoBusca(" in (PASTA / "js" / "telas" / f"{tela}.js").read_text(encoding="utf-8"), tela
+
+
+def test_captura_tem_as_quatro_abas_e_so_fontes_que_funcionam():
+    """Etapa 5c: Captura com as abas Pasta monitorada, Vídeo, Celular e Alertas (um módulo cada); as fontes e o
+    envio que ainda não existem (RTSP, SDK da FLIR, WhatsApp automático) não aparecem na tela."""
+    casca = (PASTA / "js" / "telas" / "captura.js").read_text(encoding="utf-8")
+    assert 'const ABAS = ["pasta", "video", "celular", "alertas"]' in casca
+    for aba in ("pasta", "video", "celular", "alertas"):
+        assert (PASTA / "js" / "captura" / f"{aba}.js").exists(), aba
+    codigo = [l for l in (PASTA / "js" / "captura" / "pasta.js").read_text(encoding="utf-8").splitlines() if not l.strip().startswith("//")]
+    assert not any(p in l.lower() for l in codigo for p in ("rtsp", "flir_sdk", "automatico"))
+    assert 'from "../grafico.js"' in (PASTA / "js" / "captura" / "video.js").read_text(encoding="utf-8")

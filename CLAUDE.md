@@ -35,7 +35,10 @@ núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Te
   Regras de leitura da lista (situação atual, severidade) em `js/situacao.js`; laudo só por `js/laudo.js`;
   importação só por `js/importar.js`; busca das listas por `campoBusca()`; acompanhamento de pendência só
   por `js/pendencia.js`; gráfico no tempo por `js/grafico.js` (uma série, pontos na cor da severidade).
-  Lista com painel ao lado (Pendências): `tabela({ aoEscolher })`; lista agrupada: `tabela({ grupo })`. Estado vazio sem dados: pré-visualização `pyron-vazio` (porta 8791,
+  Lista com painel ao lado (Pendências): `tabela({ aoEscolher })`; lista agrupada: `tabela({ grupo })`.
+- **Tela com abas** (Captura, `docs/interface/5c-captura.md`): casca em `js/telas/captura.js` e um módulo por aba
+  em `js/captura/` com `montar(no, ctx)` devolvendo a limpeza; trocar de aba não recarrega (endereço por
+  `history.replaceState`). Só aparece fonte que funciona. Teste com o vídeo `dados/video_demo.mp4` em `pyron-vazio`. Estado vazio sem dados: pré-visualização `pyron-vazio` (porta 8791,
   `saida/dados_vazio`, apagar pela Lixeira depois).
 - Conferir: `testes/test_interface_nova.py` (regra dura do CSS, foco, módulos) e o catálogo
   `/nova/catalogo.html` com "Conferir acessibilidade" (claro, `?tema=escuro`, `?toque`).
@@ -110,7 +113,7 @@ núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Te
   apresentação o modo celular é **só identificação** (sem leitura da barra de cores).
 
 **Comandos** (na raiz, sempre com o Python do `.venv`):
-- Testes: `.venv/Scripts/python.exe -m pytest -q` (pastas `testes` e `tests`, ≈250 testes, ~40 s).
+- Testes: `.venv/Scripts/python.exe -m pytest -q` (pastas `testes` e `tests`, ≈255 testes, ~40 s).
 - Pyron para testar sem dados reais: pré-visualização `pyron-demo` (`.claude/launch.json`, porta 8790,
   dados em `saida/dados_demo`). Apresentação: pré-visualização `apresentacao` (porta 8792).
 - Abrir de verdade: atalhos "Abrir Pyron" e "Pyron Apresentação" da área de trabalho (`pythonw.exe -m apresentacao`).

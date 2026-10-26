@@ -40,6 +40,8 @@ const ICONES = {
   calendario: '<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/>',
   pasta: '<path d="M3.5 7a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>',
   video: '<rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10.5 5-3v9l-5-3z"/>',
+  tocar: '<path d="M7.5 5.2v13.6a.6.6 0 0 0 .9.5l10.7-6.8a.6.6 0 0 0 0-1L8.4 4.7a.6.6 0 0 0-.9.5z"/>',
+  pausar: '<rect x="6.5" y="5" width="3.5" height="14" rx="1"/><rect x="14" y="5" width="3.5" height="14" rx="1"/>',
   celular: '<rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18.5h3"/>',
   grafico: '<path d="M3.5 20.5h17"/><rect x="5" y="11" width="3.5" height="7" rx="1"/><rect x="10.25" y="5.5" width="3.5" height="12.5" rx="1"/><rect x="15.5" y="8.5" width="3.5" height="9.5" rx="1"/>',
   sobe: '<path d="M4 17.5 10 11.5l3.5 3.5L20 8.5"/><path d="M14.5 8.5H20V14"/>',

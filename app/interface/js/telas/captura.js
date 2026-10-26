@@ -1,52 +1,67 @@
-// Captura (Etapa 3b: só o estado sem fonte de imagens, com dados reais). A tela completa, com pasta
-// monitorada, vídeo, celular e alertas, entra na Etapa 5c; enquanto isso a configuração abre na interface atual.
+// Captura (Etapa 5c): as fontes de imagem que chegam sozinhas e o resultado delas. Abas Pasta monitorada,
+// Vídeo, Celular e Alertas (decisão da Etapa 1); cada aba é um módulo em js/captura/ com montar(area, ctx)
+// que devolve a limpeza. Trocar de aba não recarrega a tela; o endereço acompanha (#captura/video).
 import { TEXTOS as T } from "../../textos.js";
 import { el, api } from "../base.js";
-import { barraFerramentas, estadoVazio, painelDetalhe, secao } from "../componentes.js";
+import { abas, esqueleto, estadoErro, estadoSemConexao } from "../componentes.js";
+import { endereco } from "../rotas.js";
 
 const K = T.captura;
-const NA_ATUAL = { pasta: "/#monitoramento", celular: "/#celular", alertas: "/#monitoramento" };
+const ABAS = ["pasta", "video", "celular", "alertas"];
 
 export async function montar(pagina, rota) {
-  const [status, celular, alertas] = await Promise.all([api("/api/status"), api("/api/celular").catch(() => ({ ligado: false })), api("/api/alertas").catch(() => ({ pendentes: 0 }))]);
-  const m = status.monitoramento || {};
-  const pasta = (m.pasta || "").trim();
-  const temFonte = Boolean(pasta || m.ativo || celular.ligado);
-  const pendentes = alertas.pendentes || 0;
+  const status = await api("/api/status");
+  let ativa = ABAS.includes(rota.partes[0]) ? rota.partes[0] : "pasta";
+  let limpar = null;
+  let geracao = 0;
 
-  pagina.classList.add("cheia");
-  const barra = barraFerramentas({
-    rotulo: K.ferramentas,
-    grupos: [
-      [
-        { texto: K.pasta, icone: "pasta", href: NA_ATUAL.pasta },
-        { texto: K.celular, icone: "celular", href: NA_ATUAL.celular },
-      ],
-      [{ texto: K.verificar, icone: "refazer", indisponivel: m.ativo ? null : K.semFonte, onclick: () => api("/api/monitoramento/verificar", { method: "POST" }) }],
-    ],
-  });
+  const meta = el("div", { class: "meta" });
+  const lista = abas({ rotulo: K.abas, ativa, itens: ABAS.map((id) => ({ id, texto: K.aba[id], qtd: id === "alertas" && status.alertas_pendentes ? status.alertas_pendentes : null })),
+    aoMudar: (id) => mostrar(id, []) });
+  const area = el("div", { class: "area-captura", role: "tabpanel", id: `painel-${ativa}`, "aria-labelledby": `aba-${ativa}`, tabindex: "-1" });
+  pagina.classList.add("tela-captura");
+  pagina.append(el("header", { class: "cabecalho" }, el("div", { class: "titulo" }, el("h1", {}, T.telas.captura), meta)), lista, area);
 
-  const centro = el("div", { class: "centro" }, temFonte
-    ? estadoVazio({ icone: "captura", titulo: K.ligadaTitulo, texto: K.ligadaTexto, acoes: [el("a", { class: "btn", href: NA_ATUAL.pasta }, T.provisoria.abrirAtual)] })
-    : estadoVazio({ ilustracao: "captura", titulo: K.vazioTitulo, texto: K.vazioTexto, acoes: [el("a", { class: "btn primario", href: NA_ATUAL.pasta }, K.definirPasta)] }));
+  // linha de estado no cabeçalho: o que está ligado agora (pasta vigiada, celular)
+  function desenharMeta(s) {
+    const m = s.monitoramento || {};
+    meta.replaceChildren(el("span", { class: `estado-fonte${m.ativo && !m.erro ? " ligada" : m.erro && m.ativo ? " erro" : ""}` },
+      m.ativo ? (m.erro ? K.metaErro : K.metaVigiando) : K.metaDesligado));
+  }
+  desenharMeta(status);
 
-  const painel = painelDetalhe({
-    rotulo: K.painel,
-    ativa: rota.partes[0] === "alertas" ? "alertas" : "fonte",
-    itens: [
-      {
-        id: "fonte", icone: "info", texto: K.fonte,
-        montar: () => [
-          secao({ titulo: K.pasta, conteudo: [el("p", { class: pasta ? "mono" : null }, pasta || K.pastaNaoDefinida), el("div", { class: "grupo-btn" }, el("a", { class: "btn compacto", href: NA_ATUAL.pasta }, pasta ? K.alterar : K.definir))] }),
-          secao({ titulo: K.celular, conteudo: [el("p", {}, celular.ligado ? K.celularLigado : K.celularDesligado), el("div", { class: "grupo-btn" }, el("a", { class: "btn compacto", href: NA_ATUAL.celular }, celular.ligado ? K.abrir : K.ligar))] }),
-        ],
-      },
-      {
-        id: "alertas", icone: "sino", texto: K.alertas, qtd: pendentes,
-        montar: () => [secao({ titulo: K.pendentes, qtd: pendentes, conteudo: [el("p", {}, pendentes ? K.alertasPendentes(pendentes) : K.nenhumAlerta), pendentes ? el("div", { class: "grupo-btn" }, el("a", { class: "btn compacto", href: NA_ATUAL.alertas }, T.provisoria.abrirAtual)) : null] })],
-      },
-    ],
-  });
+  async function mostrar(id, partes) {
+    const minha = ++geracao;
+    limpar?.();
+    limpar = null;
+    ativa = id;
+    lista.escolher(id);
+    area.id = `painel-${id}`;
+    area.setAttribute("aria-labelledby", `aba-${id}`);
+    if (!partes.length) history.replaceState(null, "", endereco("captura", id === "pasta" ? [] : [id]));
+    area.replaceChildren(esqueleto.linhas(4));
+    try {
+      const modulo = await import(`../captura/${id}.js`);
+      const no = el("div", { class: "conteudo-aba entra" });
+      const r = await modulo.montar(no, { partes, aoMudarEstado: desenharMeta, contarAlertas: (n) => contar(n) });
+      if (minha !== geracao) { if (typeof r === "function") r(); return; }
+      limpar = typeof r === "function" ? r : null;
+      area.replaceChildren(no);
+    } catch (erro) {
+      if (minha !== geracao) return;
+      const semServidor = erro.message === T.geral.semResposta || /dynamically imported module|Failed to fetch/i.test(erro.message);
+      area.replaceChildren(semServidor ? estadoSemConexao({ tentar: () => mostrar(id, partes) }) : estadoErro({ titulo: K.aba[id], erro, tentar: () => mostrar(id, partes) }));
+    }
+  }
 
-  pagina.append(el("div", { class: "tela-trabalho" }, barra, el("div", { class: "area-trabalho" }, centro, painel)));
+  /** Contador da aba Alertas (pendentes) e o do sino, na casca. */
+  function contar(n) {
+    const aba = lista.querySelector("#aba-alertas");
+    aba.querySelector(".qtd")?.remove();
+    if (n) aba.append(el("span", { class: "qtd" }, String(n)));
+    document.dispatchEvent(new CustomEvent("pyron:alertas"));
+  }
+
+  await mostrar(ativa, rota.partes.slice(1));
+  return () => { geracao++; limpar?.(); };
 }
