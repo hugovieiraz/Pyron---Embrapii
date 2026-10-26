@@ -9,7 +9,10 @@ Pista (onde está o objeto), em pixels da imagem já na orientação do EXIF:
 - ``{"pontos": ((x1, y1), (x2, y2))}``: distância entre dois pontos.
 
 Referência (opcional): uma pista do mesmo jeito mais ``tamanho_cm``, ``medida`` (``comprimento``, padrão,
-``largura`` ou ``altura``) e ``nome``. Ela corrige a escala da cena inteira.
+``largura``, ``altura`` ou ``lado``, a média dos dois lados de um quadrado) e ``nome``. Ela corrige a escala da cena
+inteira. ``{"auto": "postit_rosa"}`` acha a referência sozinho pela cor (``referencia_auto.py``); com ela (ou com
+``cantos`` clicados) a medida também sai pelo plano da referência, sem profundidade (``no_plano_da_referencia``),
+que vale para objeto no mesmo plano dela.
 """
 
 from __future__ import annotations
@@ -53,6 +56,7 @@ class Medida:
     nota_contorno: float | None = None
     contorno: list = field(default_factory=list)  # polígonos [[x, y], ...] em pixels
     contorno_referencia: list = field(default_factory=list)
+    no_plano_da_referencia: dict = field(default_factory=dict)  # comprimento e largura pela homografia
     tempos_ms: dict = field(default_factory=dict)
     modelos: dict = field(default_factory=dict)
 
@@ -195,6 +199,29 @@ class Medidor:
 
     def _medir_pista(self, img, geo, pista, chave, tempos, rotulo=""):
         """Medidas em metros (``Extensao``) de uma pista, mais máscara e nota do contorno."""
+        if "auto" in pista or "cantos" in pista:
+            t0 = time.perf_counter()
+            if "auto" in pista:
+                from nucleo.medicao import referencia_auto
+
+                cor = referencia_auto.REFERENCIAS_AUTO[pista["auto"]]["cor"]
+                achado = referencia_auto.achar(img, cor)
+                if achado is None:
+                    raise ValueError(f"não achei a referência ({pista['auto']}) na foto")
+                cantos, m = achado.cantos, achado.mascara
+            else:
+                from nucleo.medicao.plano_ref import ordenar_cantos
+
+                cantos = ordenar_cantos(pista["cantos"])
+                import cv2
+
+                m = np.zeros((img.height, img.width), np.uint8)
+                cv2.fillConvexPoly(m, np.round(cantos).astype(np.int32), 1)
+                m = m.astype(bool)
+            tempos[f"contorno{rotulo}"] = round((time.perf_counter() - t0) * 1000, 1)
+            r = medir_geometria(geo.pontos, m & geo.validos)
+            r["cantos"] = cantos
+            return r, m, None
         if "pontos" in pista:
             p1, p2 = pista["pontos"]
             return {"forma": "distância", "vertical": "", "medidas": {"distancia": g.distancia(geo.pontos, p1, p2)}}, None, None
@@ -222,8 +249,24 @@ class Medidor:
         mascara_ref = None
         if referencia:
             rr, mascara_ref, _ = self._medir_pista(img, geo, referencia, chave, tempos, rotulo="_referencia")
-            qual = "distancia" if "pontos" in referencia else referencia.get("medida", "comprimento")
-            ext_ref = rr["medidas"].get(qual)
+            if "auto" in referencia:
+                from nucleo.medicao.referencia_auto import REFERENCIAS_AUTO
+
+                pronta = REFERENCIAS_AUTO[referencia["auto"]]
+                referencia = {**referencia, "tamanho_cm": referencia.get("tamanho_cm") or pronta["lado_cm"],
+                              "nome": referencia.get("nome") or pronta["nome"]}
+            padrao = "lado" if ("auto" in referencia or "cantos" in referencia) else "comprimento"
+            qual = "distancia" if "pontos" in referencia else referencia.get("medida", padrao)
+            if qual == "lado":
+                # quadrado (post-it): a média dos dois lados no plano; retângulo (A4 por cantos): cada lado com o seu
+                a, b = rr["medidas"]["comprimento"], rr["medidas"]["largura"]
+                t = float(referencia["tamanho_cm"])
+                maior, menor = sorted((t, float(referencia.get("outro_lado_cm") or t)), reverse=True)
+                razao = (a.valor / maior + b.valor / menor) / 2  # metros estimados por cm real
+                ext_ref = g.Extensao(valor=razao * t, eixo=a.eixo, passo=(a.passo + b.passo) / 2,
+                                     dispersao=(a.dispersao + b.dispersao) / 2)
+            else:
+                ext_ref = rr["medidas"].get(qual)
             if ext_ref is None:
                 raise ValueError(f"a referência não tem {qual} (forma {rr['forma']})")
             real_m = float(referencia["tamanho_cm"]) / 100.0
@@ -232,6 +275,19 @@ class Medidor:
             erro_escala = ext_ref.incerteza() / ext_ref.valor
             tamanho = f"{referencia['tamanho_cm']:g}".replace(".", ",")
             metodo = f"referência: {referencia.get('nome') or 'informada'} ({tamanho} cm)"
+
+        no_plano = {}
+        if referencia and mascara is not None and "cantos" in rr:
+            from nucleo.medicao import plano_ref
+
+            lado = float(referencia["tamanho_cm"])
+            outro = float(referencia.get("outro_lado_cm") or lado)  # post-it: quadrado
+            try:
+                t0 = time.perf_counter()
+                no_plano = plano_ref.medir_mascara(rr["cantos"], (lado, outro), mascara)
+                tempos["plano_referencia"] = round((time.perf_counter() - t0) * 1000, 1)
+            except ValueError:
+                no_plano = {}
 
         saida = Medida(
             metodo=metodo,
@@ -243,6 +299,7 @@ class Medidor:
             nota_contorno=None if nota is None else round(nota, 3),
             contorno=[] if mascara is None else contorno(mascara),
             contorno_referencia=[] if mascara_ref is None else contorno(mascara_ref),
+            no_plano_da_referencia=no_plano,
             modelos={"profundidade": geo.modelo, "contorno": getattr(self._segmentador, "nome", "")},
         )
         for nome, ext in r["medidas"].items():

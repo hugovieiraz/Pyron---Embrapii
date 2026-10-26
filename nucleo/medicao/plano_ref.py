@@ -5,7 +5,7 @@ plano vira uma distância real, mesmo com a foto inclinada (perspectiva). Só va
 retângulo (a parede da porta, o tampo da mesa); fora dele, a medida sai errada.
 
 A incerteza vem de Monte Carlo: cada canto e cada ponta com erro de clique de 1 pixel (desvio padrão), e a
-margem é o dobro do desvio das distâncias sorteadas.
+margem é a metade da faixa de 95 % das distâncias sorteadas.
 """
 
 from __future__ import annotations
@@ -16,6 +16,13 @@ import numpy as np
 
 ERRO_CLIQUE_PX = 1.0
 SORTEIOS = 400
+
+
+def _meia_faixa(amostras: np.ndarray) -> float:
+    """Metade da faixa de 95 % dos sorteios: com referência pequena, um sorteio pode jogar o horizonte para dentro
+    do objeto e o desvio padrão explode; o percentil não."""
+    lo, hi = np.percentile(amostras, [2.5, 97.5])
+    return float(hi - lo) / 2.0
 
 
 def ordenar_cantos(cantos) -> np.ndarray:
@@ -98,7 +105,7 @@ def medir(cantos, tamanho_cm, pontos, erro_px: float = ERRO_CLIQUE_PX, semente: 
         hc = homografia(c + rng.normal(0, erro_px, c.shape), real)
         aa, bb = aplicar(hc, p + rng.normal(0, erro_px, p.shape))
         amostras[i] = np.linalg.norm(bb - aa)
-    incerteza = 2.0 * float(np.std(amostras))
+    incerteza = _meia_faixa(amostras)
 
     # pontos fora do retângulo: distância ao centro dele em múltiplos do lado maior (extrapolação)
     centro = real.mean(axis=0)
@@ -109,4 +116,44 @@ def medir(cantos, tamanho_cm, pontos, erro_px: float = ERRO_CLIQUE_PX, semente: 
         "extrapolacao": round(longe, 2),
         "pontos_no_plano_cm": [[round(float(v), 2) for v in a], [round(float(v), 2) for v in b]],
         "metodo": "plano da referência (sem modelo)",
+    }
+
+
+def medir_mascara(cantos, tamanho_cm, mascara: np.ndarray, erro_px: float = ERRO_CLIQUE_PX, semente: int = 0) -> dict:
+    """Comprimento e largura (cm) de um objeto (máscara) que está no plano do retângulo de referência: o contorno
+    passa pela homografia e o menor retângulo que o envolve dá os lados. Margem: os cantos da referência com erro
+    de ``erro_px`` (Monte Carlo) mais 1 pixel de cada lado do contorno, na escala local do objeto."""
+    import cv2
+
+    lado1, lado2 = sorted((float(tamanho_cm[0]), float(tamanho_cm[1])), reverse=True)
+    c = ordenar_cantos(cantos)
+    real = _retangulo(c, lado1, lado2)
+    cs, _ = cv2.findContours(mascara.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    if not cs:
+        raise ValueError("máscara vazia")
+    borda = max(cs, key=cv2.contourArea).reshape(-1, 2).astype(float)
+    borda = borda[:: max(1, len(borda) // 2000)]
+
+    def lados(h):
+        pts = aplicar(h, borda).astype(np.float32)
+        (_, _), (a, b), _ = cv2.minAreaRect(pts)
+        return max(a, b), min(a, b)
+
+    h = homografia(c, real)
+    comprimento, largura = lados(h)
+    rng = np.random.default_rng(semente)
+    amostras = np.array([lados(homografia(c + rng.normal(0, erro_px, c.shape), real)) for _ in range(SORTEIOS // 2)])
+    # 1 pixel de cada lado do contorno, convertido em cm no centro do objeto
+    centro = borda.mean(axis=0)
+    a, b = aplicar(h, np.array([centro, centro + [1.0, 0.0]]))
+    cm_por_px = float(np.linalg.norm(b - a))
+    extra = 2 * erro_px * cm_por_px
+    return {
+        "comprimento_cm": round(float(comprimento), 2),
+        "largura_cm": round(float(largura), 2),
+        "incerteza_cm": {
+            "comprimento": round(_meia_faixa(amostras[:, 0]) + extra, 2),
+            "largura": round(_meia_faixa(amostras[:, 1]) + extra, 2),
+        },
+        "metodo": "plano da referência (sem profundidade)",
     }

@@ -43,7 +43,8 @@ núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Te
 - **Medir foto** (Captura › Medir foto, `js/captura/medir.js`; roteiro em `docs/07_roteiro_medicao_geral.md`): medida
   de objeto qualquer em foto comum. Núcleo em `nucleo/medicao/` (`medir()` no `__init__`; `geometria.py` só NumPy;
   `profundidade.py` MoGe-2; `segmentar.py` SAM 2.1 pelo `transformers`; `plano_ref.py` sem modelo, por homografia;
-  `modelos.py` pesos em `modelos/medicao/`). API `/api/medicao`, `/api/medicao/estado` e `/api/medicao/plano`.
+  `referencia_auto.py` acha o post-it rosa de 7,6 cm pela cor;
+  `modelos.py` pesos em `modelos/medicao/`). API `/api/medicao`, `/api/medicao/estado`, `/api/medicao/plano` e `/api/medicao/referencia`.
   Licenças: só MIT e Apache 2.0 (nada CC BY-NC, AGPL, GPL; Depth Pro fora). Sem os pesos, a aba abre no modo
   "Retângulo de referência".
 - Conferir: `testes/test_interface_nova.py` (regra dura do CSS, foco, módulos), axe (WCAG 2.2 AA, Etapa 6) e o catálogo
@@ -125,7 +126,8 @@ núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Te
   dados em `saida/dados_demo`). Apresentação: pré-visualização `apresentacao` (porta 8792).
 - Medição em foto: instalar `.venv/Scripts/pip install --no-deps git+https://github.com/microsoft/MoGe.git` (mais o
   extra `[medicao]` do `pyproject.toml`), pesos `python -m nucleo.medicao.modelos --baixar vitl small`, avaliação no
-  gabarito `python -m ml.avaliar_medicao` (fotos e medidas reais em `testes/gabarito/`).
+  gabarito `python -m ml.avaliar_medicao` (fotos e medidas reais em `testes/gabarito/`); fotos por pasta (uma
+  subpasta por objeto e `medidas.csv`): `python -m ml.avaliar_medicao --pasta <pasta> --modelos vitl`.
 - Abrir de verdade: atalhos "Abrir Pyron" e "Pyron Apresentação" da área de trabalho (`pythonw.exe -m apresentacao`).
 - Pacote portátil da apresentação (para outro computador): `.venv/Scripts/python.exe -m apresentacao.empacotar`
   (gera pasta + .zip na Área de Trabalho; apagar os anteriores antes). Nota técnica para o leitor:

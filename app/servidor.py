@@ -1960,7 +1960,20 @@ def _validar_pista_medicao(p: dict | None, nome: str, exige_tamanho: bool = Fals
         return [float(x) for x in v]
 
     saida: dict = {}
-    if "pontos" in p:
+    if exige_tamanho and "auto" in p:  # referência achada sozinha pela cor (post-it); tamanho padrão do tipo
+        from nucleo.medicao.referencia_auto import REFERENCIAS_AUTO
+
+        if p["auto"] not in REFERENCIAS_AUTO:
+            raise HTTPException(422, f"Referência automática desconhecida: {p['auto']}.")
+        saida["auto"] = p["auto"]
+        p = {"tamanho_cm": REFERENCIAS_AUTO[p["auto"]]["lado_cm"], "medida": "lado", **p}
+    elif exige_tamanho and "cantos" in p:
+        cantos = p["cantos"]
+        if not isinstance(cantos, list) or len(cantos) != 4:
+            raise HTTPException(422, f"{nome}: são 4 cantos.")
+        saida["cantos"] = [numeros(c, 2) for c in cantos]
+        p = {"medida": "lado", **p}
+    elif "pontos" in p:
         par = p["pontos"]
         if not isinstance(par, (list, tuple)) or len(par) != 2:
             raise HTTPException(422, f"{nome}: \"pontos\" precisa de dois pontos.")
@@ -1980,10 +1993,13 @@ def _validar_pista_medicao(p: dict | None, nome: str, exige_tamanho: bool = Fals
             raise HTTPException(422, "Informe o tamanho real da referência, em cm.")
         saida["tamanho_cm"] = float(tam)
         medida = p.get("medida", "comprimento")
-        if medida not in ("comprimento", "largura", "altura"):
-            raise HTTPException(422, "A medida da referência é comprimento, largura ou altura.")
+        if medida not in ("comprimento", "largura", "altura", "lado"):
+            raise HTTPException(422, "A medida da referência é comprimento, largura, altura ou lado.")
         saida["medida"] = medida
         saida["nome"] = str(p.get("nome") or "")[:60]
+        outro = p.get("outro_lado_cm")
+        if isinstance(outro, (int, float)) and 0 < outro < 100000:
+            saida["outro_lado_cm"] = float(outro)
     return saida
 
 
@@ -1991,8 +2007,10 @@ def _validar_pista_medicao(p: dict | None, nome: str, exige_tamanho: bool = Fals
 def medicao_estado() -> dict:
     """Modelos da medição instalados e dispositivo (placa de vídeo ou processador)."""
     from nucleo.medicao import REFERENCIAS_PRONTAS, modelos as modelos_medicao
+    from nucleo.medicao.referencia_auto import REFERENCIAS_AUTO
 
-    return {**modelos_medicao.estado(), "referencias": REFERENCIAS_PRONTAS}
+    return {**modelos_medicao.estado(), "referencias": REFERENCIAS_PRONTAS,
+            "referencias_auto": {k: {"nome": v["nome"], "lado_cm": v["lado_cm"]} for k, v in REFERENCIAS_AUTO.items()}}
 
 
 @app.post("/api/medicao")
@@ -2025,6 +2043,27 @@ async def medicao(arquivo: UploadFile = File(...), pista: str = Form(...), refer
         raise HTTPException(503, f"Os modelos da medição não estão instalados ({type(e).__name__}: {e}).")
     except ValueError as e:
         raise HTTPException(422, str(e))
+
+
+@app.post("/api/medicao/referencia")
+async def medicao_referencia(arquivo: UploadFile = File(...), tipo: str = Form("postit_rosa")) -> dict:
+    """Acha sozinho, pela cor, a referência quadrada (post-it) na foto e devolve os 4 cantos. Sem modelo."""
+    from nucleo.medicao import referencia_auto
+    from nucleo.medicao.profundidade import abrir
+
+    if tipo not in referencia_auto.REFERENCIAS_AUTO:
+        raise HTTPException(422, f"Referência automática desconhecida: {tipo}.")
+    dados = await arquivo.read()
+    try:
+        img = abrir(dados)
+    except Exception:
+        raise HTTPException(422, "Não consegui abrir a foto.")
+    pronta = referencia_auto.REFERENCIAS_AUTO[tipo]
+    achado = referencia_auto.achar(img, pronta["cor"])
+    if achado is None:
+        raise HTTPException(422, f"Não achei o {pronta['nome']} na foto.")
+    return {"cantos": [[round(float(x), 2), round(float(y), 2)] for x, y in achado.cantos],
+            "lado_cm": pronta["lado_cm"], "nome": pronta["nome"], "retangularidade": achado.retangularidade}
 
 
 @app.post("/api/medicao/plano")

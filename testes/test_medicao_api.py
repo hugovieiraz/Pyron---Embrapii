@@ -143,3 +143,41 @@ def test_medir_pelo_plano_da_referencia_sem_modelo(cliente):
                   {"cantos": cantos, "tamanho_cm": [29.7, 21], "pontos": [[0, 0]]},
                   {"cantos": [[0, 0], [1, 0], [2, 0], [3, 0]], "tamanho_cm": [29.7, 21], "pontos": [[0, 0], [1, 1]]}):
         assert cli.post("/api/medicao/plano", json=corpo).status_code == 422
+
+
+def test_referencia_automatica_e_por_cantos_validadas(cliente):
+    from app import servidor
+
+    v = servidor._validar_pista_medicao({"auto": "postit_rosa"}, "a referência", exige_tamanho=True)
+    assert v == {"auto": "postit_rosa", "tamanho_cm": 7.6, "medida": "lado", "nome": ""}
+    v = servidor._validar_pista_medicao({"auto": "postit_rosa", "tamanho_cm": 7.5}, "a referência", exige_tamanho=True)
+    assert v["tamanho_cm"] == 7.5
+    v = servidor._validar_pista_medicao({"cantos": [[0, 0], [10, 0], [10, 7], [0, 7]], "tamanho_cm": 29.7, "outro_lado_cm": 21},
+                                         "a referência", exige_tamanho=True)
+    assert v["medida"] == "lado" and v["outro_lado_cm"] == 21 and len(v["cantos"]) == 4
+    cli, foto = cliente
+    assert _post(cli, foto, {"ponto": [500, 400]}, {"auto": "nao_existe"}).status_code == 422
+    assert _post(cli, foto, {"ponto": [500, 400]}, {"cantos": [[0, 0]], "tamanho_cm": 8}).status_code == 422
+    # foto sintética sem post-it rosa: 422 com o motivo
+    r = _post(cli, foto, {"ponto": _px(-0.6, 0.0, 3.0)}, {"auto": "postit_rosa"})
+    assert r.status_code == 422 and "não achei" in r.json()["erro"]
+    assert "postit_rosa" in cli.get("/api/medicao/estado").json()["referencias_auto"]
+
+
+def test_achar_referencia_na_foto(cliente):
+    import numpy as np
+    from PIL import Image
+
+    cli, foto = cliente
+    img = np.full((300, 400, 3), 120, np.uint8)
+    img[100:180, 150:230] = (236, 64, 150)  # post-it rosa de 80 × 80 px
+    buf = io.BytesIO()
+    Image.fromarray(img).save(buf, format="PNG")
+    r = cli.post("/api/medicao/referencia", files={"arquivo": ("p.png", buf.getvalue(), "image/png")}, data={"tipo": "postit_rosa"})
+    assert r.status_code == 200, r.text
+    c = np.array(r.json()["cantos"])
+    assert np.abs(c - [[149.5, 99.5], [229.5, 99.5], [229.5, 179.5], [149.5, 179.5]]).max() < 0.6
+    r = cli.post("/api/medicao/referencia", files={"arquivo": ("f.png", foto, "image/png")}, data={"tipo": "postit_rosa"})
+    assert r.status_code == 422
+    r = cli.post("/api/medicao/referencia", files={"arquivo": ("f.png", foto, "image/png")}, data={"tipo": "outro"})
+    assert r.status_code == 422

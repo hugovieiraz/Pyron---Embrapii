@@ -190,12 +190,13 @@ class SegmentadorSintetico:
         return m.copy(), 1.0
 
 
-def imagem_da_cena(cena: Cena):
-    """Imagem RGB (PIL) só para passar adiante: tons por objeto, do tamanho da cena."""
+def imagem_da_cena(cena: Cena, cores: dict | None = None):
+    """Imagem RGB (PIL) só para passar adiante: tons por objeto, do tamanho da cena. ``cores``: nome → (r, g, b)
+    para pintar um objeto (o post-it rosa da referência automática, por exemplo)."""
     from PIL import Image
 
     h, w = cena.pontos.shape[:2]
     rgb = np.full((h, w, 3), 200, dtype=np.uint8)
-    for i, m in enumerate(cena.mascaras.values()):
-        rgb[m] = (40 + 50 * i) % 256
+    for i, (nome, m) in enumerate(cena.mascaras.items()):
+        rgb[m] = (cores or {}).get(nome, (40 + 50 * i) % 256)
     return Image.fromarray(rgb)

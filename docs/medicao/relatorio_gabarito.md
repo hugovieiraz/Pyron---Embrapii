@@ -5,6 +5,8 @@ com as 6 fotos de `testes/gabarito/` (≈ 900 × 1600, comprimidas, sem EXIF) e 
 completa (`saida/medicao/relatorio.md`). "Calibrado pela câmera" = fator mediano real/estimado das outras fotos.
 Nenhuma foto tem duas referências juntas: o modo "com referência" ainda não foi medido em foto real.
 
+Depois deste relatório, o diâmetro do pote (7,7 cm) entrou no gabarito: ViT-L mediu 10,9 cm (+42 %).
+
 Conclusões (detalhe no Registro de `docs/07_roteiro_medicao_geral.md`):
 - ViT-L é o melhor: erro mediano 19 % (ViT-B 28 %, ViT-S 47 %); ponto e caixa dão o mesmo (o clique basta);
 - com o ambiente em volta (pessoa na sala, A4 na bancada, Kindle na mesa): −9 a +19 %;

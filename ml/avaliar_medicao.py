@@ -2,6 +2,7 @@
 
 Uso:
     python -m ml.avaliar_medicao                          (fotos de testes/gabarito, MoGe-2 ViT-S, B e L)
+    python -m ml.avaliar_medicao --pasta fotos_medicao --modelos vitl     (uma pasta por objeto + medidas.csv)
     python -m ml.avaliar_medicao --modelos vits --sam small
     python -m ml.avaliar_medicao --sintetico              (cenas sintéticas, sem modelo nenhum)
 
@@ -10,9 +11,17 @@ Lê ``testes/gabarito/gabarito.csv`` (uma linha por medida conhecida) e ``testes
 tamanho de cada referência que aparece na foto). Mede cada objeto pelo ponto e pela caixa e grava em
 ``saida/medicao/``: ``relatorio.json``, ``relatorio.md`` e ``contornos/`` (o contorno do SAM sobre a foto).
 
+Pasta de fotos (``--pasta``): uma subpasta por objeto (o nome da subpasta é o objeto) e ``medidas.csv`` na raiz
+com ``objeto,medida,valor_cm`` (medida: comprimento, largura, altura, espessura; ``lado`` e ``diametro`` valem como
+comprimento). A linha ``postit,lado,7.6`` dá o tamanho do post-it. O objeto é o que está no centro da foto, a não
+ser que ``pistas.json`` na raiz diga outro ponto ou caixa (chave: ``subpasta/arquivo``). O post-it rosa é achado
+sozinho pela cor; foto sem post-it entra só no modo sem referência.
+
 Modos de escala comparados:
 - **sem referência**: a escala do MoGe-2;
-- **com referência na foto**: quando o CSV aponta ``referencia_na_foto``;
+- **com referência na foto**: quando o CSV aponta ``referencia_na_foto`` ou o post-it é achado; a referência
+  corrige a escala da profundidade;
+- **plano da referência**: só a homografia dos cantos da referência, sem profundidade (vale no plano dela);
 - **calibrado pela câmera**: um fator único (mediana de real/estimado) ajustado nas *outras* fotos e
   aplicado nesta (deixa uma de fora), o passo 1 da parte E do roteiro.
 """
@@ -80,7 +89,7 @@ def _calibrar_deixando_uma_fora(linhas: list[dict], chave_est: str, chave_saida:
 
 def _erros(linhas: list[dict]) -> None:
     for l in linhas:
-        for modo in ("sem_ref", "com_ref", "calibrado"):
+        for modo in ("sem_ref", "com_ref", "calibrado", "plano"):
             est = l.get(f"estimado_{modo}")
             if est is None:
                 l[f"erro_{modo}_cm"] = l[f"erro_{modo}_rel"] = None
@@ -102,11 +111,52 @@ def _desenhar(img, medida, caminho: Path, rotulo: str) -> None:
     im.save(caminho, quality=85)
 
 
-def avaliar_fotos(pasta: Path, variantes: list[str], sam: str, pistas_modos: list[str], saida: Path) -> dict:
+SINONIMOS = {"lado": "comprimento", "diametro": "comprimento", "diâmetro": "comprimento"}
+EXTENSOES = {".jpg", ".jpeg", ".png", ".webp"}
+
+
+def ler_pasta(pasta: Path) -> tuple[list[dict], dict, dict | None]:
+    """Pasta com uma subpasta por objeto e ``medidas.csv``: devolve (linhas do gabarito, pistas, referência auto)."""
+    import unicodedata
+
+    def chave(t: str) -> str:
+        return unicodedata.normalize("NFD", t.strip().lower()).encode("ascii", "ignore").decode().replace(" ", "_")
+
+    with open(pasta / "medidas.csv", encoding="utf-8-sig") as f:
+        medidas = [{k.strip().lower(): (v or "").strip() for k, v in l.items()} for l in csv.DictReader(f)]
+    ref = None
+    reais: dict = {}
+    for m in medidas:
+        valor = float(m["valor_cm"].replace(",", "."))
+        if chave(m["objeto"]).startswith("postit"):
+            ref = {"auto": "postit_rosa", "tamanho_cm": valor}
+            continue
+        reais.setdefault(chave(m["objeto"]), []).append((SINONIMOS.get(chave(m["medida"]), chave(m["medida"])), valor))
+    pistas_arquivo = pasta / "pistas.json"
+    pistas_extra = json.loads(pistas_arquivo.read_text(encoding="utf-8")) if pistas_arquivo.exists() else {}
+    linhas, pistas = [], {}
+    for sub in sorted(p for p in pasta.iterdir() if p.is_dir()):
+        objeto = chave(sub.name)
+        if objeto.startswith("postit") or objeto not in reais:
+            if objeto not in reais and not objeto.startswith("postit"):
+                print(f"aviso: {sub.name} sem medida no medidas.csv; fica de fora")
+            continue
+        for foto in sorted(f for f in sub.iterdir() if f.suffix.lower() in EXTENSOES):
+            rel = f"{sub.name}/{foto.name}"
+            pistas[rel] = pistas_extra.get(rel) or {"centro": True}
+            for medida, valor in reais[objeto]:
+                linhas.append({"arquivo": rel, "objeto": objeto, "medida": medida, "valor_cm": valor,
+                               "referencia_na_foto": "auto" if ref else "", "observacao": ""})
+    return linhas, pistas, ref
+
+
+def avaliar_fotos(pasta: Path, variantes: list[str], sam: str, pistas_modos: list[str], saida: Path,
+                  linhas_gab: list[dict] | None = None, pistas: dict | None = None, ref_auto: dict | None = None) -> dict:
     from nucleo.medicao.profundidade import Profundidade, abrir
     from nucleo.medicao.segmentar import Segmentador
 
-    linhas_gab, pistas = ler_gabarito(pasta)
+    if linhas_gab is None:
+        linhas_gab, pistas = ler_gabarito(pasta)
     seg = Segmentador(sam)
     resultado_linhas: list[dict] = []
     tempos: dict = {}
@@ -119,18 +169,29 @@ def avaliar_fotos(pasta: Path, variantes: list[str], sam: str, pistas_modos: lis
         for arquivo in dict.fromkeys(l["arquivo"] for l in linhas_gab):
             img = abrir(pasta / arquivo)
             p = pistas[arquivo]
-            for modo in pistas_modos:
-                pista = {modo: p[modo]}
+            modos = ["ponto"] if p.get("centro") else [m for m in pistas_modos if m in p]
+            for modo in modos:
+                pista = {"ponto": (img.width / 2, img.height / 2)} if p.get("centro") else {modo: p[modo]}
                 ref = None
                 linhas_foto = [l for l in linhas_gab if l["arquivo"] == arquivo]
                 nome_ref = next((l["referencia_na_foto"] for l in linhas_foto if l["referencia_na_foto"]), "")
-                if nome_ref:
+                if nome_ref == "auto":
+                    ref = dict(ref_auto)
+                elif nome_ref:
                     ref = dict(p["referencias"][nome_ref])
-                m_sem = med.medir(img, pista)
-                m_com = med.medir(img, pista, ref) if ref else None
-                _desenhar(
-                    img, m_sem, saida / "contornos" / f"{Path(arquivo).stem}_{v}_{modo}.jpg", f"{v} {modo} {m_sem.forma}"
-                )
+                try:
+                    m_sem = med.medir(img, pista)
+                except ValueError as e:
+                    print(f"{v} {modo:5s} {arquivo}: não mediu ({e})")
+                    continue
+                m_com = None
+                if ref:
+                    try:
+                        m_com = med.medir(img, pista, ref)
+                    except ValueError as e:  # foto sem o post-it (as de comparação): só sem referência
+                        print(f"{v} {modo:5s} {arquivo}: sem referência na foto ({e})")
+                nome_saida = arquivo.replace("/", "__").rsplit(".", 1)[0]
+                _desenhar(img, m_com or m_sem, saida / "contornos" / f"{nome_saida}_{v}_{modo}.jpg", f"{v} {modo} {m_sem.forma}")
                 print(f"{v} {modo:5s} {arquivo}: {m_sem.forma}, tempos {m_sem.tempos_ms}")
                 for l in linhas_foto:
                     chave = f"{l['medida']}_cm"
@@ -149,6 +210,8 @@ def avaliar_fotos(pasta: Path, variantes: list[str], sam: str, pistas_modos: lis
                             "estimado_sem_ref": getattr(m_sem, chave),
                             "incerteza_sem_ref": m_sem.incerteza_cm.get(l["medida"]),
                             "estimado_com_ref": getattr(m_com, chave) if m_com else None,
+                            "incerteza_com_ref": m_com.incerteza_cm.get(l["medida"]) if m_com else None,
+                            "estimado_plano": (m_com.no_plano_da_referencia.get(chave) if m_com else None),
                             "tempos_ms": m_sem.tempos_ms,
                             "observacao": l["observacao"],
                         }
@@ -207,9 +270,9 @@ def avaliar_sintetico(semente: int = 0) -> dict:
 def resumir(res: dict) -> dict:
     grupos: dict = {}
     for l in res["linhas"]:
-        g = grupos.setdefault(f"{l['modelo']} · {l['pista']}", {"sem_ref": [], "com_ref": [], "calibrado": [], "tempo": []})
-        for modo in ("sem_ref", "com_ref", "calibrado"):
-            g[modo].append(l[f"erro_{modo}_rel"])
+        g = grupos.setdefault(f"{l['modelo']} · {l['pista']}", {"sem_ref": [], "com_ref": [], "calibrado": [], "plano": [], "tempo": []})
+        for modo in ("sem_ref", "com_ref", "calibrado", "plano"):
+            g[modo].append(l.get(f"erro_{modo}_rel"))
         g["tempo"].append(l["tempos_ms"].get("total"))
     saida = {}
     for k, g in grupos.items():
@@ -218,6 +281,7 @@ def resumir(res: dict) -> dict:
             "sem referência": resumo(g["sem_ref"]),
             "com referência": resumo(g["com_ref"]),
             "calibrado pela câmera": resumo(g["calibrado"]),
+            "plano da referência": resumo(g["plano"]),
             "tempo_mediano_ms": round(float(np.median(tempos)), 1) if tempos else None,
         }
     return saida
@@ -231,7 +295,7 @@ def markdown(res: dict, resumo_: dict, titulo: str) -> str:
     out = [f"# {titulo}", ""]
     out += ["## Resumo por modelo e pista", "", "| Modelo · pista | Modo | n | Erro mediano | Viés mediano | Intervalo de 95 % | Erro máximo |", "|---|---|---|---|---|---|---|"]
     for k, r in resumo_.items():
-        for modo in ("sem referência", "com referência", "calibrado pela câmera"):
+        for modo in ("sem referência", "com referência", "calibrado pela câmera", "plano da referência"):
             s = r[modo]
             if not s.get("n"):
                 continue
@@ -241,7 +305,7 @@ def markdown(res: dict, resumo_: dict, titulo: str) -> str:
                 f"{_f(ic[0])} a {_f(ic[1])} % | {_f(s['erro_maximo_pct'])} % |"
             )
     out += ["", "Tempo mediano por medição (ms): " + ", ".join(f"{k}: {_f(r['tempo_mediano_ms'], 0)}" for k, r in resumo_.items()), ""]
-    out += ["## Por foto", "", "| Foto | Medida | Real (cm) | Modelo · pista | Forma | Sem ref. (cm) | ± | Erro | Calibrado (cm) | Erro | Com ref. (cm) | Erro |", "|---|---|---|---|---|---|---|---|---|---|---|---|"]
+    out += ["## Por foto", "", "| Foto | Medida | Real (cm) | Modelo · pista | Forma | Sem ref. (cm) | ± | Erro | Calibrado (cm) | Erro | Com ref. (cm) | Erro | Plano da ref. (cm) | Erro |", "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for l in res["linhas"]:
         def pct(x):
             return "—" if x is None else f"{x * 100:+.1f} %".replace(".", ",")
@@ -249,7 +313,8 @@ def markdown(res: dict, resumo_: dict, titulo: str) -> str:
         out.append(
             f"| {l['arquivo']} | {l['medida']} | {_f(l['valor_cm'], 2)} | {l['modelo']} · {l['pista']} | {l['forma']} | "
             f"{_f(l['estimado_sem_ref'], 2)} | {_f(l.get('incerteza_sem_ref'), 2)} | {pct(l['erro_sem_ref_rel'])} | "
-            f"{_f(l.get('estimado_calibrado'), 2)} | {pct(l['erro_calibrado_rel'])} | {_f(l['estimado_com_ref'], 2)} | {pct(l['erro_com_ref_rel'])} |"
+            f"{_f(l.get('estimado_calibrado'), 2)} | {pct(l['erro_calibrado_rel'])} | {_f(l['estimado_com_ref'], 2)} | {pct(l['erro_com_ref_rel'])} | "
+            f"{_f(l.get('estimado_plano'), 2)} | {pct(l.get('erro_plano_rel'))} |"
         )
     out += ["", "## Tempos por etapa (ms)", "", "| Foto | Modelo · pista | Etapas |", "|---|---|---|"]
     vistos = set()
@@ -267,6 +332,7 @@ def markdown(res: dict, resumo_: dict, titulo: str) -> str:
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--gabarito", type=Path, default=PASTA_GABARITO)
+    ap.add_argument("--pasta", type=Path, help="uma subpasta por objeto e medidas.csv (ver o cabeçalho)")
     ap.add_argument("--modelos", nargs="+", default=list(modelos.MOGE), choices=list(modelos.MOGE))
     ap.add_argument("--sam", default=modelos.SAM_PADRAO, choices=list(modelos.SAM))
     ap.add_argument("--pistas", nargs="+", default=["ponto", "caixa"], choices=["ponto", "caixa"])
@@ -278,6 +344,11 @@ def main(argv=None) -> int:
     if args.sintetico:
         res = avaliar_sintetico()
         titulo = "Medição em foto comum: cenas sintéticas"
+    elif args.pasta:
+        linhas, pistas, ref = ler_pasta(args.pasta)
+        print(f"{len(pistas)} fotos, {len(linhas)} medidas, referência automática: {ref}")
+        res = avaliar_fotos(args.pasta, args.modelos, args.sam, args.pistas, args.saida, linhas, pistas, ref)
+        titulo = f"Medição em foto comum: {args.pasta.name}"
     else:
         res = avaliar_fotos(args.gabarito, args.modelos, args.sam, args.pistas, args.saida)
         titulo = "Medição em foto comum: gabarito"
