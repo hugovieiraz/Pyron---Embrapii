@@ -2013,6 +2013,27 @@ def medicao_estado() -> dict:
             "referencias_auto": {k: {"nome": v["nome"], "lado_cm": v["lado_cm"]} for k, v in REFERENCIAS_AUTO.items()}}
 
 
+@app.post("/api/medicao/baixar")
+def medicao_baixar(corpo: dict = Body(...)) -> dict:
+    """Baixa do Hugging Face os pesos de um modelo da medição (``da3``, ``moge`` ou ``sam``; só os da lista,
+    todos MIT ou Apache 2.0). Leva minutos: a tela espera com o botão ocupado."""
+    from nucleo.medicao import modelos as modelos_medicao
+
+    variante = modelos_medicao.VARIANTE_DO_MODELO.get(str(corpo.get("modelo")))
+    if variante is None:
+        raise HTTPException(400, "Modelo desconhecido (use da3, moge ou sam).")
+    if not modelos_medicao.pacote("huggingface_hub"):
+        raise HTTPException(409, "Falta o pacote huggingface_hub para baixar os pesos.")
+    try:
+        modelos_medicao.baixar([variante])
+    except Exception as e:  # rede, disco, Hugging Face fora do ar
+        raise HTTPException(502, f"Não consegui baixar os pesos: {e}") from e
+    import nucleo.medicao
+
+    nucleo.medicao.esquecer()
+    return medicao_estado()
+
+
 @app.post("/api/medicao")
 async def medicao(arquivo: UploadFile = File(...), pista: str = Form(...), referencia: str | None = Form(None)) -> dict:
     """Mede um objeto numa foto comum: pista (ponto, caixa ou dois pontos) e referência opcional

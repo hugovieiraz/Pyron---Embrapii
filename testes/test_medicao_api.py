@@ -129,6 +129,23 @@ def test_estado(cliente, tmp_path, monkeypatch):
     assert set(e["profundidade"]) == {"vits", "vitb", "vitl", "da3"}
     assert set(e["contorno"]) == {"small", "base-plus"}
     assert e["referencias"]["folha_a4"]["comprimento"] == 29.7
+    assert [c["id"] for c in e["catalogo"]] == ["da3", "moge", "sam"]
+    assert not any(c["pesos"] for c in e["catalogo"])
+
+
+def test_baixar_pesos(cliente, tmp_path, monkeypatch):
+    from nucleo.medicao import modelos
+
+    cli, _ = cliente
+    monkeypatch.setenv("PYRON_MODELOS_MEDICAO", str(tmp_path / "pesos"))
+    assert cli.post("/api/medicao/baixar", json={"modelo": "outro"}).status_code == 400
+    pedidos = []
+    monkeypatch.setattr(modelos, "pacote", lambda nome: True)
+    monkeypatch.setattr(modelos, "baixar", lambda variantes: pedidos.extend(variantes) or [])
+    r = cli.post("/api/medicao/baixar", json={"modelo": "moge"})
+    assert r.status_code == 200, r.text
+    assert pedidos == ["vitl"]
+    assert "catalogo" in r.json()
 
 
 def test_medir_pelo_plano_da_referencia_sem_modelo(cliente):

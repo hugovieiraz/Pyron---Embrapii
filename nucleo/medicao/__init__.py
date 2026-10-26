@@ -346,6 +346,13 @@ _padrao: Medidor | None = None
 _por_modelo: dict[str, Medidor] = {}
 
 
+def esquecer() -> None:
+    """Descarta os medidores carregados (depois de baixar pesos: o padrão pode ter mudado para o DA3)."""
+    global _padrao
+    _padrao = None
+    _por_modelo.clear()
+
+
 def medidor(modelo: str | None = None) -> Medidor:
     """O medidor do modelo de profundidade pedido (``da3`` ou ``moge``; ``None``: o padrão). O SAM é um só."""
     global _padrao

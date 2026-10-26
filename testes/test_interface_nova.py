@@ -157,7 +157,7 @@ def test_modelos_e_configuracoes_usam_a_tela_com_abas():
     a mesma casca de abas da Captura (js/telaAbas.js); toda rota tem tela própria."""
     rotas = (PASTA / "js" / "rotas.js").read_text(encoding="utf-8")
     assert "provisoria" not in rotas
-    for tela, pasta, abas in (("modelos", "modelos", ("emuso", "treino", "avaliacao")),
+    for tela, pasta, abas in (("modelos", "modelos", ("emuso", "treino", "avaliacao", "medicao")),
                               ("configuracoes", "configuracoes", ("empresa", "criterio", "componentes", "aparencia", "dados", "sobre")),
                               ("captura", "captura", ("pasta", "video", "celular", "medir", "alertas"))):
         assert 'from "../telaAbas.js"' in (PASTA / "js" / "telas" / f"{tela}.js").read_text(encoding="utf-8"), tela

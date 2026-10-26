@@ -568,3 +568,6 @@ body:has(.painel-lateral) .avisos { right: calc(var(--detalhe) + var(--e-6) * 2)
 .celular-medir { display: grid; gap: var(--e-2); justify-items: start; }
 .qr-medir { width: calc(var(--e-16) * 3); height: auto; aspect-ratio: 1; border: 1px solid var(--borda); border-radius: var(--r-m); background: var(--branco); image-rendering: pixelated; }
 .celular-medir .corta { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ================================================================ Modelos › Medição */
+.cab-modelo pre.comando { margin: 0; padding: var(--e-2) var(--e-3); border: 1px solid var(--borda); border-radius: var(--r-m); background: var(--superficie-2); font-family: var(--fonte-num); font-size: var(--t-1); line-height: var(--a-1); white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; }

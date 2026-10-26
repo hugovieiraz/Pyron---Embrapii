@@ -1,10 +1,10 @@
 // Modelos (Etapa 5d): os detectores, o treino e a avaliação. Abas Em uso, Treino e Avaliação (decisão da
-// Etapa 1: avaliar é parte de escolher o modelo); cada aba é um módulo em js/modelos/ (js/telaAbas.js).
+// Etapa 1: avaliar é parte de escolher o modelo), mais Medição (modelos de medir em foto comum); cada aba é um módulo em js/modelos/ (js/telaAbas.js).
 import { TEXTOS as T } from "../../textos.js";
 import { telaComAbas } from "../telaAbas.js";
 
 const M = T.modelos;
-const ABAS = ["emuso", "treino", "avaliacao"];
+const ABAS = ["emuso", "treino", "avaliacao", "medicao"];
 
 export async function montar(pagina, rota) {
   const tela = await telaComAbas(pagina, rota, {

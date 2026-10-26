@@ -83,6 +83,16 @@ def disponiveis() -> list[dict]:
     return [{"id": k, "nome": v, "instalado": instalado[k]} for k, v in MODELOS_PROFUNDIDADE.items()]
 
 
+# o que a aba Modelos › Medição mostra: pacote instalado, pesos na pasta e a variante para ``baixar()``
+VARIANTE_DO_MODELO = {"da3": "da3", "moge": MOGE_PADRAO, "sam": SAM_PADRAO}
+
+
+def catalogo() -> list[dict]:
+    pacotes = {"da3": pacote("depth_anything_3") and pacote("safetensors"), "moge": pacote("moge"), "sam": pacote("transformers")}
+    pesos = {"da3": caminho_da3().exists(), "moge": caminho_moge(MOGE_PADRAO).exists(), "sam": sam_instalado()}
+    return [{"id": k, "pacote": pacotes[k], "pesos": pesos[k], "variante": v} for k, v in VARIANTE_DO_MODELO.items()]
+
+
 def sam_instalado(variante: str = SAM_PADRAO) -> bool:
     p = caminho_sam(variante)
     return (p / "config.json").exists() and any(p.glob("*.safetensors"))
@@ -110,6 +120,7 @@ def estado() -> dict:
         "profundidade": {**{v: caminho_moge(v).exists() for v in MOGE}, "da3": da3_instalado()},
         "contorno": {v: sam_instalado(v) for v in SAM},
         "modelos": disponiveis(),
+        "catalogo": catalogo(),
         "modelo_padrao": "da3" if da3_instalado() else "moge",
         "pasta": str(pasta()),
         "pronto": pacotes["torch"]

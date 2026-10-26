@@ -46,7 +46,8 @@ núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Te
   `referencia_auto.py` acha o post-it rosa (8 cm) pela cor;
   `modelos.py` pesos em `modelos/medicao/`). API `/api/medicao`, `/api/medicao/estado`, `/api/medicao/plano`, `/api/medicao/referencia` e `/api/medicao/comparar`
   (mede nos dois modelos, sem e com referência, e grava em `registro.py`: fotos com os bytes originais). Pelo celular:
-  `/c/{token}/medir` (`app/estatico/medir_celular.*`, QR na seção "Medir pelo celular"), foto enviada sem recomprimir.
+  `/c/{token}/medir` (`app/estatico/medir_celular.*`, QR na seção "Medir pelo celular"), foto enviada sem recomprimir. Estado, erro e baixar pesos: Modelos › Medição
+  (`js/modelos/medicao.js`, `/api/medicao/baixar`).
   Licenças: só MIT e Apache 2.0 (nada CC BY-NC, AGPL, GPL; Depth Pro fora). Sem os pesos, a aba abre no modo
   "Retângulo de referência".
 - Conferir: `testes/test_interface_nova.py` (regra dura do CSS, foco, módulos), axe (WCAG 2.2 AA, Etapa 6) e o catálogo
