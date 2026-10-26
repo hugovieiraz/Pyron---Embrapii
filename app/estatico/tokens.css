@@ -188,6 +188,8 @@
   --dur-media: 250ms;    /* troca de página, abrir painel */
   --dur-lenta: 400ms;    /* entrada de conteúdo grande */
   --escalonar: 30ms;     /* entre itens de lista (no máximo 6 animados) */
+  --dur-varredura: 1800ms; /* faixa de luz varrendo a foto enquanto mede (indicador) */
+  --varredura: rgba(255, 255, 255, .28);
   --ease-entrada: cubic-bezier(.16, 1, .3, 1);   /* desacelera ao chegar */
   --ease-saida: cubic-bezier(.4, 0, 1, 1);       /* acelera ao sair (mais rápido) */
   --ease-padrao: cubic-bezier(.2, 0, 0, 1);

@@ -275,18 +275,23 @@ def test_comparar_dois_pontos_sem_referencia(comparacao):
     assert res["moge"]["com_referencia"] is None
 
 
-def test_celular_para_medir_liga_sem_detector_e_mede_a_foto(comparacao, monkeypatch):
-    """O servidor do Pyron: a foto do celular fica no registro como chegou e é medida nos dois modelos."""
+def test_foto_do_celular_fica_guardada_e_e_medida_na_tela(comparacao, monkeypatch):
+    """A foto do celular fica guardada como chegou; a tela do computador abre e mede nos dois modelos."""
     from app import servidor
 
     cli, foto = comparacao
     assert cli.get("/api/medicao/celular").json()["ligado"] is False
     codigo = servidor._celular_guardar_foto(foto)
     assert cli.get(f"/api/medicao/fotos/{codigo}").content == foto
-    r = servidor._celular_medir(codigo, {"ponto": _px(-0.6, 0.0, 3.0)}, None)
-    assert r["resultados"]["da3"]["sem_referencia"]["comprimento_cm"] == pytest.approx(210 * 1.05, rel=0.005)
+    r = cli.post("/api/medicao/comparar", files={"arquivo": ("f.png", cli.get(f"/api/medicao/fotos/{codigo}").content, "image/png")},
+                 data={"pista": json.dumps({"ponto": _px(-0.6, 0.0, 3.0)}), "como": "sem"})
+    assert r.json()["resultados"]["da3"]["sem_referencia"]["comprimento_cm"] == pytest.approx(210 * 1.05, rel=0.005)
     entrada = cli.get("/api/medicao/registro").json()["entradas"][0]
-    assert entrada["origem"] == "celular" and entrada["foto"] == codigo
+    assert entrada["foto"] == codigo and entrada["como"] == "sem"
+    cli.put(f"/api/medicao/registro/{entrada['id']}", json={"nome": "Caixa"})
+    assert cli.get("/api/medicao/registro").json()["entradas"][0]["nome"] == "Caixa"
+    assert "Caixa" in cli.get("/api/medicao/registro.csv").text
+    assert cli.get(f"/api/medicao/fotos/{codigo}/miniatura").content[:3] == b"\xff\xd8\xff"
     assert servidor._celular_previa(codigo)[:3] == b"\xff\xd8\xff"
     r = cli.post("/api/medicao/previa", files={"arquivo": ("f.png", foto, "image/png")})
     assert r.status_code == 200 and r.content[:3] == b"\xff\xd8\xff"

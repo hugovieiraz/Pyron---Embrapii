@@ -45,8 +45,10 @@ núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Te
   `profundidade.py` Depth Anything 3 Metric (padrão, Apache 2.0) e MoGe-2 (reserva); `segmentar.py` SAM 2.1 pelo `transformers`; `plano_ref.py` sem modelo, por homografia;
   `referencia_auto.py` acha o post-it rosa (8 cm) pela cor;
   `modelos.py` pesos em `modelos/medicao/`). API `/api/medicao`, `/api/medicao/estado`, `/api/medicao/plano`, `/api/medicao/referencia` e `/api/medicao/comparar`
-  (mede nos dois modelos, sem e com referência, e grava em `registro.py`: fotos com os bytes originais). Pelo celular:
-  `/c/{token}/medir` (`app/estatico/medir_celular.*`, QR na seção "Medir pelo celular"), foto enviada sem recomprimir. Estado, erro e o botão Instalar: Modelos › Medição
+  (mede nos dois modelos, sem e com referência, e grava em `registro.py`: fotos com os bytes originais). O celular só tira e envia a foto:
+  `/c/{token}/medir` (`app/estatico/medir_celular.*`, QR em "Fotos do celular"), original sem recomprimir; a medida é sempre no
+  computador. Fotos guardadas na faixa com setas (`/api/medicao/fotos`), zoom, nome do objeto e "Medir: Os dois / Com / Sem post-it";
+  histórico e CSV em Modelos › Medição. Estado, erro e o botão Instalar: Modelos › Medição
   (`js/modelos/medicao.js`, `/api/medicao/instalar`; pacotes que faltam + pesos por `nucleo/medicao/instalar.py`, que nunca troca o torch).
   Licenças: só MIT e Apache 2.0 (nada CC BY-NC, AGPL, GPL; Depth Pro fora). Sem os pesos, a aba abre no modo
   "Retângulo de referência".

@@ -8,7 +8,7 @@
 // A4 ou de um cartão: 4 cantos e 2 pontas, por homografia (POST /api/medicao/plano).
 import { TEXTOS as T } from "../../textos.js";
 import { el, api, fmt, json, lerNumero } from "../base.js";
-import { botao, avisar, barraFerramentas, campo, esqueleto, estadoVazio, ocupado, secao } from "../componentes.js";
+import { botao, avisar, barraFerramentas, campo, esqueleto, estadoVazio, ocupado, secao, segmentado } from "../componentes.js";
 import { endereco } from "../rotas.js";
 
 const M = T.medir;
@@ -23,7 +23,7 @@ function svg(tag, attrs = {}) {
   return n;
 }
 
-export async function montar(no) {
+export async function montar(no, ctx = {}) {
   const estado = await api("/api/medicao/estado");
 
   let foto = null;           // { arquivo, url, largura, altura }
@@ -48,30 +48,94 @@ export async function montar(no) {
   const camada = svg("svg", { class: "camada-medir", "aria-hidden": "true", preserveAspectRatio: "none" });
   const quadro = el("div", { class: "quadro-medir" }, imagem, camada);
   const hud = el("p", { class: "hud-medir", role: "status" });
-  const palco = el("div", { class: "palco-medir", tabindex: "0", "aria-label": M.palco }, hud, quadro);
+  // zoom: a foto cresce dentro de uma janela que rola por dentro; os cliques usam o retângulo da imagem, então
+  // continuam no ponto certo. Ctrl + roda (e a pinça do touchpad) aproxima onde está o cursor; botão do meio ou
+  // espaço + arrastar movem a foto.
+  const janela = el("div", { class: "janela-medir" }, quadro);
+  let zoom = 1, baseLargura = 0, espaco = false;
+  const rotuloZoom = el("span", { class: "num nota-palco" }, M.zoomPct(100));
+  const controlesZoom = el("div", { class: "zoom-medir", role: "group", "aria-label": M.zoom },
+    botao({ texto: M.afastar, icone: "menos", soIcone: true, compacto: true, variante: "fantasma", onclick: () => mudarZoom(zoom / 1.5) }),
+    rotuloZoom,
+    botao({ texto: M.aproximar, icone: "mais", soIcone: true, compacto: true, variante: "fantasma", onclick: () => mudarZoom(zoom * 1.5) }),
+    botao({ texto: M.ajustar, icone: "ajustar", soIcone: true, compacto: true, variante: "fantasma", onclick: () => mudarZoom(1) }));
+  const palco = el("div", { class: "palco-medir", tabindex: "0", "aria-label": M.palco }, el("div", { class: "topo-palco" }, hud, controlesZoom), janela);
+
+  /** Zoom de 1× (foto inteira) a 8×, mantendo parado o ponto em (cx, cy) da tela (o centro, sem cursor). */
+  function mudarZoom(novo, cx, cy) {
+    if (!foto) return;
+    novo = Math.min(8, Math.max(1, novo));
+    if (zoom === 1) baseLargura = quadro.offsetWidth;
+    const jr = janela.getBoundingClientRect(), qr = quadro.getBoundingClientRect();
+    cx ??= jr.left + jr.width / 2; cy ??= jr.top + jr.height / 2;
+    const fx = (cx - qr.left) / qr.width, fy = (cy - qr.top) / qr.height;
+    if (zoom === 1) janela.style.height = `${jr.height}px`;  // a janela fica do tamanho da foto inteira
+    zoom = novo;
+    quadro.style.width = zoom === 1 ? "" : `${baseLargura * zoom}px`;
+    if (zoom === 1) janela.style.height = "";
+    janela.scrollLeft = quadro.offsetLeft + fx * quadro.offsetWidth - (cx - jr.left);
+    janela.scrollTop = quadro.offsetTop + fy * quadro.offsetHeight - (cy - jr.top);
+    janela.classList.toggle("ampliada", zoom > 1);
+    rotuloZoom.textContent = M.zoomPct(Math.round(zoom * 100));
+  }
+  janela.addEventListener("wheel", (ev) => {
+    if (!ev.ctrlKey || !foto) return;
+    ev.preventDefault();
+    mudarZoom(zoom * Math.exp(-ev.deltaY * 0.0025), ev.clientX, ev.clientY);
+  }, { passive: false });
+  let movendo = null;
+  janela.addEventListener("pointerdown", (ev) => {
+    if (zoom === 1 || !(ev.button === 1 || (ev.button === 0 && espaco))) return;
+    ev.preventDefault(); ev.stopPropagation();
+    movendo = { x: ev.clientX, y: ev.clientY, l: janela.scrollLeft, t: janela.scrollTop };
+    janela.setPointerCapture(ev.pointerId);
+    janela.classList.add("movendo");
+  }, { capture: true });
+  janela.addEventListener("pointermove", (ev) => {
+    if (!movendo) return;
+    janela.scrollLeft = movendo.l - (ev.clientX - movendo.x);
+    janela.scrollTop = movendo.t - (ev.clientY - movendo.y);
+  });
+  const pararDeMover = () => { movendo = null; janela.classList.remove("movendo"); };
+  janela.addEventListener("pointerup", pararDeMover);
+  janela.addEventListener("pointercancel", pararDeMover);
+  const teclaEspaco = (ev) => { if (ev.code === "Space" && !ev.target.closest?.("input, textarea, button")) espaco = ev.type === "keydown"; };
+  addEventListener("keydown", teclaEspaco);
+  addEventListener("keyup", teclaEspaco);
   const listaMedicoes = el("div", { class: "lista-medicoes", "aria-live": "polite" });
   const blocoComparacao = el("section", { class: "bloco-comparacao", "aria-label": M.comparacaoTitulo },
     el("div", { class: "titulo-bloco" }, el("h2", {}, M.comparacaoTitulo)), listaMedicoes);
   const area = el("div", { class: "coluna-medir" }, palco);
+  // faixa das fotos guardadas (as abertas aqui e as do celular), com setas para passar de uma para outra
+  let galeria = [];
+  const faixa = el("nav", { class: "faixa-fotos", "aria-label": M.faixa });
 
   // ---------------------------------------------------------------- painel: resultado, referência, detalhes
   const caixaResultado = el("div", { class: "resultado-medir", "aria-live": "polite" });
   const caixaDetalhes = el("div", { class: "detalhes-medir" });
   const refs = Object.entries(estado.referencias || {});
   const autos = Object.entries(estado.referencias_auto || {});
+  // só "Nenhuma" e o post-it rosa (achado sozinho pela cor), a referência das fotos de medir; as outras (A4, cartão,
+  // marcar à mão) saíram da lista a pedido. Sem o achador de post-it, voltam as prontas.
   const objetoRef = campo({ rotulo: M.objetoReferencia, valor: autos.length ? `auto:${autos[0][0]}` : "", opcoes: [{ valor: "", texto: M.nenhuma },
-    ...autos.map(([id, r]) => ({ valor: `auto:${id}`, texto: `${r.nome} ${M.autoSufixo}` })),
-    ...refs.map(([id, r]) => ({ valor: id, texto: r.nome })), { valor: "outro", texto: M.outro }] });
+    ...autos.map(([id, r]) => ({ valor: `auto:${id}`, texto: r.nome })),
+    ...(autos.length ? [] : [...refs.map(([id, r]) => ({ valor: id, texto: r.nome })), { valor: "outro", texto: M.outro }])] });
   const ladoRef = campo({ rotulo: M.medidaReferencia, valor: "comprimento", opcoes: Object.entries(M.lados).map(([valor, texto]) => ({ valor, texto })) });
   const tamanhoRef = campo({ rotulo: M.tamanho, tipo: "number", unidade: "cm" });
   const marcarRef = botao({ texto: M.marcarReferencia, icone: "regua", onclick: () => comecarReferencia() });
   const tirarRef = botao({ texto: M.tirarReferencia, variante: "fantasma", compacto: true, onclick: () => { pistaRef = null; desenharReferencia(); remedir(); } });
   const notaRef = el("p", { class: "nota", role: "status" });
-  const corpoRef = el("div", { class: "grupo-campos" }, el("p", { class: "nota" }, M.referenciaTexto), objetoRef, ladoRef, tamanhoRef, el("div", { class: "grupo-btn" }, marcarRef, tirarRef), notaRef);
+  // medir com a referência, sem ou os dois: vale para os próximos cliques (cada medida guarda a sua escolha)
+  let comoMedir = "ambos";
+  try { comoMedir = localStorage.getItem("pyron.medir.como") || "ambos"; } catch { /* sem armazenamento */ }
+  const notaComo = el("p", { class: "nota" }, M.comoNota[comoMedir]);
+  const seletorComo = segmentado({ rotulo: M.medirComo, valor: comoMedir, opcoes: Object.entries(M.como).map(([valor, texto]) => ({ valor, texto })),
+    aoMudar: (v) => { comoMedir = v; notaComo.textContent = M.comoNota[v]; try { localStorage.setItem("pyron.medir.como", v); } catch { /* sem armazenamento */ } } });
+  const corpoRef = el("div", { class: "grupo-campos" }, el("p", { class: "nota" }, M.referenciaTexto), objetoRef, ladoRef, tamanhoRef, seletorComo, notaComo, el("div", { class: "grupo-btn" }, marcarRef, tirarRef), notaRef);
   const retangulos = refs.filter(([, r]) => r.largura != null);
   const retRef = campo({ rotulo: M.retangulo, valor: autos.length ? `auto:${autos[0][0]}` : retangulos[0]?.[0] || "outro", opcoes: [
     ...autos.map(([id, r]) => ({ valor: `auto:${id}`, texto: r.nome })),
-    ...retangulos.map(([id, r]) => ({ valor: id, texto: r.nome })), { valor: "outro", texto: M.outro }] });
+    ...(autos.length ? [] : [...retangulos.map(([id, r]) => ({ valor: id, texto: r.nome })), { valor: "outro", texto: M.outro }])] });
   const ladoMaior = campo({ rotulo: M.ladoMaior, tipo: "number", unidade: "cm" });
   const ladoMenor = campo({ rotulo: M.ladoMenor, tipo: "number", unidade: "cm" });
   const acharPostit = botao({ texto: M.acharPostit, icone: "detectar", onclick: () => ocupado(acharPostit, achar) });
@@ -126,19 +190,25 @@ export async function montar(no) {
 
   function desenharVazio() {
     area.replaceChildren(estadoVazio({ icone: "regua", titulo: M.vazioTitulo, texto: estado.pronto ? M.vazioTexto : M.planoTexto,
-      acoes: [botao({ texto: M.abrir, icone: "foto", variante: "primario", onclick: () => entrada.click() })] }));
+      acoes: [botao({ texto: M.abrir, icone: "foto", variante: "primario", onclick: () => entrada.click() })] }), faixa);
     caixaResultado.replaceChildren(el("p", { class: "nota" }, M.semResultado));
     caixaDetalhes.replaceChildren();
   }
 
   function dica() {
-    if (medindo) return [el("b", {}, M.medindo), " ", el("span", {}, M.medindoNota)];
+    if (medindo) return [el("b", {}, M.medindoTempo(Math.round((Date.now() - inicioMedida) / 1000))), " ", el("span", {}, M.medindoNota)];
     if (modo === "plano") return cantos.length < 4 ? M.dicaModo.cantos(cantos.length + 1) : pontoPlano ? M.dicaModo.pontosSegundo : M.dicaModo.plano;
     if (alvo === "referencia") return M.dicaModo.referencia;
     if (modo === "pontos" && primeiroPonto) return M.dicaModo.pontosSegundo;
     return M.dicaModo[modo];
   }
-  const atualizarHud = () => hud.replaceChildren(...[dica()].flat());
+  const atualizarHud = () => {
+    quadro.classList.toggle("medindo", medindo);  // faixa de luz varrendo a foto (telas.css)
+    hud.replaceChildren(...[dica()].flat());
+  };
+  // o tempo corre no aviso enquanto mede (a primeira medida na CPU passa de meio minuto)
+  let inicioMedida = 0;
+  const relogioMedida = setInterval(() => { if (medindo) atualizarHud(); }, 1000);
 
   function desenharCamada(rascunho = null) {
     if (!foto) return;
@@ -200,7 +270,9 @@ export async function montar(no) {
     const res = m.r.resultados;
     const modelos = Object.keys(res);
     const comRef = modelos.some((k) => res[k].com_referencia);
-    const colunas = modelos.flatMap((k) => [[k, "sem_referencia", NOMES[k] || k], ...(comRef ? [[k, "com_referencia", M.comRef(NOMES[k] || k)]] : [])]);
+    // "Com referência" mostra só essas colunas; se a referência não foi achada, cai nas sem referência
+    const sem = m.como !== "com" || !comRef;
+    const colunas = modelos.flatMap((k) => [...(sem ? [[k, "sem_referencia", NOMES[k] || k]] : []), ...(comRef ? [[k, "com_referencia", M.comRef(NOMES[k] || k)]] : [])]);
     const medidas = ORDEM.filter((q) => colunas.some(([k, modo]) => res[k][modo]?.[`${q}_cm`] != null));
     const celula = (k, modo, q) => {
       const v = res[k][modo];
@@ -222,12 +294,24 @@ export async function montar(no) {
     }
     const tempos = modelos.map((k) => res[k].sem_referencia?.tempos_ms?.total != null
       ? M.temposModelo(NOMES[k] || k, M.segundos(fmt(res[k].sem_referencia.tempos_ms.total / 1000, 1))) : null).filter(Boolean);
-    return el("article", { class: "cartao-medida" }, cab,
+    return el("article", { class: "cartao-medida" }, cab, campoNome(m),
       el("div", { class: "rola-tabela" }, el("table", { class: "tabela-comparacao" },
         el("thead", {}, el("tr", {}, el("th", { scope: "col" }, M.colunaMedida), ...colunas.map(([, , nome]) => el("th", { scope: "col" }, nome)), el("th", { scope: "col" }, M.colunaReal))),
         el("tbody", {}, linhas))),
       ...notas.map((t) => el("p", { class: "nota aviso-escala" }, t)),
       tempos.length ? el("p", { class: "nota" }, M.tempos(tempos.join(", "))) : null);
+  }
+
+  /** O nome do objeto ("Kindle"): agrupa as medidas em Modelos › Medição. */
+  function campoNome(m) {
+    const c = campo({ rotulo: M.nomeObjeto, valor: m.nome, marcador: M.nomeMarcador, classe: "campo-nome", autocomplete: "off" });
+    const entrada = c.querySelector("input");
+    entrada.addEventListener("change", async () => {
+      m.nome = entrada.value.trim();
+      try { await api(`/api/medicao/registro/${m.id}`, json("PUT", { nome: m.nome })); avisar(M.nomeSalvo); }
+      catch (erro) { avisar(erro.message, { erro: true }); }
+    });
+    return c;
   }
 
   function campoReal(m, q) {
@@ -335,6 +419,7 @@ export async function montar(no) {
     if (auto && !lerNumero(campoTamanho.value)) campoTamanho.value = fmt(auto.lado_cm, 1);
     if (pronta) campoTamanho.value = fmt(pronta[seletorLado.value === "largura" && pronta.largura != null ? "largura" : "comprimento"], 2);
     marcarRef.hidden = Boolean(auto);
+    seletorComo.hidden = notaComo.hidden = !escolha;  // sem referência não há o que escolher
     marcarRef.disabled = !escolha || !foto;
     tirarRef.hidden = !pistaRef;
     notaRef.textContent = pistaRef ? M.referenciaMarcada : "";
@@ -367,12 +452,14 @@ export async function montar(no) {
       pistaRef = primeiroPonto = pontoPlano = null;
       cantos = []; medidasPlano = []; medicoes = [];
       alvo = "objeto";
+      geracao++; medindo = false;  // a medida da foto anterior não aparece nesta
       imagem.src = url;
+      zoom = 1; quadro.style.width = ""; janela.style.height = ""; janela.classList.remove("ampliada"); rotuloZoom.textContent = M.zoomPct(100);
       quadro.style.setProperty("--proporcao", String(foto.largura / foto.altura));
-      area.replaceChildren(palco, blocoComparacao);
+      area.replaceChildren(palco, faixa, blocoComparacao);
       desenharReferencia(); atualizarTudo();
       palco.focus({ preventScroll: true });
-      if (foto.codigo) trazerMedidasDoCelular();
+      if (foto.codigo) { trazerMedidasDoCelular(); desenharFaixa(); } else guardarNaFaixa(arquivo);
     };
     img.onerror = async () => {
       URL.revokeObjectURL(url);
@@ -422,7 +509,7 @@ export async function montar(no) {
       remedir();
       return;
     }
-    const m = { n: ++contador, pista: p, r: null, real: {}, id: null, erros: null };
+    const m = { n: ++contador, pista: p, r: null, real: {}, id: null, erros: null, como: comoMedir, nome: "" };
     medicoes.push(m);
     medir(m);
   }
@@ -434,6 +521,7 @@ export async function montar(no) {
   let fila = Promise.resolve();
   function medir(m) {
     const minha = geracao;
+    if (!medindo) inicioMedida = Date.now();
     medindo = true;
     desenharResultado(); atualizarHud(); desenharCamada();
     fila = fila.then(async () => {
@@ -441,8 +529,9 @@ export async function montar(no) {
       const dados = new FormData();
       dados.append("arquivo", foto.arquivo);
       dados.append("pista", JSON.stringify(m.pista));
-      const ref = referencia();
+      const ref = m.como === "sem" ? null : referencia();
       if (ref) dados.append("referencia", JSON.stringify(ref));
+      dados.append("como", m.como);
       try {
         const r = await api("/api/medicao/comparar", { method: "POST", body: dados });
         if (minha !== geracao) return;
@@ -472,7 +561,7 @@ export async function montar(no) {
   };
   let arrasto = null;
   quadro.addEventListener("pointerdown", (ev) => {
-    if (!foto || ev.button !== 0) return;
+    if (!foto || ev.button !== 0 || espaco) return;
     ev.preventDefault();
     arrasto = { inicio: naImagem(ev), id: ev.pointerId };
     quadro.setPointerCapture(ev.pointerId);
@@ -514,7 +603,10 @@ export async function montar(no) {
       ev.preventDefault();
       mira = { x: Math.min(1, Math.max(0, mira.x + d[0])), y: Math.min(1, Math.max(0, mira.y + d[1])) };
       desenharCamada();
-    } else if (ev.key === "Enter" || ev.key === " ") {
+    } else if (ev.key === "+" || ev.key === "=" || ev.key === "-" || ev.key === "0") {
+      ev.preventDefault();
+      mudarZoom(ev.key === "0" ? 1 : ev.key === "-" ? zoom / 1.5 : zoom * 1.5);
+    } else if (ev.key === "Enter" || (ev.key === " " && zoom === 1)) {
       ev.preventDefault();
       clicar(mira.x * foto.largura, mira.y * foto.altura);
     } else if (ev.key === "Escape" && (primeiroPonto || pontoPlano || alvo === "referencia")) {
@@ -536,13 +628,11 @@ export async function montar(no) {
       caixaCelular.replaceChildren(el("div", { class: "grupo-btn" }, ligar));
       return;
     }
-    const hora = (t) => new Date(t * 1000).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
     caixaCelular.replaceChildren(
       el("img", { class: "qr-medir", src: `/api/celular/qr.png?medir=1&v=${encodeURIComponent(celular.url)}`, alt: M.celularQrAlt }),
       el("code", { class: "mono corta" }, celular.url),
       el("p", { class: "nota" }, M.celularQr),
-      celular.fotos.length ? el("p", { class: "nota" }, M.fotosCelular) : null,
-      ...celular.fotos.slice(0, 5).map((f) => botao({ texto: M.abrirFotoCelular(hora(f.quando)), compacto: true, variante: "fantasma", onclick: () => abrirDoCelular(f.id) })));
+      el("p", { class: "nota" }, M.fotosCelular));
   }
 
   async function abrirDoCelular(codigo) {
@@ -554,13 +644,13 @@ export async function montar(no) {
     abrir(arquivo);  // ao carregar, traz as medidas que o celular já fez nesta foto
   }
 
-  /** As medidas feitas no celular para a foto aberta entram como cartões aqui (sem o contorno, que fica no celular). */
+  /** As medidas já guardadas da foto aberta voltam como cartões (sem o contorno, que não fica no registro). */
   async function trazerMedidasDoCelular() {
     if (!foto?.codigo) return;
     const reg = await api("/api/medicao/registro?limite=100");
     const ids = new Set(medicoes.map((m) => m.id));
-    const novas = reg.entradas.filter((e) => e.foto === foto.codigo && e.origem === "celular" && !ids.has(e.id)).reverse();
-    for (const e of novas) medicoes.push({ n: ++contador, pista: e.pista, r: { resultados: e.resultados, contorno: [], contorno_referencia: [] }, real: e.real || {}, id: e.id, erros: e.erros });
+    const novas = reg.entradas.filter((e) => e.foto === foto.codigo && !ids.has(e.id)).reverse();  // as medidas já guardadas desta foto
+    for (const e of novas) medicoes.push({ n: ++contador, pista: e.pista, r: { resultados: e.resultados, contorno: [], contorno_referencia: [] }, real: e.real || {}, id: e.id, erros: e.erros, como: e.como || (e.referencia ? "ambos" : "sem"), nome: e.nome || "" });
     if (novas.length) { desenharResultado(); desenharCamada(); atualizarRegistro(); }
   }
 
@@ -572,6 +662,7 @@ export async function montar(no) {
       if (vistas == null) vistas = new Set(est.fotos.map((f) => f.id));
       if (!mudou) return;
       desenharCelular();
+      carregarFaixa();
       const nova = est.fotos.find((f) => !vistas.has(f.id));
       if (nova) {
         vistas.add(nova.id);
@@ -587,6 +678,74 @@ export async function montar(no) {
   desenharVazio();
   atualizarRegistro();
   vigiarCelular();
-  return () => { geracao++; clearInterval(relogioCelular); if (foto) URL.revokeObjectURL(foto.url); };
+  // outra foto: arrastar para a aba ou colar (Ctrl+V), além do botão
+  const fotoDe = (lista) => [...(lista || [])].find((f) => f.type.startsWith("image/") || /\.(heic|heif)$/i.test(f.name));
+  const arrastando = (ev) => { if (![...(ev.dataTransfer?.types || [])].includes("Files")) return; ev.preventDefault(); no.classList.add("soltar-foto"); };
+  const saiu = (ev) => { if (!no.contains(ev.relatedTarget)) no.classList.remove("soltar-foto"); };
+  const soltou = (ev) => {
+    no.classList.remove("soltar-foto");
+    const f = fotoDe(ev.dataTransfer?.files);
+    if (!f) return;
+    ev.preventDefault();
+    abrir(f);
+  };
+  const colou = (ev) => {
+    if (ev.target.closest?.("input, textarea")) return;
+    const f = fotoDe(ev.clipboardData?.files);
+    if (f) { ev.preventDefault(); abrir(f); }
+  };
+  no.dataset.soltar = M.soltar;
+  no.addEventListener("dragover", arrastando);
+  no.addEventListener("dragleave", saiu);
+  no.addEventListener("drop", soltou);
+  document.addEventListener("paste", colou);
+
+  // ---------------------------------------------------------------- faixa de fotos
+  const hora = (t) => new Date(t * 1000).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+  async function carregarFaixa() {
+    try { galeria = (await api("/api/medicao/fotos?limite=60")).fotos.reverse(); } catch { return; }  // da mais antiga (esquerda) à mais nova
+    desenharFaixa();
+  }
+
+  /** Foto aberta do computador: guarda os bytes originais no Pyron para ela ficar na faixa (e o código evita reenviar). */
+  async function guardarNaFaixa(arquivo) {
+    const dados = new FormData();
+    dados.append("arquivo", arquivo);
+    try {
+      const { codigo } = await api("/api/medicao/fotos", { method: "POST", body: dados });
+      arquivo.codigo = codigo;
+      if (foto?.arquivo === arquivo) foto.codigo = codigo;
+      await carregarFaixa();
+    } catch { /* fica só nesta sessão */ }
+  }
+
+  function desenharFaixa() {
+    faixa.hidden = !galeria.length;
+    if (!galeria.length) return;
+    const i = galeria.findIndex((f) => f.codigo === foto?.codigo);
+    const ir = (j) => { if (galeria[j]) abrirDoCelular(galeria[j].codigo); };
+    const miniaturas = galeria.map((f, j) => el("button", { type: "button", class: "mini-faixa", "aria-current": j === i ? "true" : null,
+      "aria-label": M.fotoDaFaixa(j + 1, galeria.length, hora(f.quando)), title: hora(f.quando), onclick: () => ir(j) },
+      el("img", { src: `/api/medicao/fotos/${f.codigo}/miniatura`, alt: "", loading: "lazy", decoding: "async" })));
+    const lista = el("div", { class: "trilho-faixa" }, miniaturas);
+    faixa.replaceChildren(
+      botao({ texto: M.fotoAnterior, icone: "anterior", soIcone: true, desabilitado: i <= 0, onclick: () => ir(i - 1) }),
+      lista,
+      botao({ texto: M.fotoSeguinte, icone: "proxima", soIcone: true, desabilitado: i < 0 ? galeria.length < 1 : i >= galeria.length - 1, onclick: () => ir(i < 0 ? 0 : i + 1) }),
+      el("span", { class: "nota num" }, i >= 0 ? M.posicaoFaixa(i + 1, galeria.length) : ""));
+    if (miniaturas[i]) requestAnimationFrame(() => { lista.scrollLeft = miniaturas[i].offsetLeft - (lista.clientWidth - miniaturas[i].offsetWidth) / 2; });  // só a faixa rola, não a página
+  }
+  carregarFaixa();
+  // Modelos › Medição abre uma foto guardada por aqui (#captura/medir/<código>)
+  const pedida = ctx.partes?.[0];
+  if (pedida && /^[0-9a-f]+$/i.test(pedida)) abrirDoCelular(pedida);
+
+  return () => {
+    geracao++; clearInterval(relogioCelular); clearInterval(relogioMedida);
+    document.removeEventListener("paste", colou);
+    removeEventListener("keydown", teclaEspaco); removeEventListener("keyup", teclaEspaco);
+    if (foto) URL.revokeObjectURL(foto.url);
+  };
 }
 

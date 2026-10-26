@@ -1,29 +1,24 @@
-/* Página de medir objeto no celular: foto, um toque, a medida dos dois modelos. Só tokens de tokens.css. */
-.med { min-height: 100%; padding-bottom: calc(env(safe-area-inset-bottom) + var(--e-6)); }
-.med-topo { position: sticky; }
-.med-inicio { display: grid; gap: var(--e-4); margin: var(--e-6) var(--e-4); padding: var(--e-6); border-radius: var(--r-g); background: var(--palco-2); }
-.med-inicio h1 { margin: 0; color: var(--branco); font-size: var(--t-5); line-height: var(--a-5); }
-.med-inicio p { margin: 0; }
-.med-foto { display: grid; gap: var(--e-3); padding: var(--e-3) var(--e-4); }
-.med-opcoes { display: grid; gap: var(--e-2); }
-.med-seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border-radius: var(--r-m); background: var(--palco-2); padding: var(--e-1); gap: var(--e-1); }
-.med-seg button { min-height: var(--alvo-toque); border: 0; border-radius: var(--r-p); background: transparent; color: var(--palco-texto); font: inherit; font-size: var(--t-1); }
-.med-seg button[aria-pressed="true"] { background: var(--branco); color: var(--palco); font-weight: var(--p-forte); }
-.med-dica { margin: 0; color: var(--branco); font-weight: var(--p-forte); }
-.med-quadro { position: relative; touch-action: manipulation; }
-.med-quadro img { display: block; width: 100%; height: auto; border-radius: var(--r-m); background: var(--palco-2); }
-.med-quadro svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
-.med-quadro svg * { fill: none; stroke: var(--branco); stroke-width: calc(var(--e-1) * .75); vector-effect: non-scaling-stroke; }
-.med-quadro svg .sombra { stroke: var(--contorno-imagem); stroke-width: calc(var(--e-2) - 1px); }
-.med-quadro svg .ref:not(.sombra) { stroke-dasharray: var(--e-2) var(--e-1); }
-.med-quadro svg circle { fill: var(--branco); stroke: var(--contorno-imagem); stroke-width: calc(var(--e-1) / 2); }
-.med-resultados { display: grid; gap: var(--e-3); }
-.med-cartao { padding: var(--e-3) var(--e-4); border-radius: var(--r-m); background: var(--palco-2); }
-.med-cartao h2 { margin: 0 0 var(--e-2); color: var(--branco); font-size: var(--t-2); line-height: var(--a-2); }
-.med-tabela { width: 100%; border-collapse: collapse; font-size: var(--t-1); line-height: var(--a-1); font-variant-numeric: tabular-nums; }
-.med-tabela th, .med-tabela td { padding: var(--e-1) var(--e-2); text-align: right; border-bottom: 1px solid var(--brilho-palco); }
-.med-tabela th:first-child { text-align: left; color: var(--palco-texto-2); font-weight: var(--p-normal); }
-.med-tabela thead th { color: var(--palco-texto-2); font-weight: var(--p-normal); }
-.med-tabela td { color: var(--branco); font-weight: var(--p-forte); }
-.med-aviso { margin: var(--e-2) 0 0; color: var(--aviso-texto); background: var(--aviso-fundo); padding: var(--e-2) var(--e-3); border-radius: var(--r-p); font-size: var(--t-1); line-height: var(--a-1); }
-.med-erro { margin: var(--e-3) var(--e-4); }
+/* Fotos para medir, no celular: tirar ou escolher, enviar o original, ver o que já foi. Só tokens de tokens.css. */
+.med { min-height: 100%; padding-top: calc(var(--alvo-toque) + var(--e-6)); padding-bottom: calc(env(safe-area-inset-bottom) + var(--e-6)); }
+.med-topo { position: fixed; z-index: 1; background: var(--palco); }
+.med-ligado { flex: none; padding: var(--e-1) var(--e-3); border-radius: var(--r-g); background: var(--sucesso-fundo); color: var(--sucesso-texto); font-size: var(--t-1); line-height: var(--a-1); font-weight: var(--p-forte); }
+.med-ligado:empty { display: none; }
+.med-ligado.off { background: var(--erro-fundo); color: var(--erro-texto); }
+.med-acoes { display: grid; gap: var(--e-3); margin: var(--e-4); padding: var(--e-5); border-radius: var(--r-g); background: var(--palco-2); }
+.med-acoes h1 { margin: 0; color: var(--branco); font-size: var(--t-5); line-height: var(--a-5); }
+.med-dica { margin: 0 0 var(--e-2); color: var(--palco-texto); }
+.med-tirar { min-height: calc(var(--alvo-toque) * 1.4); font-size: var(--t-3); }
+.med-enviadas { display: grid; gap: var(--e-3); margin: var(--e-4); }
+.med-enviadas h2 { margin: 0; color: var(--palco-texto-2); font-size: var(--t-1); line-height: var(--a-1); font-weight: var(--p-forte); letter-spacing: .06em; text-transform: uppercase; }
+.med-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-2); }
+.med-item { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: var(--e-2) var(--e-3); padding: var(--e-2); border-radius: var(--r-m); background: var(--palco-2); }
+.med-mini { width: calc(var(--alvo-toque) * 1.4); aspect-ratio: 3 / 4; object-fit: cover; border-radius: var(--r-p); background: var(--brilho-palco); }
+.med-mini.sem { visibility: hidden; }
+.med-info { display: grid; gap: var(--e-1); min-width: 0; }
+.med-info b { color: var(--branco); }
+.med-situ { color: var(--palco-texto); font-size: var(--t-1); line-height: var(--a-1); font-weight: var(--p-forte); }
+.med-situ.ok { color: var(--sucesso-texto); }
+.med-situ.ruim { color: var(--erro-texto); }
+.med-barra { display: block; height: var(--e-1); border-radius: var(--r-p); background: var(--brilho-palco); overflow: hidden; }
+.med-barra i { display: block; height: 100%; background: var(--branco); transform-origin: left; transition: transform var(--dur-rapida) var(--ease-padrao); }
+.med-tentar { grid-column: 1 / -1; }

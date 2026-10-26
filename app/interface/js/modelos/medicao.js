@@ -2,7 +2,7 @@
 // está instalado e o erro nas fotos do Hugo; ao lado, o detalhe do escolhido, o erro no registro deste
 // computador (medidas com valor real) e o que falta instalar. Testar abre Captura › Medir foto.
 import { TEXTOS as T } from "../../textos.js";
-import { el, icone, api, json } from "../base.js";
+import { el, icone, api, json, fmt } from "../base.js";
 import { botao, tabela, secao, avisar } from "../componentes.js";
 import { endereco } from "../rotas.js";
 
@@ -10,10 +10,12 @@ const M = T.modelos.medicao;
 const MODOS = { com_referencia: M.comPostit, sem_referencia: M.semRef };
 
 export async function montar(no) {
-  let [estado, registro] = await Promise.all([api("/api/medicao/estado"), api("/api/medicao/registro?limite=1").catch(() => ({ resumo: {} }))]);
+  let [estado, registro] = await Promise.all([api("/api/medicao/estado"), api("/api/medicao/registro?limite=500").catch(() => ({ resumo: {}, entradas: [] }))]);
   let escolhido = estado.modelo_padrao || "da3";
   const corpo = el("div", { class: "corpo-lista com-lado" });
-  const area = el("div", { class: "area-lista" });
+  const tabelaModelos = el("div");
+  const guardadas = el("section", { class: "medicoes-guardadas", "aria-label": M.guardadas });
+  const area = el("div", { class: "area-lista area-medicao" }, tabelaModelos, guardadas);
   const lado = el("aside", { class: "painel-lateral", "aria-label": T.modelos.detalhe });
   no.append(el("div", { class: "barra-lista" }, el("p", { class: "nota" }, M.nota), el("span", { class: "empurrar" }),
     el("a", { class: "btn", href: endereco("captura", ["medir"]) }, icone("regua"), M.testar)), corpo);
@@ -46,6 +48,40 @@ export async function montar(no) {
     }, 2000);
   }
 
+  /** Todas as medições, agrupadas pelo nome do objeto: uma linha por medição, a medida principal em cada modelo e modo. */
+  function desenharGuardadas() {
+    // agrupadas pelo nome (as sem nome no fim), a mais nova primeiro dentro de cada grupo
+    const entradas = [...(registro.entradas || [])].sort((a, b) => Number(!a.nome) - Number(!b.nome)
+      || (a.nome || "").localeCompare(b.nome || "", "pt-BR") || b.quando - a.quando);
+    const cab = el("div", { class: "titulo-bloco" }, el("h2", {}, M.guardadas),
+      entradas.length ? el("a", { href: "/api/medicao/registro.csv", download: "medicoes_pyron.csv" }, M.exportar) : null);
+    if (!entradas.length) { guardadas.replaceChildren(cab, el("p", { class: "nota" }, M.guardadasVazio)); return; }
+    const ORDEM = ["comprimento", "altura", "largura", "distancia", "espessura"];
+    const principal = (e) => ORDEM.find((q) => Object.values(e.resultados || {}).some((r) => r?.sem_referencia?.[`${q}_cm`] != null || r?.com_referencia?.[`${q}_cm`] != null));
+    const valor = (e, modelo, modo) => {
+      const q = principal(e), v = e.resultados?.[modelo]?.[modo]?.[`${q}_cm`];
+      if (v == null) return el("span", { class: "fraco" }, T.geral.semValor);
+      const erro = e.erros?.[modelo]?.[modo]?.[q];
+      return [el("span", { class: "num" }, fmt(v, 1)), erro != null ? el("span", { class: `sub num erro-medida ${Math.abs(erro) < 0.1 ? "bom" : ""}` }, M.erroPct(Math.round(erro * 100))) : null];
+    };
+    const data = (t) => new Date(t * 1000).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+    const colunasModelo = [["da3", "sem_referencia", "da3"], ["da3", "com_referencia", "da3_ref"], ["moge", "sem_referencia", "moge"], ["moge", "com_referencia", "moge_ref"]];
+    guardadas.replaceChildren(cab, el("p", { class: "nota" }, M.guardadasNota), tabela({
+      rotulo: M.guardadas,
+      grupo: (e) => e.nome || M.semNome,
+      href: (e) => endereco("captura", ["medir", e.foto]),
+      colunas: [
+        { chave: "foto", titulo: M.colFoto, celula: (e) => el("img", { class: "mini-medicao", src: `/api/medicao/fotos/${e.foto}/miniatura`, alt: "", loading: "lazy", decoding: "async" }) },
+        { chave: "objeto", titulo: M.colObjeto, link: true, celula: (e) => [el("span", { class: "corta", title: M.abrirFoto }, e.nome || M.semNome),
+          el("span", { class: "sub corta" }, M.quando(data(e.quando), M.origem[e.origem] || e.origem))] },
+        { chave: "medida", titulo: M.colMedida, celula: (e) => T.medir.nomes[principal(e)] || T.geral.semValor },
+        ...colunasModelo.map(([modelo, modo, id]) => ({ chave: id, titulo: M.colunas[id], classe: "num", celula: (e) => valor(e, modelo, modo) })),
+        { chave: "real", titulo: M.colReal, classe: "num", celula: (e) => e.real?.[principal(e)] != null ? fmt(e.real[principal(e)], 1) : el("span", { class: "fraco" }, T.geral.semValor) },
+      ],
+      linhas: entradas,
+    }));
+  }
+
   function situacao(c) {
     if (!c.pacote) return el("span", { class: "fraco" }, M.semPacote);
     if (!c.pesos) return el("span", { class: "fraco" }, M.naoInstalado);
@@ -55,7 +91,8 @@ export async function montar(no) {
 
   function desenhar() {
     const lista = estado.catalogo || [];
-    area.replaceChildren(tabela({
+    desenharGuardadas();
+    tabelaModelos.replaceChildren(tabela({
       rotulo: T.modelos.aba.medicao,
       colunas: [
         { chave: "nome", titulo: T.modelos.colModelo, link: true, celula: (c) => [el("span", { class: "corta" }, M.modelos[c.id].nome), el("span", { class: "sub corta" }, M.modelos[c.id].sub)] },

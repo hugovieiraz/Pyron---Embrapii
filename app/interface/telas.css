@@ -572,3 +572,44 @@ body:has(.painel-lateral) .avisos { right: calc(var(--detalhe) + var(--e-6) * 2)
 /* ================================================================ Modelos › Medição */
 .cab-modelo pre.comando { margin: 0; padding: var(--e-2) var(--e-3); border: 1px solid var(--borda); border-radius: var(--r-m); background: var(--superficie-2); font-family: var(--fonte-num); font-size: var(--t-1); line-height: var(--a-1); white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; }
 .cab-modelo pre.erro-instalar { color: var(--erro-texto); }
+
+/* Medir foto: faixa de luz varrendo a foto enquanto os modelos medem (indicador de carregamento) */
+.quadro-medir.medindo { overflow: hidden; }
+.quadro-medir.medindo .foto-medir { opacity: .85; transition: opacity var(--dur-media) var(--ease-padrao); }
+.quadro-medir.medindo::after {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 30%; pointer-events: none;
+  background: linear-gradient(to bottom, transparent, var(--varredura)); border-bottom: var(--borda-sel) solid var(--marca-imagem);
+  animation: varrer-foto var(--dur-varredura) var(--ease-padrao) infinite;
+}
+@keyframes varrer-foto { from { transform: translateY(-100%); } to { transform: translateY(340%); } }
+/* outra foto arrastada para a aba */
+.soltar-foto { position: relative; }
+.soltar-foto::after {
+  content: attr(data-soltar); position: absolute; inset: 0; z-index: var(--z-menu); display: grid; place-items: center;
+  border: var(--borda-sel) dashed var(--acao); border-radius: var(--r-g); background: var(--veu);
+  color: var(--branco); font-size: var(--t-3); line-height: var(--a-3); font-weight: var(--p-medio); pointer-events: none;
+}
+/* faixa das fotos guardadas, embaixo da foto: setas e miniaturas que rolam de lado */
+.faixa-fotos { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: var(--e-2); margin-top: var(--e-3); }
+.faixa-fotos[hidden] { display: none; }
+.trilho-faixa { display: flex; gap: var(--e-2); overflow-x: auto; padding: var(--e-1); scrollbar-width: thin; }
+.mini-faixa { flex: none; padding: 0; border: var(--borda-sel) solid transparent; border-radius: var(--r-m); background: var(--palco); cursor: pointer; transition: border-color var(--dur-rapida) var(--ease-padrao); }
+.mini-faixa img { display: block; width: var(--miniatura); height: var(--miniatura); object-fit: cover; border-radius: var(--r-p); }
+.mini-faixa:hover { border-color: var(--borda-forte); }
+.mini-faixa[aria-current="true"] { border-color: var(--acao); }
+/* zoom da foto: a janela rola por dentro quando a foto está ampliada */
+.topo-palco { justify-self: stretch; display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); }
+.zoom-medir { display: flex; align-items: center; gap: var(--e-1); flex: none; }
+.zoom-medir .btn { color: var(--palco-texto); }
+.zoom-medir .btn:hover { background: var(--palco-hover); }
+.nota-palco { min-width: calc(var(--e-12)); text-align: center; color: var(--palco-texto-2); font-size: var(--t-1); line-height: var(--a-1); }
+.janela-medir { justify-self: stretch; display: block; overflow: hidden; }
+.janela-medir .quadro-medir { margin-inline: auto; }
+.janela-medir.ampliada { overflow: auto; overscroll-behavior: contain; }
+.janela-medir.ampliada .quadro-medir { max-width: none; }
+.janela-medir.movendo, .janela-medir.movendo .quadro-medir { cursor: grabbing; }
+/* Modelos › Medição: modelos em cima, medições guardadas embaixo (a coluna rola por dentro) */
+.area-medicao { display: grid; align-content: start; gap: var(--e-8); min-height: 0; overflow: auto; }
+.medicoes-guardadas { display: grid; gap: var(--e-3); }
+.mini-medicao { display: block; width: var(--miniatura); height: var(--miniatura); object-fit: cover; border-radius: var(--r-p); background: var(--palco); }
+.medicoes-guardadas td .sub.erro-medida { display: block; }
