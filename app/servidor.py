@@ -2227,6 +2227,133 @@ def medicao_plano(corpo: dict = Body(...)) -> dict:
         raise HTTPException(422, str(e))
 
 
+# ---------------------------------------------------------------- cadastro de medidas e câmeras (app/cadastro_medidas.py)
+
+
+def _cadastro():
+    from app.cadastro_medidas import Cadastro
+
+    return Cadastro(PASTA_DADOS)
+
+
+def _erro_cadastro(func):
+    from app.cadastro_medidas import ErroCadastro
+
+    try:
+        return func()
+    except ErroCadastro as e:
+        raise HTTPException(422, str(e))
+
+
+@app.get("/api/cadastro/medidas")
+def cadastro_medidas(equipamento: str | None = None, status: str | None = None) -> list:
+    return _cadastro().medidas(equipamento, status)
+
+
+@app.post("/api/cadastro/medidas")
+def cadastro_propor(corpo: dict = Body(...)) -> dict:
+    """Registra uma medida como proposta (do programa ou de uma pessoa). Só vale depois de validada."""
+    campos = ("equipamento_chave", "componente", "medida", "valor_cm", "metodo", "criado_por", "incerteza_cm",
+              "classe", "fase", "origem", "substitui_id", "nota")
+    return _erro_cadastro(lambda: _cadastro().propor(**{k: corpo.get(k) for k in campos if k in corpo}))
+
+
+@app.post("/api/cadastro/medidas/{medida_id}/validar")
+def cadastro_validar(medida_id: int, corpo: dict = Body(...)) -> dict:
+    return _erro_cadastro(lambda: _cadastro().validar(medida_id, corpo.get("engenheiro"), corpo.get("registro"), corpo.get("nota")))
+
+
+@app.post("/api/cadastro/medidas/{medida_id}/rejeitar")
+def cadastro_rejeitar(medida_id: int, corpo: dict = Body(...)) -> dict:
+    return _erro_cadastro(lambda: _cadastro().rejeitar(medida_id, corpo.get("engenheiro"), corpo.get("registro"), corpo.get("motivo")))
+
+
+@app.get("/api/cadastro/equipamentos/{chave}/fases")
+def cadastro_fases(chave: str) -> list:
+    """Mesma classe e medida nas fases A, B e C: a diferença que o engenheiro vê antes de validar."""
+    return _cadastro().conferir_fases(chave)
+
+
+@app.get("/api/cadastro/cameras")
+def cadastro_cameras() -> list:
+    return _cadastro().cameras()
+
+
+@app.post("/api/cadastro/cameras/ficha")
+def cadastro_camera_ficha(corpo: dict = Body(...)) -> dict:
+    """Câmera pela ficha técnica (térmica): resolução e campo de visão horizontal."""
+    from nucleo.medicao.camera import perfil_da_ficha
+
+    try:
+        p = perfil_da_ficha(str(corpo["nome"]), int(corpo["largura"]), int(corpo["altura"]),
+                            float(corpo["fov_horizontal_graus"]), corpo.get("tipo", "termica"), corpo.get("modelo", ""))
+    except (KeyError, TypeError, ValueError):
+        raise HTTPException(422, "Informe nome, largura, altura e fov_horizontal_graus.")
+    return _cadastro().salvar_camera(p)
+
+
+@app.post("/api/cadastro/cameras/calibrar")
+async def cadastro_camera_calibrar(nome: str = Form(...), modelo: str = Form(""), quadrado_mm: float = Form(25.0),
+                                   fotos: list[UploadFile] = File(...)) -> dict:
+    """Calibra a lente com a folha ChArUco em várias fotos (5 a 20) e guarda o perfil da câmera."""
+    from nucleo.medicao import camera as camera_mod
+
+    dados = [await f.read() for f in fotos]
+    try:
+        p = camera_mod.calibrar(nome, dados, modelo=modelo, quadrado_mm=quadrado_mm,
+                                marcador_mm=quadrado_mm * 18 / 25)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    return _cadastro().salvar_camera(p)
+
+
+@app.post("/api/cadastro/cameras/{nome}/posicao")
+async def cadastro_camera_posicao(nome: str, arquivo: UploadFile = File(...), quadrado_mm: float = Form(25.0),
+                                  equipamento_chave: str | None = Form(None)) -> dict:
+    """Câmera fixa: a foto de instalação com a folha. Guarda o plano de referência e a cena para conferir."""
+    from nucleo.medicao import camera as camera_mod
+
+    cad = _cadastro()
+    perfil = _erro_cadastro(lambda: cad.camera(nome))
+    try:
+        pos = camera_mod.registrar_posicao(perfil, await arquivo.read(), quadrado_mm=quadrado_mm,
+                                           marcador_mm=quadrado_mm * 18 / 25)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+    cad.salvar_posicao(pos, equipamento_chave)
+    return pos.para_dict()
+
+
+@app.post("/api/cadastro/cameras/{nome}/conferir")
+async def cadastro_camera_conferir(nome: str, arquivo: UploadFile = File(...)) -> dict:
+    """A câmera fixa continua na posição calibrada?"""
+    from nucleo.medicao import camera as camera_mod
+
+    pos = _cadastro().posicao(nome)
+    if pos is None:
+        raise HTTPException(404, "Esta câmera não tem posição fixa registrada.")
+    return camera_mod.conferir_posicao(pos, await arquivo.read())
+
+
+@app.post("/api/cadastro/escala")
+def cadastro_escala(corpo: dict = Body(...)) -> dict:
+    """Escala de uma foto por um componente cadastrado e validado: câmera, medida e tamanho dele em pixels."""
+    from nucleo.medicao.camera import escala_por_referencia
+
+    cad = _cadastro()
+    m = _erro_cadastro(lambda: cad.medida(int(corpo.get("medida_id", 0))))
+    if m["status"] != "validada":
+        raise HTTPException(422, f"A medida {m['id']} está {m['status']}: só medida validada por engenheiro dá escala.")
+    perfil = _erro_cadastro(lambda: cad.camera(str(corpo.get("camera"))))
+    try:
+        largura, altura = int(corpo["largura"]), int(corpo["altura"])
+        r = escala_por_referencia(perfil.para_resolucao(largura, altura), float(corpo["comprimento_px"]),
+                                  m["valor_cm"], m["incerteza_cm"] or 0.0)
+    except (KeyError, TypeError, ValueError) as e:
+        raise HTTPException(422, f"Informe largura, altura e comprimento_px da foto ({e}).")
+    return r | {"referencia": {k: m[k] for k in ("id", "equipamento_chave", "componente", "medida", "valor_cm", "validado_por")}}
+
+
 # ---------------------------------------------------------------- câmera do celular
 
 
