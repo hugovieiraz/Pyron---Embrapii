@@ -96,7 +96,11 @@ Conferido: testes da interface (10/10), `node --check`, os dois temas.
     "Usar dados de demonstração". Só aparece sem nenhuma inspeção.
 20. **Sobre** (em Configurações): logo, versão, créditos, licença do dataset, sem texto longo.
 
-## 5. Etapa 3c: estilo FLIR (pedido do Hugo em 25/10)
+## 5. Etapa 3c: estilo FLIR (pedido do Hugo em 25/10) · cancelada
+
+**Cancelada em 25/10:** o Hugo esclareceu que a FLIR é só referência de sobriedade, e a medição mostrou
+a cor de estrutura em menos de 1 % da tela (tabela em `docs/plano-interface.md`, Etapa 3c). A direção C
+continua; o texto abaixo fica como registro do que foi proposto.
 
 O Hugo mostrou telas do FLIR Thermal Studio e pediu o Pyron nesse estilo: fundo branco (ou preto no
 tema escuro), enxuto, profissional, sem cor espalhada na estrutura. Isso vira a Etapa 3c, feita antes

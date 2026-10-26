@@ -14,6 +14,9 @@ núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Te
 - **Três famílias** com papéis separados: Segoe UI Variable (conteúdo), **Bahnschrift semicondensada**
   (`--fonte-estrutura`: navegação, abas, títulos de seção, cabeçalho de tabela e barra de ferramentas;
   maiúsculas espaçadas, menos nos rótulos de ferramenta) e Cascadia Mono (caminhos e leituras).
+- **Proporção de cor:** cor de estrutura (cobalto) abaixo de 2 % da tela, medida nas capturas em toda
+  etapa; o cobalto marca só a ação principal, a aba atual e a seleção. O resto da cor é dado
+  (termograma, severidade) ou o acento das ilustrações. A FLIR é referência de sobriedade, não estilo a copiar.
 - **Superfície:** área de trabalho em `--fundo-trabalho`; barras, painéis e tabelas brancos com linha
   de 1 px. **Sombra só no que flutua** (menu, diálogo, aviso) e no chão das ilustrações; cartão sem sombra.
 - **Estrutura de tela de trabalho:** `barraFerramentas()` (uma por tela) + área + `painelDetalhe()`

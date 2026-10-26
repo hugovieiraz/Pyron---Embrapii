@@ -124,16 +124,23 @@ Modelo: **Opus**, esforço **alto**. Base: `docs/interface/2-direcao.md`, seçã
 - **Pronto quando:** o catálogo mostra tudo nos dois temas, contraste e alvos com 0 falhas, e a
   captura do estado "Captura sem câmera" ao lado da referência da FLIR mostra o mesmo nível de acabamento.
 
-## Etapa 3c · Estilo FLIR (pedido do Hugo, 25/10)
-Modelo: **Opus**, esforço **alto**. Base: `docs/interface/acabamento.md`, parte 5.
-- [ ] Revisar a direção em `2-direcao.md`: interface monocromática; cor só no termograma, na
-      severidade e no acento das ilustrações.
-- [ ] Tokens: ação, aba ativa e seleção em grafite (branco no escuro), sem cobalto; cinzas neutros;
-      corpo 15 px e tabelas 14 px; raios de 2 a 4 px; título de página grande em peso leve.
-- [ ] Estrutura padrão de tela (barra de ferramentas, área, painel de detalhes com trilho);
-      estados vazios sem cartão; Configurações como diálogo com categorias.
-- [ ] Catálogo, contraste e alvos conferidos de novo; `CLAUDE.md` seção 0 atualizada.
-- **Pronto quando:** catálogo e Captura no estilo novo, nos dois temas, com 0 falhas.
+## Etapa 3c · Estilo FLIR: cancelada (25/10)
+O Hugo esclareceu: a FLIR é referência de **sobriedade** (o medo é voltar a ter cor espalhada), não um
+estilo a copiar; se a proporção de cor já estiver estudada e boa, seguir a direção planejada.
+Medido em 1536 × 816 (pixels com cor, saturação > 0,35):
+
+| Tela | Com cor | Cobalto (ação) | Dado e acento térmico |
+|---|---|---|---|
+| Interface atual, Análise / Painel | 23,7 % / 16,2 % | 9,4 % / 7,5 % | 14,2 % / 8,7 % |
+| Nova, Captura (claro / escuro) | 1,0 % / 1,1 % | 0,8 % / 0,8 % | 0,3 % / 0,3 % |
+| Esboço da nova Análise | 14,6 % | 0,9 % | 13,7 % (o termograma) |
+| FLIR Thermal Studio (referência) | 0,1 % | 0 % | 0,1 % |
+
+A cor de estrutura caiu de 7–9 % para menos de 1 %: o cobalto ficou só no botão primário, no traço da
+aba atual e na marca do trilho (um destaque por tela, Von Restorff). Tirá-lo deixaria a tela sem sinal de
+ação principal e de onde se está. Decisão: manter a direção C e a paleta aço e cobalto; corpo continua em
+17 px (leitura no projetor). Regra para as próximas etapas: **cor de estrutura abaixo de 2 % da tela**,
+medida nas capturas; o resto da cor é dado (termograma, severidade) ou o acento das ilustrações.
 
 ## Etapa 4 · Tela de referência
 Modelo: **Opus**, esforço **alto**.
@@ -172,6 +179,7 @@ Modelo: Opus com esforço **médio**.
 | 3b (em andamento) | 25/10/2026 | Tokens (estrutura, ilustração, ferro, fundo de trabalho); Bahnschrift semicondensada na navegação, abas, cabeçalho de tabela e ferramentas (medido: 15 % mais estreita); barra de ferramentas, seção recolhível, painel com trilho; 6 ilustrações isométricas em `js/ilustracoes.js`; `/nova#captura` mostra o estado sem fonte com dados reais; catálogo: 0 falhas em 395 textos e 83 alvos (claro, escuro, toque); Captura: 0 falhas | Barra de título própria (WCO) não dá: na janela `--app` a API existe mas fica desligada (`visible: false`); só funciona instalando como PWA, o que muda o lançador | Falta: revisar a olho as 5 outras ilustrações nos dois temas, CLAUDE.md seções 1 e 2, comparação lado a lado com a FLIR (`saida/`), marcar as caixas |
 | 3b (nuvem) | 25/10/2026 | Ilustrações v2: moldura 4:3 comum, gradiente nas faces, filete de luz, sombra difusa; 6 corrigidas e 4 novas (`analise`, `laudo`, `busca`, `celular`); entrada peça a peça e varredura no `procurando`; 4 tokens `--ilu-*`; capturas em `docs/interface/capturas/etapa3b/`; lista de toques finais em `docs/interface/acabamento.md` | Cada ilustração em até 6 peças (chão, peças, acento por último); loop só em `procurando`; logo nova aprovada em `marca/vetor/` (símbolo vetorizado da referência do Hugo + Chakra Petch Bold), ainda não aplicada | Usar as ilustrações nos estados da tabela de `acabamento.md`; aplicar a logo nova (`acabamento.md`, parte 6); CLAUDE.md seções 1 e 2; comparação com a FLIR; Etapa 3c (`acabamento.md`, parte 5), pedida pelo Hugo |
 | 3b | 25/10/2026 | Pacote da nuvem integrado (3 commits, testes 242/8); 10 ilustrações revisadas no catálogo, claro e escuro; logo nova aplicada: `marca/gerar_marca.py` reescrito (rasteriza os SVG no Edge sem janela, fundo transparente), `simbolo.png`, `logo.png` vertical, `icone-64/192.png`, `pyron.ico` com 10 tamanhos e cópias da apresentação; barra da interface nova com a logo horizontal (claro e escuro); comparação com a FLIR em `saida/capturas/etapa3/comparacao-flir.png`; catálogo 0 falhas em 398 textos e 83 alvos, Captura 0 falhas, nos dois temas e em toque | `logo.png` em montagem vertical (símbolo sobre a palavra, das mesmas peças) para caber na tela de abertura do `Pyron.exe` sem recompilar; o `.exe` não foi recompilado (o ícone embutido só muda ao rodar `lancador/construir.py`); a comparação com a FLIR mostra a mesma estrutura e acabamento, e a diferença restante é a cor (cobalto), que é a Etapa 3c | Etapa 3c (estilo FLIR); recompilar o `Pyron.exe` quando quiser o ícone novo na barra do Windows (conferir o tamanho de ≈100 KB) |
+| 3c | 25/10/2026 | Cancelada depois de medir a proporção de cor (tabela na Etapa 3c) | FLIR é referência de sobriedade, não estilo a copiar (Hugo); cobalto fica só como o destaque da ação; regra nova: cor de estrutura < 2 % da tela, medida em toda etapa | Etapa 4: Análise |
 
 ### Medição de equipamentos (Etapa 0)
 
