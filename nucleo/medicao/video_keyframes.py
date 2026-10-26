@@ -341,8 +341,8 @@ def medir_video(
     img_anterior = keyframes[0].imagem_rgb
 
     for i, kf in enumerate(keyframes):
-        if i > 0:
-            pista_corrente = propagar_pista(pista_inicial, img_anterior, kf.imagem_rgb)
+        if i > 0:  # de quadro em quadro: a pista do anterior segue para este (a do 1º só vale no 1º)
+            pista_corrente = propagar_pista(pista_corrente, img_anterior, kf.imagem_rgb)
 
         if medidor is not None:
             m = medidor.medir(kf.bytes_jpeg, pista_corrente, referencia)
@@ -364,3 +364,48 @@ def medir_video(
         "quadros": detalhes_quadros,
         "n_keyframes": len(keyframes),
     }
+
+
+def comparar_video(
+    video_origem: str | Path | bytes,
+    pista_inicial: dict,
+    referencia: dict | None = None,
+    max_keyframes: int = 4,
+    comparar=None,
+) -> dict[str, Any]:
+    """Como ``medir_video``, mas cada quadro passa por ``medicao.comparar`` (DA3 e MoGe-2, sem e com a referência)
+    e o consenso sai por modelo e modo: ``{"consenso": {modelo: {modo: {campo: {...}}}}, "quadros": [...]}``.
+    A pista vale no 1º quadro e segue o objeto de quadro em quadro; quadro onde o objeto se perde fica de fora."""
+    from types import SimpleNamespace
+
+    if comparar is None:
+        from nucleo import medicao as medicao_mod
+
+        comparar = medicao_mod.comparar
+    keyframes = selecionar_keyframes(video_origem, max_keyframes=max_keyframes)
+    if not keyframes:
+        raise ValueError("Nenhum quadro nítido no vídeo: grave mais devagar, com o objeto parado e bem iluminado.")
+
+    quadros: list[dict] = []
+    pista, anterior = pista_inicial, keyframes[0].imagem_rgb
+    for i, kf in enumerate(keyframes):
+        if i > 0:
+            pista = propagar_pista(pista, anterior, kf.imagem_rgb)
+        anterior = kf.imagem_rgb
+        try:
+            r = comparar(kf.bytes_jpeg, pista, referencia)
+        except ValueError as e:
+            quadros.append({"keyframe": kf.para_dict(), "pista": pista, "erro": str(e)})
+            continue
+        quadros.append({"keyframe": kf.para_dict(), "pista": pista, "resultados": r["resultados"], "contorno": r.get("contorno", [])})
+
+    validos = [q for q in quadros if "resultados" in q]
+    if not validos:
+        raise ValueError(quadros[0]["erro"])
+    consenso: dict = {}
+    for modelo in validos[0]["resultados"]:
+        for modo in ("sem_referencia", "com_referencia"):
+            medidas = [SimpleNamespace(**q["resultados"][modelo][modo]) for q in validos if (q["resultados"].get(modelo) or {}).get(modo)]
+            if medidas:
+                consenso.setdefault(modelo, {})[modo] = agregar_medicoes(medidas)
+    return {"consenso": consenso, "quadros": quadros, "n_keyframes": len(keyframes), "jpeg_primeiro": keyframes[0].bytes_jpeg}

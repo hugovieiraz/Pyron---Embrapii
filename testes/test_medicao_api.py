@@ -335,3 +335,32 @@ def test_api_video_keyframes_e_medir(cliente, tmp_path):
     assert "comprimento_cm" in dados_med["consenso"]
     assert dados_med["n_keyframes"] >= 1
 
+
+def test_video_comparar_guarda_video_e_registra(comparacao, monkeypatch, tmp_path):
+    """O vídeo passa pelos dois modelos em cada quadro; a medida entra no registro com o 1º quadro como foto."""
+    cv2 = pytest.importorskip("cv2")
+    import numpy as np
+
+    import nucleo.medicao as medicao
+
+    cli, _ = comparacao
+    caminho = tmp_path / "v.mp4"
+    escrita = cv2.VideoWriter(str(caminho), cv2.VideoWriter_fourcc(*"mp4v"), 10.0, (160, 120))
+    for i in range(20):
+        q = np.full((120, 160, 3), 200, np.uint8)
+        q[::10] = 20
+        q[:, (i % 10)::10] = 20
+        escrita.write(q)
+    escrita.release()
+    monkeypatch.setattr(medicao, "comparar", lambda jpeg, pista, ref: {"resultados": {
+        "da3": {"sem_referencia": {"comprimento_cm": 33.0}, "com_referencia": None}}, "contorno": []})
+    r = cli.post("/api/medicao/video/comparar", files={"arquivo": ("v.mp4", caminho.read_bytes(), "video/mp4")},
+                 data={"pista": json.dumps({"ponto": [80, 60]}), "como": "sem"})
+    assert r.status_code == 200, r.text
+    corpo = r.json()
+    assert corpo["consenso"]["da3"]["sem_referencia"]["comprimento_cm"]["valor"] == 33.0
+    assert cli.get(f"/api/medicao/videos/{corpo['video']}").content == caminho.read_bytes()
+    entrada = cli.get("/api/medicao/registro").json()["entradas"][0]
+    assert entrada["origem"] == "video" and entrada["foto"] == corpo["foto"]
+    assert entrada["resultados"]["da3"]["sem_referencia"]["comprimento_cm"] == 33.0
+    assert entrada["video"]["codigo"] == corpo["video"]

@@ -172,3 +172,50 @@ def test_medir_video_ponta_a_ponta(tmp_path):
     assert resultado["consenso"]["comprimento_cm"]["valor"] == pytest.approx(42.0, abs=1.0)
     assert len(resultado["quadros"]) == resultado["n_keyframes"]
     assert falso.chamadas == resultado["n_keyframes"]
+
+
+def test_pista_segue_de_quadro_em_quadro():
+    """Com três quadros andando 6 px cada, a pista do 3º sai do 2º (não do 1º): termina 12 px adiante."""
+    base = _criar_padrao_nitido()
+    quadros = [cv2.warpAffine(base, np.float32([[1, 0, 6 * i], [0, 1, 0]]), (base.shape[1], base.shape[0])) for i in range(3)]
+    pista = {"ponto": [100.0, 100.0]}
+    for anterior, atual in zip(quadros, quadros[1:]):
+        pista = vk.propagar_pista(pista, anterior, atual)
+    assert pista["ponto"][0] == pytest.approx(112.0, abs=1.5)
+
+
+def test_comparar_video_consenso_por_modelo_e_modo(tmp_path):
+    video = _criar_video_teste(tmp_path / "v.mp4", duracao_s=2.0, fps=15)
+    chamadas = []
+
+    def comparar(jpeg, pista, referencia):
+        chamadas.append(pista)
+        n = len(chamadas)
+        return {"resultados": {"da3": {"sem_referencia": {"comprimento_cm": 40.0 + n, "metodo": "x"},
+                                       "com_referencia": {"comprimento_cm": 30.0, "metodo": "x"}},
+                               "moge": {"sem_referencia": {"comprimento_cm": 50.0, "metodo": "x"}, "com_referencia": None}},
+                "contorno": []}
+
+    r = vk.comparar_video(video, {"caixa": [40, 40, 160, 160]}, {"auto": "postit_rosa"}, max_keyframes=3, comparar=comparar)
+    n = len(chamadas)
+    assert n == r["n_keyframes"] >= 1
+    assert r["consenso"]["da3"]["com_referencia"]["comprimento_cm"]["valor"] == 30.0
+    assert r["consenso"]["da3"]["sem_referencia"]["comprimento_cm"]["n_quadros"] == n
+    assert "com_referencia" not in r["consenso"]["moge"]
+    assert r["jpeg_primeiro"][:3] == b"\xff\xd8\xff"
+
+
+def test_comparar_video_quadro_sem_objeto_fica_de_fora(tmp_path):
+    video = _criar_video_teste(tmp_path / "v.mp4", duracao_s=2.0, fps=15)
+    vezes = []
+
+    def comparar(jpeg, pista, referencia):
+        vezes.append(1)
+        if len(vezes) == 1:
+            raise ValueError("objeto não achado")
+        return {"resultados": {"da3": {"sem_referencia": {"comprimento_cm": 20.0}, "com_referencia": None}}}
+
+    r = vk.comparar_video(video, {"ponto": [100, 100]}, max_keyframes=3, comparar=comparar)
+    if r["n_keyframes"] > 1:
+        assert "erro" in r["quadros"][0]
+        assert r["consenso"]["da3"]["sem_referencia"]["comprimento_cm"]["n_quadros"] == r["n_keyframes"] - 1

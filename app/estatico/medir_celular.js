@@ -28,7 +28,7 @@ function el(tag, props = {}, ...filhos) {
 function enviar(item) {
   return new Promise((ok, falha) => {
     const x = new XMLHttpRequest();
-    x.open("POST", `${BASE}/medir/foto`);
+    x.open("POST", `${BASE}/medir/${item.arquivo.type.startsWith("video/") ? "video" : "foto"}`);
     x.setRequestHeader("Content-Type", item.arquivo.type || "application/octet-stream");
     x.upload.onprogress = (ev) => { if (ev.lengthComputable) { item.progresso = ev.loaded / ev.total; desenharItem(item); } };
     x.onload = () => {
@@ -64,7 +64,8 @@ const proximo = () => enviadas.find((i) => i.estado === "fila");
 
 function adicionar(arquivos) {
   for (const arquivo of arquivos) {
-    const item = { arquivo, url: URL.createObjectURL(arquivo), estado: "fila", progresso: 0, id: null, erro: null, n: enviadas.length + 1 };
+    const item = { arquivo, url: URL.createObjectURL(arquivo), estado: "fila", progresso: 0, id: null, erro: null, n: enviadas.length + 1,
+      video: arquivo.type.startsWith("video/") };
     enviadas.unshift(item);
     item.no = el("li", { class: "med-item" });
     $("#lista").prepend(item.no);
@@ -75,9 +76,11 @@ function adicionar(arquivos) {
 }
 
 function desenharItem(item) {
-  const miniatura = el("img", { class: "med-mini", src: item.url, alt: "", loading: "lazy" });
+  // vídeo: o 1º quadro do próprio arquivo (sem som, sem tocar); foto: a imagem
+  const miniatura = item.video ? el("video", { class: "med-mini", src: `${item.url}#t=0.1`, muted: true, playsinline: true, preload: "metadata" })
+    : el("img", { class: "med-mini", src: item.url, alt: "", loading: "lazy" });
   // HEIC no Android: o navegador não mostra; depois de enviada, a prévia vem do computador
-  miniatura.onerror = () => { miniatura.onerror = null; if (item.id) miniatura.src = `${BASE}/medir/${item.id}/previa`; else miniatura.classList.add("sem"); };
+  miniatura.onerror = () => { miniatura.onerror = null; if (item.id && !item.video) miniatura.src = `${BASE}/medir/${item.id}/previa`; else miniatura.classList.add("sem"); };
   const situacao = {
     fila: el("span", { class: "med-situ" }, T.naFila),
     enviando: el("span", { class: "med-situ" }, T.enviando(Math.round(item.progresso * 100))),
@@ -90,7 +93,7 @@ function desenharItem(item) {
     : null;
   const tentar = item.estado === "erro" ? el("button", { class: "cel-btn cel-btn-contorno med-tentar", type: "button", onclick: () => { item.estado = "fila"; processarFila(); } }, T.tentar) : null;
   item.no.replaceChildren(...[miniatura,
-    el("span", { class: "med-info" }, el("b", {}, T.foto(item.n)), el("span", { class: "cel-nota" }, `${mb(item.arquivo.size)} MB · ${T.original}`), situacao, barra),
+    el("span", { class: "med-info" }, el("b", {}, item.video ? T.video(item.n) : T.foto(item.n)), el("span", { class: "cel-nota" }, `${mb(item.arquivo.size)} MB · ${T.original}`), situacao, barra),
     tentar].filter(Boolean));
 }
 
@@ -104,11 +107,13 @@ function ligado(sim) {
 // ---------------------------------------------------------------- início
 $("#subtitulo").textContent = T.subtitulo;
 $("#titulo").textContent = T.titulo;
-$("#dica").textContent = T.dica;
+$("#dica").textContent = `${T.dica} ${T.dicaVideo}`;
 $("#btn-tirar").textContent = T.tirar;
 $("#btn-galeria").textContent = T.galeria;
+$("#btn-video").textContent = T.gravarVideo;
+$("#btn-video").addEventListener("click", () => $("#arq-video").click());
 $("#titulo-enviadas").textContent = T.enviadas;
 $("#btn-tirar").addEventListener("click", () => $("#arq-camera").click());
 $("#btn-galeria").addEventListener("click", () => $("#arq-galeria").click());
-for (const id of ["#arq-camera", "#arq-galeria"]) $(id).addEventListener("change", (ev) => { adicionar([...ev.target.files]); ev.target.value = ""; });
+for (const id of ["#arq-camera", "#arq-video", "#arq-galeria"]) $(id).addEventListener("change", (ev) => { adicionar([...ev.target.files]); ev.target.value = ""; });
 fetch(location.pathname, { cache: "no-store" }).then((r) => ligado(r.ok)).catch(() => ligado(false));
