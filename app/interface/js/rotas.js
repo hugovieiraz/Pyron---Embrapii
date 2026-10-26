@@ -8,8 +8,8 @@ export const ROTAS = {
   equipamentos: { titulo: T.telas.equipamentos, modulo: "equipamentos", atalho: "3", icone: "equipamentos", detalhe: "equipamento", esqueleto: "lista" },
   pendencias: { titulo: T.telas.pendencias, modulo: "pendencias", atalho: "4", icone: "pendencias", esqueleto: "lista" },
   captura: { titulo: T.telas.captura, modulo: "captura", detalhe: "captura", atalho: "5", icone: "captura" },
-  modelos: { titulo: T.telas.modelos, modulo: "provisoria", atalho: "6", icone: "modelos" },
-  configuracoes: { titulo: T.telas.configuracoes, modulo: "provisoria", atalho: "0", icone: "config" },
+  modelos: { titulo: T.telas.modelos, modulo: "modelos", atalho: "6", icone: "modelos" },
+  configuracoes: { titulo: T.telas.configuracoes, modulo: "configuracoes", atalho: "0", icone: "config" },
 };
 
 /** "#inspecoes/abc?sev=critico" vira { tela: "inspecoes", partes: ["abc"], params: URLSearchParams }. */

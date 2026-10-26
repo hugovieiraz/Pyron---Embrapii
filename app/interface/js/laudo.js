@@ -5,6 +5,7 @@ import { TEXTOS as T } from "../textos.js";
 import { el, icone, json, conexao } from "./base.js";
 import { botao, campo, dialogo, ocupado } from "./componentes.js";
 import { ilustracao } from "./ilustracoes.js";
+import { endereco } from "./rotas.js";
 
 const L = T.laudo;
 
@@ -33,7 +34,7 @@ async function pedirPdf(ids, responsavel, art) {
 export function abrirLaudo({ ids, config, responsavel = null, art = "" }) {
   const resps = config?.responsaveis || [];
   if (!resps.length) {
-    dialogo({ titulo: L.titulo(ids.length), corpo: [el("p", {}, L.semResponsavel)], acoes: [el("a", { class: "btn primario", href: "/#configuracoes/identidade" }, L.cadastrar)] }).abrir();
+    dialogo({ titulo: L.titulo(ids.length), corpo: [el("p", {}, L.semResponsavel)], acoes: [el("a", { class: "btn primario", href: endereco("configuracoes"), onclick: () => document.querySelector("dialog[open]")?.close() }, L.cadastrar)] }).abrir();
     return;
   }
   const escolhido = [responsavel, config.responsavel_padrao, resps[0].id].find((id) => id && resps.some((r) => r.id === id));

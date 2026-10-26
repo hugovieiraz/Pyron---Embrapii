@@ -48,8 +48,8 @@ table { border-collapse: collapse; }
 .topo-marca { display: flex; align-items: center; gap: var(--e-2); margin-right: var(--e-6); color: var(--texto); font-family: var(--fonte-titulo); font-weight: var(--p-forte); font-size: var(--t-3); }
 .topo-marca:hover { text-decoration: none; }
 .topo-marca img { width: auto; height: var(--logo-topo); }
-.topo-marca .logo-escuro, :root[data-tema="escuro"] .topo-marca .logo-claro { display: none; }
-:root[data-tema="escuro"] .topo-marca .logo-escuro { display: block; }
+.logo-escuro, :root[data-tema="escuro"] .logo-claro { display: none; } /* logo da marca: versão do tema (topo e Sobre) */
+:root[data-tema="escuro"] .logo-escuro { display: block; }
 .nav { display: flex; align-items: stretch; }
 /* voz de estrutura (Bahnschrift semicondensada): navegação, títulos de seção, cabeçalho de tabela, ferramentas */
 .estrutura { font-family: var(--fonte-estrutura); font-stretch: var(--largura-estrutura); }

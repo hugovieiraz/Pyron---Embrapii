@@ -63,7 +63,7 @@ kbd { font: var(--t-1) / var(--a-1) var(--fonte-num); padding: 0 var(--e-1); bor
 .campo [aria-invalid="true"] { border-color: var(--erro); }
 .campo input:disabled, .campo select:disabled { background: var(--superficie-2); color: var(--texto-apagado); cursor: not-allowed; }
 .com-unidade { position: relative; display: flex; align-items: center; }
-.com-unidade input { padding-right: var(--e-12); font-variant-numeric: tabular-nums; }
+.campo .com-unidade input:not([type="checkbox"]) { padding-right: var(--e-12); font-variant-numeric: tabular-nums; } /* mesma força do estilo do campo: a unidade não cobre o número */
 .com-unidade .unidade { position: absolute; right: var(--e-3); color: var(--texto-3); font-size: var(--t-1); pointer-events: none; }
 
 .marcar { display: inline-flex; align-items: center; gap: var(--e-2); min-height: var(--alvo); cursor: pointer; font-size: var(--t-1); }

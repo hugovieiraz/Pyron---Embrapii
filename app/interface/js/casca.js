@@ -228,6 +228,7 @@ async function iniciar() {
   setInterval(atualizarContadores, 30000);
   document.addEventListener("pyron:importadas", atualizarContadores);
   document.addEventListener("pyron:alertas", atualizarContadores);
+  document.addEventListener("pyron:tema", (ev) => aplicarTema(ev.detail)); // Configurações › Aparência
 }
 
 iniciar();

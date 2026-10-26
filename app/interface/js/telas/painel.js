@@ -114,7 +114,7 @@ function avisoConfiguracao(config) {
   if (!falta.length) return null;
   return el("div", { class: "aviso-config" }, icone("info"),
     el("p", {}, P.falta(falta)),
-    el("a", { class: "btn compacto", href: "/#configuracoes/identidade" }, P.configurar));
+    el("a", { class: "btn compacto", href: endereco("configuracoes") }, P.configurar));
 }
 
 function proximas(comAgenda) {
