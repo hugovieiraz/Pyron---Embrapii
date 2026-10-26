@@ -2027,6 +2027,30 @@ async def medicao(arquivo: UploadFile = File(...), pista: str = Form(...), refer
         raise HTTPException(422, str(e))
 
 
+@app.post("/api/medicao/plano")
+def medicao_plano(corpo: dict = Body(...)) -> dict:
+    """Medir sem modelo: 4 cantos de um retângulo de tamanho conhecido (A4, cartão) e 2 pontos no mesmo plano.
+    Só geometria (homografia); não precisa da foto nem dos pesos."""
+    from nucleo.medicao import plano_ref
+
+    cantos, tamanho, pontos = corpo.get("cantos"), corpo.get("tamanho_cm"), corpo.get("pontos")
+
+    def pares(v, n):
+        return (isinstance(v, list) and len(v) == n
+                and all(isinstance(p, list) and len(p) == 2 and all(isinstance(x, (int, float)) for x in p) for p in v))
+
+    if not pares(cantos, 4):
+        raise HTTPException(422, "Marque os 4 cantos da referência.")
+    if not pares(pontos, 2):
+        raise HTTPException(422, "Marque os 2 pontos a medir.")
+    if not (isinstance(tamanho, list) and len(tamanho) == 2 and all(isinstance(x, (int, float)) and 0 < x < 100000 for x in tamanho)):
+        raise HTTPException(422, "Informe os dois lados da referência, em cm.")
+    try:
+        return plano_ref.medir(cantos, tamanho, pontos)
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+
 # ---------------------------------------------------------------- câmera do celular
 
 

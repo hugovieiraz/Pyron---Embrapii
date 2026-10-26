@@ -129,3 +129,17 @@ def test_estado(cliente, tmp_path, monkeypatch):
     assert set(e["profundidade"]) == {"vits", "vitb", "vitl"}
     assert set(e["contorno"]) == {"small", "base-plus"}
     assert e["referencias"]["folha_a4"]["comprimento"] == 29.7
+
+
+def test_medir_pelo_plano_da_referencia_sem_modelo(cliente):
+    cli, _ = cliente
+    # A4 de frente a 1 m com focal 1000: 297 × 210 px; pontos a 500 px de distância = 50 cm
+    cantos = [[100, 100], [397, 100], [397, 310], [100, 310]]
+    r = cli.post("/api/medicao/plano", json={"cantos": cantos, "tamanho_cm": [29.7, 21.0], "pontos": [[100, 400], [600, 400]]})
+    assert r.status_code == 200, r.text
+    assert r.json()["distancia_cm"] == pytest.approx(50.0, rel=1e-3)
+    for corpo in ({"cantos": cantos[:3], "tamanho_cm": [29.7, 21], "pontos": [[0, 0], [1, 1]]},
+                  {"cantos": cantos, "tamanho_cm": [29.7], "pontos": [[0, 0], [1, 1]]},
+                  {"cantos": cantos, "tamanho_cm": [29.7, 21], "pontos": [[0, 0]]},
+                  {"cantos": [[0, 0], [1, 0], [2, 0], [3, 0]], "tamanho_cm": [29.7, 21], "pontos": [[0, 0], [1, 1]]}):
+        assert cli.post("/api/medicao/plano", json=corpo).status_code == 422

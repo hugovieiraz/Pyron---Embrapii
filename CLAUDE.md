@@ -40,6 +40,12 @@ núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Te
   em `js/captura/`, `js/modelos/` ou `js/configuracoes/` com `montar(no, ctx)` devolvendo a limpeza; trocar de aba
   não recarrega (endereço por `history.replaceState`). Critério e componentes salvam com botão (recalculam tudo). Só aparece fonte que funciona. Teste com o vídeo `dados/video_demo.mp4` em `pyron-vazio`. Estado vazio sem dados: pré-visualização `pyron-vazio` (porta 8791,
   `saida/dados_vazio`, apagar pela Lixeira depois).
+- **Medir foto** (Captura › Medir foto, `js/captura/medir.js`; roteiro em `docs/07_roteiro_medicao_geral.md`): medida
+  de objeto qualquer em foto comum. Núcleo em `nucleo/medicao/` (`medir()` no `__init__`; `geometria.py` só NumPy;
+  `profundidade.py` MoGe-2; `segmentar.py` SAM 2.1 pelo `transformers`; `plano_ref.py` sem modelo, por homografia;
+  `modelos.py` pesos em `modelos/medicao/`). API `/api/medicao`, `/api/medicao/estado` e `/api/medicao/plano`.
+  Licenças: só MIT e Apache 2.0 (nada CC BY-NC, AGPL, GPL; Depth Pro fora). Sem os pesos, a aba abre no modo
+  "Retângulo de referência".
 - Conferir: `testes/test_interface_nova.py` (regra dura do CSS, foco, módulos), axe (WCAG 2.2 AA, Etapa 6) e o catálogo
   `/catalogo.html` com "Conferir acessibilidade" (claro, `?tema=escuro`, `?toque`).
 
@@ -117,6 +123,9 @@ núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Te
 - Testes: `.venv/Scripts/python.exe -m pytest -q` (pastas `testes` e `tests`, ≈255 testes, ~40 s).
 - Pyron para testar sem dados reais: pré-visualização `pyron-demo` (`.claude/launch.json`, porta 8790,
   dados em `saida/dados_demo`). Apresentação: pré-visualização `apresentacao` (porta 8792).
+- Medição em foto: instalar `.venv/Scripts/pip install --no-deps git+https://github.com/microsoft/MoGe.git` (mais o
+  extra `[medicao]` do `pyproject.toml`), pesos `python -m nucleo.medicao.modelos --baixar vitb small`, avaliação no
+  gabarito `python -m ml.avaliar_medicao` (fotos e medidas reais em `testes/gabarito/`).
 - Abrir de verdade: atalhos "Abrir Pyron" e "Pyron Apresentação" da área de trabalho (`pythonw.exe -m apresentacao`).
 - Pacote portátil da apresentação (para outro computador): `.venv/Scripts/python.exe -m apresentacao.empacotar`
   (gera pasta + .zip na Área de Trabalho; apagar os anteriores antes). Nota técnica para o leitor:

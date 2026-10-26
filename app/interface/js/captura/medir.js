@@ -2,8 +2,10 @@
 // Abrir a foto, clicar no objeto (ou arrastar uma caixa, ou marcar duas pontas) e ver altura, largura e
 // comprimento com a margem de erro; uma referência de tamanho conhecido na foto corrige a escala.
 // O servidor faz tudo (POST /api/medicao): profundidade do MoGe-2, contorno do SAM 2.1 e geometria em 3D.
+// Sem modelo nenhum (ou sem os pesos instalados), o modo "Retângulo de referência" mede no plano de uma folha
+// A4 ou de um cartão: 4 cantos e 2 pontas, por homografia (POST /api/medicao/plano).
 import { TEXTOS as T } from "../../textos.js";
-import { el, api, fmt, lerNumero } from "../base.js";
+import { el, api, fmt, json, lerNumero } from "../base.js";
 import { botao, avisar, barraFerramentas, campo, esqueleto, estadoVazio, secao } from "../componentes.js";
 
 const M = T.medir;
@@ -20,10 +22,12 @@ function svg(tag, attrs = {}) {
 
 export async function montar(no) {
   const estado = await api("/api/medicao/estado");
-  if (!estado.pronto) { desenharSemModelos(no, estado); return null; }
 
   let foto = null;           // { arquivo, url, largura, altura }
-  let modo = "ponto";        // ponto | caixa | pontos
+  let modo = estado.pronto ? "ponto" : "plano"; // ponto | caixa | pontos (com os modelos) | plano (sem modelo)
+  let cantos = [];           // modo plano: cantos do retângulo de referência
+  let pontoPlano = null;     // modo plano: a primeira ponta da medida
+  let medidasPlano = [];     // modo plano: [{ pontos, r }]
   let alvo = "objeto";       // objeto | referencia: o que a próxima marca na foto define
   let pista = null;          // pista do objeto (enviada ao servidor)
   let pistaRef = null;       // pista da referência
@@ -54,10 +58,20 @@ export async function montar(no) {
   const tirarRef = botao({ texto: M.tirarReferencia, variante: "fantasma", compacto: true, onclick: () => { pistaRef = null; desenharReferencia(); remedir(); } });
   const notaRef = el("p", { class: "nota", role: "status" });
   const corpoRef = el("div", { class: "grupo-campos" }, el("p", { class: "nota" }, M.referenciaTexto), objetoRef, ladoRef, tamanhoRef, el("div", { class: "grupo-btn" }, marcarRef, tirarRef), notaRef);
+  const retangulos = refs.filter(([, r]) => r.largura != null);
+  const retRef = campo({ rotulo: M.retangulo, valor: retangulos[0]?.[0] || "outro", opcoes: [...retangulos.map(([id, r]) => ({ valor: id, texto: r.nome })), { valor: "outro", texto: M.outro }] });
+  const ladoMaior = campo({ rotulo: M.ladoMaior, tipo: "number", unidade: "cm" });
+  const ladoMenor = campo({ rotulo: M.ladoMenor, tipo: "number", unidade: "cm" });
+  const refazerCantos = botao({ texto: M.refazerCantos, variante: "fantasma", compacto: true, onclick: () => { cantos = []; pontoPlano = null; medidasPlano = []; atualizarTudo(); palco.focus({ preventScroll: true }); } });
+  const corpoPlano = el("div", { class: "grupo-campos" }, el("p", { class: "nota" }, M.planoTexto), retRef, ladoMaior, ladoMenor, el("div", { class: "grupo-btn" }, refazerCantos));
+  const secaoRef = secao({ titulo: M.referenciaTitulo, conteudo: [corpoRef] });
+  const secaoPlano = secao({ titulo: M.planoTitulo, conteudo: [corpoPlano] });
+  const avisoModelos = estado.pronto ? null : el("div", { class: "aviso-modelos" }, el("p", { class: "nota" }, M.semModelosNota), el("code", { class: "mono comando-medir" }, M.comandoInstalar));
   const painel = el("aside", { class: "painel-medir", "aria-label": M.resultado },
     el("section", {}, el("div", { class: "titulo-bloco" }, el("h2", {}, M.resultado)), caixaResultado),
-    secao({ titulo: M.referenciaTitulo, conteudo: [corpoRef] }),
-    secao({ titulo: M.detalhes, aberta: false, conteudo: [caixaDetalhes] }));
+    secaoPlano, secaoRef,
+    secao({ titulo: M.detalhes, aberta: false, conteudo: [caixaDetalhes] }),
+    avisoModelos);
 
   const grade = el("div", { class: "medir-grade" }, area, painel);
   no.append(entrada, barra, grade);
@@ -67,20 +81,32 @@ export async function montar(no) {
   const campoTamanho = tamanhoRef.querySelector("input");
   seletorLado.addEventListener("change", () => { if (objetoRef.querySelector("select").value !== "outro") desenharReferencia(); remedir(); });
   campoTamanho.addEventListener("change", () => remedir());
+  const seletorRet = retRef.querySelector("select");
+  const campoMaior = ladoMaior.querySelector("input"), campoMenor = ladoMenor.querySelector("input");
+  function desenharRetangulo() {
+    const pronto = estado.referencias?.[seletorRet.value];
+    if (pronto) { campoMaior.value = fmt(pronto.comprimento, 2); campoMenor.value = fmt(pronto.largura, 2); }
+    campoMaior.readOnly = campoMenor.readOnly = Boolean(pronto);
+  }
+  seletorRet.addEventListener("change", () => { desenharRetangulo(); remedirPlano(); });
+  campoMaior.addEventListener("change", () => remedirPlano());
+  campoMenor.addEventListener("change", () => remedirPlano());
+  desenharRetangulo();
 
   // ---------------------------------------------------------------- desenho
   function desenharBarra() {
-    const ferramenta = (id, icone) => ({ texto: M[id], icone, pressionado: modo === id, indisponivel: foto ? null : M.dicaModo.ponto, onclick: () => escolherModo(id) });
+    const ferramenta = (id, icone) => ({ texto: M[id], icone, pressionado: modo === id, onclick: () => escolherModo(id),
+      indisponivel: !estado.pronto && id !== "plano" ? M.semModelosCurto : foto ? null : M.dicaModo.ponto });
     barra.replaceChildren(barraFerramentas({
       rotulo: M.ferramentas,
       grupos: [[{ texto: foto ? M.trocar : M.abrir, icone: "foto", onclick: () => entrada.click() }],
-        [ferramenta("ponto", "ponto"), ferramenta("caixa", "regiao"), ferramenta("pontos", "linha")]],
+        [ferramenta("ponto", "ponto"), ferramenta("caixa", "regiao"), ferramenta("pontos", "linha")], [ferramenta("plano", "escala")]],
       direita: [{ texto: M.limpar, icone: "x", indisponivel: foto ? null : M.dicaModo.ponto, onclick: () => limpar() }],
     }));
   }
 
   function desenharVazio() {
-    area.replaceChildren(estadoVazio({ icone: "regua", titulo: M.vazioTitulo, texto: M.vazioTexto,
+    area.replaceChildren(estadoVazio({ icone: "regua", titulo: M.vazioTitulo, texto: estado.pronto ? M.vazioTexto : M.planoTexto,
       acoes: [botao({ texto: M.abrir, icone: "foto", variante: "primario", onclick: () => entrada.click() })] }));
     caixaResultado.replaceChildren(el("p", { class: "nota" }, M.semResultado));
     caixaDetalhes.replaceChildren();
@@ -88,6 +114,7 @@ export async function montar(no) {
 
   function dica() {
     if (medindo) return [el("b", {}, M.medindo), " ", el("span", {}, M.medindoNota)];
+    if (modo === "plano") return cantos.length < 4 ? M.dicaModo.cantos(cantos.length + 1) : pontoPlano ? M.dicaModo.pontosSegundo : M.dicaModo.plano;
     if (alvo === "referencia") return M.dicaModo.referencia;
     if (modo === "pontos" && primeiroPonto) return M.dicaModo.pontosSegundo;
     return M.dicaModo[modo];
@@ -114,15 +141,27 @@ export async function montar(no) {
         p.pontos.forEach(([cx, cy]) => filhos.push(svg("circle", { cx, cy, r: Math.max(W, H) * 0.006, class: classe })));
       }
     };
-    marca(pistaRef, "marca-ref");
-    marca(pista, "marca-obj");
-    if (primeiroPonto) marca({ ponto: primeiroPonto }, "marca-obj");
+    if (modo === "plano") {
+      if (cantos.length >= 2) {
+        const pts = cantos.map((q) => q.join(",")).join(" ");
+        const tag = cantos.length === 4 ? "polygon" : "polyline";
+        filhos.push(svg(tag, { points: pts, class: "marca-ref sombra" }), svg(tag, { points: pts, class: "marca-ref" }));
+      }
+      cantos.forEach(([cx, cy]) => filhos.push(svg("circle", { cx, cy, r: Math.max(W, H) * 0.006, class: "marca-ref" })));
+      medidasPlano.forEach((m) => marca({ pontos: m.pontos }, "marca-obj"));
+      if (pontoPlano) marca({ ponto: pontoPlano }, "marca-obj");
+    } else {
+      marca(pistaRef, "marca-ref");
+      marca(pista, "marca-obj");
+      if (primeiroPonto) marca({ ponto: primeiroPonto }, "marca-obj");
+    }
     if (rascunho) marca({ caixa: rascunho }, "marca-rascunho");
     if (document.activeElement === palco) filhos.push(svg("circle", { cx: mira.x * W, cy: mira.y * H, r: Math.max(W, H) * 0.012, class: "mira" }));
     camada.replaceChildren(...filhos);
   }
 
   function desenharResultado() {
+    if (modo === "plano") { desenharResultadoPlano(); return; }
     if (medindo) { caixaResultado.replaceChildren(esqueleto.linhas(3)); return; }
     if (!resultado) { caixaResultado.replaceChildren(el("p", { class: "nota" }, M.semResultado)); caixaDetalhes.replaceChildren(); return; }
     const r = resultado;
@@ -139,6 +178,49 @@ export async function montar(no) {
       el("p", {}, M.lente[r.lente] || ""),
       el("p", {}, M.modelosUsados(r.modelos?.profundidade || T.geral.semValor, r.modelos?.contorno || T.geral.semValor)),
       el("p", { class: "nota" }, M.tempos(tempos)));
+  }
+
+  function desenharResultadoPlano() {
+    if (!medidasPlano.length) { caixaResultado.replaceChildren(el("p", { class: "nota" }, M.semResultado)); caixaDetalhes.replaceChildren(); return; }
+    const linhas = medidasPlano.map((m, i) => el("div", { class: i === medidasPlano.length - 1 ? "leitura-medir principal" : "leitura-medir" },
+      el("span", { class: "rotulo" }, m.r.extrapolacao > 3 ? `${M.medidaN(i + 1)}, ${M.longe}` : M.medidaN(i + 1)),
+      el("b", { class: "num" }, M.valor(fmt(m.r.distancia_cm, 1))),
+      el("span", { class: "num mais" }, M.mais(fmt(m.r.incerteza_cm, 1)))));
+    caixaResultado.replaceChildren(el("div", { class: "leituras-medir" }, linhas.reverse()), el("p", { class: "nota" }, M.planoMetodo));
+    caixaDetalhes.replaceChildren();
+  }
+
+  function atualizarTudo() { desenharBarra(); desenharResultado(); atualizarHud(); desenharCamada(); secaoPlano.hidden = modo !== "plano"; secaoRef.hidden = modo === "plano"; }
+
+  function tamanhoPlano() {
+    const a = lerNumero(campoMaior.value), b = lerNumero(campoMenor.value);
+    return a > 0 && b > 0 ? [a, b] : null;
+  }
+
+  async function medirPlano(m) {
+    const tamanho = tamanhoPlano();
+    if (!tamanho) { avisar(M.planoSemTamanho, { erro: true }); return false; }
+    try {
+      m.r = await api("/api/medicao/plano", json("POST", { cantos, tamanho_cm: tamanho, pontos: m.pontos }));
+      return true;
+    } catch (e) {
+      avisar(`${M.erroMedir} ${e.message}`, { erro: true });
+      return false;
+    }
+  }
+
+  async function remedirPlano() {
+    for (const m of medidasPlano) await medirPlano(m);
+    desenharResultado();
+  }
+
+  async function clicarPlano(p) {
+    if (cantos.length < 4) { cantos.push(p); atualizarHud(); desenharCamada(); return; }
+    if (!pontoPlano) { pontoPlano = p; atualizarHud(); desenharCamada(); return; }
+    const m = { pontos: [pontoPlano, p], r: null };
+    pontoPlano = null;
+    if (await medirPlano(m)) medidasPlano.push(m);
+    atualizarTudo();
   }
 
   function desenharReferencia() {
@@ -170,12 +252,13 @@ export async function montar(no) {
     const img = new Image();
     img.onload = () => {
       foto = { arquivo, url, largura: img.naturalWidth, altura: img.naturalHeight };
-      pista = pistaRef = primeiroPonto = resultado = null;
+      pista = pistaRef = primeiroPonto = resultado = pontoPlano = null;
+      cantos = []; medidasPlano = [];
       alvo = "objeto";
       imagem.src = url;
       quadro.style.setProperty("--proporcao", String(foto.largura / foto.altura));
       area.replaceChildren(palco);
-      desenharBarra(); desenharReferencia(); desenharResultado(); atualizarHud(); desenharCamada();
+      desenharReferencia(); atualizarTudo();
       palco.focus({ preventScroll: true });
     };
     img.onerror = () => { URL.revokeObjectURL(url); avisar(M.erroMedir, { erro: true }); };
@@ -184,16 +267,18 @@ export async function montar(no) {
 
   function escolherModo(id) {
     modo = id;
-    primeiroPonto = null;
-    desenharBarra(); atualizarHud(); desenharCamada();
+    primeiroPonto = pontoPlano = null;
+    alvo = "objeto";
+    atualizarTudo();
   }
 
   function limpar() {
-    pista = pistaRef = primeiroPonto = resultado = null;
+    pista = pistaRef = primeiroPonto = resultado = pontoPlano = null;
+    cantos = []; medidasPlano = [];
     alvo = "objeto";
     geracao++;
     medindo = false;
-    desenharReferencia(); desenharResultado(); atualizarHud(); desenharCamada();
+    desenharReferencia(); atualizarTudo();
   }
 
   function comecarReferencia() {
@@ -274,6 +359,7 @@ export async function montar(no) {
 
   function clicar(x, y) {
     const p = [Math.round(x), Math.round(y)];
+    if (modo === "plano") { clicarPlano(p); return; }
     if (modo === "pontos" && alvo === "objeto") {
       if (!primeiroPonto) { primeiroPonto = p; atualizarHud(); desenharCamada(); return; }
       const par = [primeiroPonto, p];
@@ -295,22 +381,16 @@ export async function montar(no) {
     } else if (ev.key === "Enter" || ev.key === " ") {
       ev.preventDefault();
       clicar(mira.x * foto.largura, mira.y * foto.altura);
-    } else if (ev.key === "Escape" && (primeiroPonto || alvo === "referencia")) {
-      primeiroPonto = null; alvo = "objeto"; atualizarHud(); desenharCamada();
+    } else if (ev.key === "Escape" && (primeiroPonto || pontoPlano || alvo === "referencia")) {
+      primeiroPonto = pontoPlano = null; alvo = "objeto"; atualizarHud(); desenharCamada();
     }
   });
   palco.addEventListener("focus", () => desenharCamada());
   palco.addEventListener("blur", () => desenharCamada());
 
-  desenharBarra();
   desenharReferencia();
+  atualizarTudo();
   desenharVazio();
   return () => { geracao++; if (foto) URL.revokeObjectURL(foto.url); };
 }
 
-function desenharSemModelos(no, estado) {
-  const faltam = Object.entries(estado.pacotes || {}).filter(([, ok]) => !ok).map(([nome]) => nome);
-  no.replaceChildren(el("div", { class: "vazio-medir" }, estadoVazio({ icone: "regua", titulo: M.semModelosTitulo, texto: M.semModelosTexto }),
-    el("code", { class: "mono comando-medir" }, M.comandoInstalar),
-    faltam.length ? el("p", { class: "nota" }, M.faltaPacote(faltam.join(", "))) : null));
-}
