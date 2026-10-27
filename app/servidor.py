@@ -1982,6 +1982,7 @@ def whatsapp_alerta(id_: str) -> dict:
 
 _trava_medicao = threading.Lock()
 LIMITE_FOTO_MEDICAO = 40 * 1024 * 1024
+LIMITE_VIDEO_MEDICAO = 100 * 1024 * 1024  # vídeo curto do celular para medir (alguns segundos)
 
 
 def _json_form(texto: str | None, nome: str) -> dict | None:
@@ -2379,6 +2380,65 @@ async def medicao_video_medir(
         raise HTTPException(422, str(e))
 
 
+@app.post("/api/medicao/video/comparar")
+async def medicao_video_comparar(
+    arquivo: UploadFile = File(...),
+    pista: str = Form(...),
+    referencia: str | None = Form(None),
+    como: str = Form("ambos"),
+    max_keyframes: int = Form(4),
+) -> dict:
+    """O vídeo nos dois modelos, sem e com referência: a pista vale no 1º quadro nítido e segue o objeto nos outros;
+    o resultado de cada modelo e modo é a mediana dos quadros. Guarda o vídeo e registra a medida (foto: o 1º quadro)."""
+    dados = await arquivo.read()
+    if not dados:
+        raise HTTPException(422, "O arquivo de vídeo está vazio.")
+    if len(dados) > LIMITE_VIDEO_MEDICAO:
+        raise HTTPException(413, "O vídeo passa de 100 MB.")
+    p = _validar_pista_medicao(_json_form(pista, "pista"), "a pista")
+    ref_bruta = _json_form(referencia, "referencia")
+    ref = _validar_pista_medicao(ref_bruta, "a referência", exige_tamanho=True) if ref_bruta else None
+    como = como if como in ("ambos", "com", "sem") else "ambos"
+    extensao = Path(arquivo.filename or "").suffix.lower() or ".mp4"
+
+    def rodar():
+        from nucleo import medicao as medicao_mod
+        from nucleo.medicao import video_keyframes as vk
+
+        with _trava_medicao:
+            r = vk.comparar_video(dados, p, ref, max_keyframes=max(1, min(max_keyframes, 8)), comparar=medicao_mod.comparar)
+        reg = _registro_medicao()
+        codigo_video = reg.guardar_video(dados, extensao)
+        foto = reg.guardar_foto(r.pop("jpeg_primeiro"))
+        resultados = {modelo: {modo: {campo: v["valor"] for campo, v in c.items() if isinstance(v, dict)}
+                               | {"desvio_cm": {campo[:-3]: v["desvio_padrao"] for campo, v in c.items() if isinstance(v, dict)},
+                                  "n_quadros": c.get("total_quadros")}
+                               for modo, c in modos.items()} for modelo, modos in r["consenso"].items()}
+        entrada = reg.adicionar(foto, p, ref, resultados, origem="video", como=como,
+                                video={"codigo": codigo_video, "quadros": r["n_keyframes"]})
+        return {**r, "id": entrada["id"], "foto": foto, "video": codigo_video, "erros": entrada["erros"]}
+
+    from starlette.concurrency import run_in_threadpool
+
+    try:
+        return await run_in_threadpool(rodar)
+    except (ImportError, OSError) as e:
+        raise HTTPException(503, f"Os modelos de medição não estão instalados ({type(e).__name__}: {e}).")
+    except ValueError as e:
+        raise HTTPException(422, str(e))
+
+
+@app.get("/api/medicao/videos/{codigo}")
+def medicao_video(codigo: str) -> Response:
+    """O vídeo guardado, como chegou (para a tela abrir o que veio do celular)."""
+    from fastapi.responses import FileResponse
+
+    caminho = _registro_medicao().caminho_video(codigo)
+    if caminho is None:
+        raise HTTPException(404, "Vídeo não encontrado.")
+    return FileResponse(caminho)
+
+
 # ---------------------------------------------------------------- biblioteca de contexto e medição 2D (nucleo/medicao/biblioteca_contexto.py)
 
 
@@ -2738,7 +2798,8 @@ def _celular_previa(codigo: str) -> bytes:
 
 
 celular_modo = celular.ModoCelular(PASTA_DADOS / "celular", _celular_detectar, _celular_capturar, _celular_modelo,
-                                   guardar_foto=_celular_guardar_foto, previa=_celular_previa)
+                                   guardar_foto=_celular_guardar_foto, previa=_celular_previa,
+                                   guardar_video=lambda dados, ext: _registro_medicao().guardar_video(dados, ext))
 INTERVALO_ESPELHO_S = 1 / 30  # o espelho confere se chegou quadro novo até 30 vezes por segundo
 
 

@@ -14,6 +14,7 @@ import { endereco } from "../rotas.js";
 const M = T.medir;
 const SVG = "http://www.w3.org/2000/svg";
 const ORDEM = ["altura", "comprimento", "largura", "espessura", "distancia"];
+const QUADROS_VIDEO = 4;  // quadros nítidos medidos por vídeo (cada um passa pelos dois modelos)
 const PASSO_TECLADO = 0.01; // mira do teclado: 1 % da foto por seta (Shift: 5 %)
 const CAIXA_MINIMA = 0.01;  // arrasto menor que 1 % da foto vale como clique
 
@@ -47,6 +48,9 @@ export async function montar(no, ctx = {}) {
 
   // ---------------------------------------------------------------- ferramentas e palco
   const entrada = el("input", { type: "file", accept: "image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif", hidden: true, onchange: () => { if (entrada.files[0]) abrir(entrada.files[0]); entrada.value = ""; } });
+  const entradaVideo = el("input", { type: "file", accept: "video/*", hidden: true, onchange: () => { if (entradaVideo.files[0]) abrirVideo(entradaVideo.files[0]); entradaVideo.value = ""; } });
+  // vídeo aberto: os quadros nítidos que o servidor escolheu; a pista vale no 1º e segue o objeto nos outros
+  let video = null;  // { arquivo, quadros: [{ url, tempo_s, largura, altura }], atual }
   const barra = el("div");
   const imagem = el("img", { class: "foto-medir", alt: "", draggable: "false" });
   const camada = svg("svg", { class: "camada-medir", "aria-hidden": "true", preserveAspectRatio: "none" });
@@ -174,7 +178,7 @@ export async function montar(no, ctx = {}) {
     avisoModelos);
 
   const grade = el("div", { class: "medir-grade" }, area, painel);
-  no.append(entrada, barra, grade);
+  no.append(entrada, entradaVideo, barra, grade);
 
   objetoRef.querySelector("select").addEventListener("change", () => { campoTamanho.value = ""; desenharReferencia(); remedir(); });
   const seletorLado = ladoRef.querySelector("select");
@@ -200,7 +204,7 @@ export async function montar(no, ctx = {}) {
       indisponivel: !estado.pronto && id !== "plano" ? M.semModelosCurto : foto ? null : M.dicaModo.ponto });
     barra.replaceChildren(barraFerramentas({
       rotulo: M.ferramentas,
-      grupos: [[{ texto: foto ? M.trocar : M.abrir, icone: "foto", onclick: () => entrada.click() }],
+      grupos: [[{ texto: foto ? M.trocar : M.abrir, icone: "foto", onclick: () => entrada.click() }, { texto: M.abrirVideo, icone: "video", onclick: () => entradaVideo.click() }],
         [ferramenta("ponto", "ponto"), ferramenta("caixa", "regiao"), ferramenta("pontos", "linha")], [ferramenta("plano", "escala")]],
       direita: [{ texto: M.limpar, icone: "x", indisponivel: foto ? null : M.dicaModo.ponto, onclick: () => limpar() }],
     }));
@@ -214,7 +218,9 @@ export async function montar(no, ctx = {}) {
   }
 
   function dica() {
-    if (medindo) return [el("b", {}, M.medindoTempo(Math.round((Date.now() - inicioMedida) / 1000))), " ", el("span", {}, M.medindoNota)];
+    const s = Math.round((Date.now() - inicioMedida) / 1000);
+    if (medindo) return [el("b", {}, video ? M.medindoVideo(s) : M.medindoTempo(s)), " ", el("span", {}, M.medindoNota)];
+    if (video && modo !== "plano") return video.atual === 0 ? M.videoDica : M.videoSoPrimeiro;
     if (modo === "plano") return cantos.length < 4 ? M.dicaModo.cantos(cantos.length + 1) : pontoPlano ? M.dicaModo.pontosSegundo : M.dicaModo.plano;
     if (alvo === "referencia") return M.dicaModo.referencia;
     if (modo === "pontos" && primeiroPonto) return M.dicaModo.pontosSegundo;
@@ -269,11 +275,12 @@ export async function montar(no, ctx = {}) {
     }
 
     const ultima = [...medicoes].reverse().find((m) => m.r);
+    const doQuadro = (m) => (video && m.r?.quadrosVideo ? m.r.quadrosVideo[video.atual] || {} : null);  // v?deo: o que vale no quadro mostrado
     if (ultima && (modo !== "plano" || ultima.r?.resultados?.contexto)) {
-      poligonos(ultima.r.contorno_referencia || [], "contorno-ref");
-      poligonos(ultima.r.contorno || [], "contorno-obj");
+      poligonos(doQuadro(ultima) ? [] : ultima.r.contorno_referencia || [], "contorno-ref");
+      poligonos(doQuadro(ultima)?.contorno || ultima.r.contorno || [], "contorno-obj");
 
-      const cotas = ultima.r.cotas || {};
+      const cotas = doQuadro(ultima) ? (video.atual === 0 ? ultima.r.cotas || {} : {}) : ultima.r.cotas || {};
       const res0 = Object.values(ultima.r.resultados || {}).find((x) => x.com_referencia || x.sem_referencia);
       const v0 = res0?.com_referencia || res0?.sem_referencia || {};
 
@@ -338,7 +345,7 @@ export async function montar(no, ctx = {}) {
       if (pontoPlano) marca({ ponto: pontoPlano }, "marca-obj");
     } else {
       marca(pistaRef, "marca-ref");
-      medicoes.forEach((m) => marca(m.pista, "marca-obj"));
+      medicoes.forEach((m) => marca(doQuadro(m)?.pista || (!video || video.atual === 0 ? m.pista : null), "marca-obj"));
       if (primeiroPonto) marca({ ponto: primeiroPonto }, "marca-obj");
     }
     if (rascunho) marca({ caixa: rascunho }, "marca-rascunho");
@@ -362,7 +369,7 @@ export async function montar(no, ctx = {}) {
   function cartao(m) {
     const fechar = botao({ texto: M.removerMedida, icone: "x", soIcone: true, compacto: true, variante: "fantasma",
       onclick: () => { medicoes = medicoes.filter((x) => x !== m); atualizarTudo(); } });
-    const cab = el("div", { class: "cab-cartao" }, el("h3", {}, M.medidaDe(m.n, M.tipoPista[Object.keys(m.pista)[0]])), fechar);
+    const cab = el("div", { class: "cab-cartao" }, el("h3", {}, M.medidaDe(m.n, m.video ? M.tipoVideo : M.tipoPista[Object.keys(m.pista)[0]])), fechar);
     if (!m.r) return el("article", { class: "cartao-medida" }, cab, el("p", { class: "nota" }, M.medindoModelos), esqueleto.linhas(2));
     const res = m.r.resultados;
     const modelos = Object.keys(res);
@@ -399,6 +406,7 @@ export async function montar(no, ctx = {}) {
       el("div", { class: "rola-tabela" }, el("table", { class: "tabela-comparacao" },
         el("thead", {}, el("tr", {}, el("th", { scope: "col" }, M.colunaMedida), ...colunas.map(([, , nome]) => el("th", { scope: "col" }, nome)), el("th", { scope: "col" }, M.colunaReal))),
         el("tbody", {}, linhas))),
+      m.video ? el("p", { class: "nota" }, M.notaVideo(m.video)) : null,
       ...notas.map((t) => el("p", { class: "nota aviso-escala" }, t)),
       tempos.length ? el("p", { class: "nota" }, M.tempos(tempos.join(", "))) : null);
   }
@@ -744,11 +752,12 @@ export async function montar(no, ctx = {}) {
   // ---------------------------------------------------------------- ações
   /** Abre a foto. O navegador não mostra HEIC: aí o servidor devolve um JPEG do mesmo tamanho só para a tela
    * (as medidas usam sempre o arquivo original, com os metadados). */
-  function abrir(arquivo, previa = null) {
+  function abrir(arquivo, previa = null, { comoVideo = false } = {}) {
     if (foto) URL.revokeObjectURL(foto.url);
     const url = URL.createObjectURL(previa || arquivo);
     const img = new Image();
     img.onload = () => {
+      if (!comoVideo) video = null;
       foto = { arquivo, url, largura: img.naturalWidth, altura: img.naturalHeight, codigo: arquivo.codigo || null };
       pistaRef = primeiroPonto = pontoPlano = null;
       cantos = []; medidasPlano = []; medicoes = [];
@@ -762,7 +771,8 @@ export async function montar(no, ctx = {}) {
       area.replaceChildren(palco, faixa, blocoComparacao);
       desenharReferencia(); atualizarTudo();
       palco.focus({ preventScroll: true });
-      if (foto.codigo) { trazerMedidasDoCelular(); desenharFaixa(); } else guardarNaFaixa(arquivo);
+      if (comoVideo) desenharFaixa();
+      else if (foto.codigo) { trazerMedidasDoCelular(); desenharFaixa(); } else guardarNaFaixa(arquivo);
     };
     img.onerror = async () => {
       URL.revokeObjectURL(url);
@@ -815,7 +825,8 @@ export async function montar(no, ctx = {}) {
       remedir();
       return;
     }
-    const m = { n: ++contador, pista: p, r: null, real: {}, id: null, erros: null, como: comoMedir, nome: "" };
+    if (video && video.atual !== 0) { avisar(M.videoSoPrimeiro); mostrarQuadro(0); return; }
+    const m = { n: ++contador, pista: p, r: null, real: {}, id: null, erros: null, como: comoMedir, nome: "", video: video ? video.quadros.length : 0 };
     medicoes.push(m);
     medir(m);
   }
@@ -833,16 +844,18 @@ export async function montar(no, ctx = {}) {
     fila = fila.then(async () => {
       if (minha !== geracao || !medicoes.includes(m)) return;
       const dados = new FormData();
-      dados.append("arquivo", foto.arquivo);
+      dados.append("arquivo", m.video ? video.arquivo : foto.arquivo);
       dados.append("pista", JSON.stringify(m.pista));
       const ref = m.como === "sem" ? null : referencia();
       if (ref) dados.append("referencia", JSON.stringify(ref));
       dados.append("como", m.como);
+      if (m.video) dados.append("max_keyframes", String(QUADROS_VIDEO));
       try {
-        const r = await api("/api/medicao/comparar", { method: "POST", body: dados });
+        const r = m.video ? deVideo(await api("/api/medicao/video/comparar", { method: "POST", body: dados }))
+          : await api("/api/medicao/comparar", { method: "POST", body: dados });
         if (minha !== geracao) return;
         m.r = r; m.id = r.id; m.erros = r.erros;
-        if (foto) foto.codigo = r.foto;
+        if (foto && !m.video) foto.codigo = r.foto;
         if (Object.keys(m.real).length) {  // o valor real já informado vale também para a medida refeita
           const e = await api(`/api/medicao/registro/${m.id}`, json("PUT", { real: m.real }));
           m.erros = e.erros;
@@ -924,7 +937,8 @@ export async function montar(no, ctx = {}) {
 
   // ---------------------------------------------------------------- celular: a foto que chega abre sozinha
   let celular = { versao: -1, fotos: [] };
-  let vistas = null;  // fotos do celular que já estavam lá ao abrir a aba (não abrem sozinhas)
+  let vistas = null;  // fotos e vídeos do celular que já estavam lá ao abrir a aba (não abrem sozinhos)
+  let vistasVideo = false;
 
   function desenharCelular() {
     if (!celular.ligado) {
@@ -965,10 +979,15 @@ export async function montar(no, ctx = {}) {
       const est = await api("/api/medicao/celular");
       const mudou = est.versao !== celular.versao || est.ligado !== celular.ligado;
       celular = est;
-      if (vistas == null) vistas = new Set(est.fotos.map((f) => f.id));
+      if (vistas == null) vistas = new Set([...est.fotos, ...(est.videos || [])].map((f) => f.id));
       if (!mudou) return;
       desenharCelular();
       carregarFaixa();
+      for (const v of (est.videos || []).filter((x) => !vistas.has(x.id))) {
+        vistas.add(v.id);
+        if (vistasVideo) { await abrirVideoGuardado(v.id); avisar(M.videoNovoCelular); }
+      }
+      vistasVideo = true;
       const nova = est.fotos.find((f) => !vistas.has(f.id));
       if (nova) {
         vistas.add(nova.id);
@@ -987,14 +1006,15 @@ export async function montar(no, ctx = {}) {
   vigiarCelular();
   // outra foto: arrastar para a aba ou colar (Ctrl+V), além do botão
   const fotoDe = (lista) => [...(lista || [])].find((f) => f.type.startsWith("image/") || /\.(heic|heif)$/i.test(f.name));
+  const videoDe = (lista) => [...(lista || [])].find((f) => f.type.startsWith("video/"));
   const arrastando = (ev) => { if (![...(ev.dataTransfer?.types || [])].includes("Files")) return; ev.preventDefault(); no.classList.add("soltar-foto"); };
   const saiu = (ev) => { if (!no.contains(ev.relatedTarget)) no.classList.remove("soltar-foto"); };
   const soltou = (ev) => {
     no.classList.remove("soltar-foto");
-    const f = fotoDe(ev.dataTransfer?.files);
-    if (!f) return;
+    const f = fotoDe(ev.dataTransfer?.files), v = videoDe(ev.dataTransfer?.files);
+    if (!f && !v) return;
     ev.preventDefault();
-    abrir(f);
+    if (v && !f) abrirVideo(v); else abrir(f);
   };
   const colou = (ev) => {
     if (ev.target.closest?.("input, textarea")) return;
@@ -1028,6 +1048,7 @@ export async function montar(no, ctx = {}) {
   }
 
   function desenharFaixa() {
+    if (video) { desenharFaixaVideo(); return; }
     faixa.hidden = !galeria.length;
     if (!galeria.length) return;
     const i = galeria.findIndex((f) => f.codigo === foto?.codigo);
@@ -1043,6 +1064,75 @@ export async function montar(no, ctx = {}) {
       el("span", { class: "nota num" }, i >= 0 ? M.posicaoFaixa(i + 1, galeria.length) : ""));
     if (miniaturas[i]) requestAnimationFrame(() => { lista.scrollLeft = miniaturas[i].offsetLeft - (lista.clientWidth - miniaturas[i].offsetWidth) / 2; });  // só a faixa rola, não a página
   }
+  // ---------------------------------------------------------------- vídeo
+  /** O servidor escolhe os quadros nítidos e espaçados; o 1º abre no palco e os outros vão para a faixa. */
+  async function abrirVideo(arquivo) {
+    limpar();
+    area.replaceChildren(palco, faixa, blocoComparacao);
+    hud.replaceChildren(el("b", {}, M.escolhendoQuadros));
+    quadro.classList.add("medindo");
+    const dados = new FormData();
+    dados.append("arquivo", arquivo);
+    dados.append("max_keyframes", String(QUADROS_VIDEO));
+    let r;
+    try { r = await api("/api/medicao/video/keyframes", { method: "POST", body: dados }); }
+    catch (e) { quadro.classList.remove("medindo"); avisar(e.message, { erro: true }); if (!foto) desenharVazio(); return; }
+    quadro.classList.remove("medindo");
+    if (!r.keyframes.length) { avisar(M.videoSemQuadros, { erro: true }); if (!foto) desenharVazio(); return; }
+    video?.quadros.forEach((q) => URL.revokeObjectURL(q.url));
+    const quadros = await Promise.all(r.keyframes.map(async (k) => ({ ...k, url: URL.createObjectURL(await (await fetch(k.imagem_base64)).blob()) })));
+    video = { arquivo, quadros, atual: 0 };
+    const primeiro = await (await fetch(quadros[0].url)).blob();
+    abrir(new File([primeiro], "quadro-1.jpg", { type: "image/jpeg" }), null, { comoVideo: true });
+  }
+
+  async function abrirVideoGuardado(codigo) {
+    const r = await fetch(`/api/medicao/videos/${codigo}`);
+    if (!r.ok) { avisar(M.erroMedir, { erro: true }); return; }
+    const blob = await r.blob();
+    abrirVideo(new File([blob], `${codigo}.mp4`, { type: blob.type || "video/mp4" }));
+  }
+
+  /** Mostra outro quadro do vídeo sem perder as medidas: a pista e o contorno daquele quadro aparecem nele. */
+  function mostrarQuadro(j) {
+    if (!video?.quadros[j]) return;
+    video.atual = j;
+    imagem.src = video.quadros[j].url;
+    atualizarHud(); desenharCamada(); desenharFaixa();
+  }
+
+  function desenharFaixaVideo() {
+    faixa.hidden = false;
+    const { quadros, atual } = video;
+    const miniaturas = quadros.map((q, j) => el("button", { type: "button", class: "mini-faixa", "aria-current": j === atual ? "true" : null,
+      "aria-label": M.quadroDaFaixa(j + 1, quadros.length, fmt(q.tempo_s, 1)), title: M.quadroCurto(fmt(q.tempo_s, 1)), onclick: () => mostrarQuadro(j) },
+      el("img", { src: q.url, alt: "" })));
+    faixa.replaceChildren(
+      botao({ texto: M.fotoAnterior, icone: "anterior", soIcone: true, desabilitado: atual <= 0, onclick: () => mostrarQuadro(atual - 1) }),
+      el("div", { class: "trilho-faixa" }, miniaturas),
+      botao({ texto: M.fotoSeguinte, icone: "proxima", soIcone: true, desabilitado: atual >= quadros.length - 1, onclick: () => mostrarQuadro(atual + 1) }),
+      el("span", { class: "nota num" }, M.posicaoFaixa(atual + 1, quadros.length)));
+  }
+
+  /** A resposta do vídeo no formato do cartão: a mediana de cada modelo e modo, o ± é o desvio entre os quadros. */
+  function deVideo(r) {
+    const resultados = {};
+    for (const [modelo, modos] of Object.entries(r.consenso)) {
+      resultados[modelo] = { sem_referencia: null, com_referencia: null };
+      for (const [modoR, c] of Object.entries(modos)) {
+        const v = { incerteza_cm: {} };
+        for (const [campo, x] of Object.entries(c)) {
+          if (x && typeof x === "object") { v[campo] = x.valor; v.incerteza_cm[campo.replace(/_cm$/, "")] = x.desvio_padrao; }
+        }
+        resultados[modelo][modoR] = v;
+      }
+    }
+    const q0 = r.quadros.find((q) => q.resultados) || {};
+    const cotas = Object.values(q0.resultados || {}).find((x) => x?.sem_referencia)?.sem_referencia?.cotas || {};
+    return { ...r, resultados, cotas, contorno: q0.contorno || [], contorno_referencia: [],
+      quadrosVideo: r.quadros.map((q) => ({ pista: q.pista, contorno: q.contorno || [] })) };
+  }
+
   carregarFaixa();
   // Modelos › Medição abre uma foto guardada por aqui (#captura/medir/<código>)
   const pedida = ctx.partes?.[0];
@@ -1053,6 +1143,7 @@ export async function montar(no, ctx = {}) {
     document.removeEventListener("paste", colou);
     removeEventListener("keydown", teclaEspaco); removeEventListener("keyup", teclaEspaco);
     if (foto) URL.revokeObjectURL(foto.url);
+    video?.quadros.forEach((q) => URL.revokeObjectURL(q.url));
   };
 }
 

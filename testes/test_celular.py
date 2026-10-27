@@ -335,6 +335,21 @@ def test_foto_para_medir_chega_inteira(tmp_path) -> None:
     assert c.post("/c/codigo-certo/medir/foto", content=b"").status_code == 422
 
 
+def test_video_para_medir_chega_inteiro(tmp_path) -> None:
+    from fastapi.testclient import TestClient
+
+    guardados = {}
+    modo = celular.ModoCelular(tmp_path, detectar=None, capturar=None, modelo=None,
+                               guardar_video=lambda dados, ext: guardados.setdefault(f"v{len(guardados)}{ext}", dados) and f"v{len(guardados) - 1}")
+    modo.token = "codigo-certo"
+    c = TestClient(celular.criar_app(modo))
+    r = c.post("/c/codigo-certo/medir/video", content=b"video-original", headers={"Content-Type": "video/quicktime"})
+    assert r.status_code == 200, r.text
+    assert guardados == {"v0.mov": b"video-original"}
+    assert modo.estado_medicao()["videos"][0]["id"] == r.json()["id"]
+    assert c.post("/c/codigo-certo/medir/video", content=b"").status_code == 422
+
+
 def test_foto_para_medir_sem_medicao(tmp_path) -> None:
     from fastapi.testclient import TestClient
 

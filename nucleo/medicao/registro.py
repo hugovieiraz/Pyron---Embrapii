@@ -56,6 +56,22 @@ class Registro:
         achados = list((self.pasta / "fotos").glob(f"{codigo}.*"))
         return achados[0] if achados else None
 
+    def guardar_video(self, dados: bytes, extensao: str = ".mp4") -> str:
+        """Guarda o vídeo como chegou, em ``<pasta>/videos/``. Devolve o código (hash do conteúdo)."""
+        codigo = hashlib.sha1(dados).hexdigest()[:16]
+        pasta = self.pasta / "videos"
+        pasta.mkdir(parents=True, exist_ok=True)
+        if not any(pasta.glob(f"{codigo}.*")):
+            ext = extensao if extensao in (".mp4", ".mov", ".webm", ".3gp", ".mkv") else ".mp4"
+            (pasta / f"{codigo}{ext}").write_bytes(dados)
+        return codigo
+
+    def caminho_video(self, codigo: str) -> Path | None:
+        if not codigo.isalnum():
+            return None
+        achados = list((self.pasta / "videos").glob(f"{codigo}.*"))
+        return achados[0] if achados else None
+
     def fotos(self, limite: int = 200) -> list[dict]:
         """As fotos guardadas, da mais nova para a mais antiga (a faixa de fotos de Medir foto)."""
         pasta = self.pasta / "fotos"
@@ -83,10 +99,12 @@ class Registro:
         return entrada
 
     def adicionar(self, foto: str, pista: dict, referencia: dict | None, resultados: dict, origem: str = "tela",
-                  como: str = "ambos") -> dict:
+                  como: str = "ambos", video: dict | None = None) -> dict:
         """``como``: o que quem mediu escolheu ver (``ambos``, ``com`` ou ``sem`` referência)."""
         entrada = {"id": f"{int(time.time() * 1000):x}", "quando": time.time(), "origem": origem, "foto": foto,
                    "pista": pista, "referencia": referencia, "como": como, "nome": "", "resultados": resultados, "real": {}}
+        if video:
+            entrada["video"] = video  # {"codigo", "quadros"}: medida de vídeo (o consenso dos quadros)
         return self._gravar(com_erros(entrada))
 
     def informar_real(self, codigo: str, real: dict) -> dict:

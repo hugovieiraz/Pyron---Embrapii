@@ -51,6 +51,7 @@ from fastapi.staticfiles import StaticFiles
 from PIL import Image
 
 LIMITE_FOTO_MEDICAO = 40 * 1024 * 1024  # foto original do celular (12 a 50 MP)
+LIMITE_VIDEO_MEDICAO = 100 * 1024 * 1024  # vídeo curto para medir (alguns segundos)
 FOTOS_MEDICAO = 20  # fotos de medição que o celular pode citar (as mais novas)
 ESTATICO = Path(__file__).resolve().parent / "estatico"
 PORTA_INICIAL = 8791
@@ -224,12 +225,14 @@ class ModoCelular:
     """
 
     def __init__(self, pasta: Path, detectar: Callable, capturar: Callable, modelo: Callable,
-                 guardar_foto: Callable | None = None, previa: Callable | None = None):
+                 guardar_foto: Callable | None = None, previa: Callable | None = None, guardar_video: Callable | None = None):
         self.pasta = pasta
         self._detectar, self._capturar, self._modelo = detectar, capturar, modelo
         # fotos para medir no computador (nucleo/medicao): o celular só tira e envia. guardar_foto(bytes) -> código;
         # previa(código) -> JPEG para mostrar a foto que o navegador do celular não abre (HEIC)
         self._guardar_foto, self._previa = guardar_foto, previa
+        self._guardar_video = guardar_video  # guardar_video(bytes, extensão) -> código; o computador mede o vídeo
+        self.videos_medicao: OrderedDict[str, float] = OrderedDict()
         self.fotos_medicao: OrderedDict[str, float] = OrderedDict()  # código -> quando chegou (as últimas)
         self.versao_medicao = 0
         self.host = "0.0.0.0"  # toda a rede local; os testes usam 127.0.0.1
@@ -282,9 +285,24 @@ class ModoCelular:
         self.versao_medicao += 1
         return codigo
 
+    def receber_video_medicao(self, dados: bytes, extensao: str = ".mp4") -> str:
+        """Vídeo curto gravado no celular para medir no computador, guardado como chegou."""
+        if self._guardar_video is None:
+            raise RuntimeError("A medição em vídeo não está disponível neste Pyron.")
+        if not dados or len(dados) > LIMITE_VIDEO_MEDICAO:
+            raise ValueError("Vídeo vazio ou maior que 100 MB.")
+        codigo = self._guardar_video(dados, extensao)
+        self.videos_medicao[codigo] = time.time()
+        self.videos_medicao.move_to_end(codigo)
+        while len(self.videos_medicao) > FOTOS_MEDICAO:
+            self.videos_medicao.popitem(last=False)
+        self.versao_medicao += 1
+        return codigo
+
     def estado_medicao(self) -> dict:
         return {"ligado": self.ligado, "url": self.url_medir, "versao": self.versao_medicao,
-                "fotos": [{"id": k, "quando": v} for k, v in reversed(self.fotos_medicao.items())]}
+                "fotos": [{"id": k, "quando": v} for k, v in reversed(self.fotos_medicao.items())],
+                "videos": [{"id": k, "quando": v} for k, v in reversed(self.videos_medicao.items())]}
 
     def ligar(self) -> None:
         import uvicorn
@@ -591,6 +609,18 @@ def criar_app(modo: ModoCelular) -> FastAPI:
         conferir(token)
         try:
             return {"id": await _em_fio(modo.receber_foto_medicao, await request.body())}
+        except ValueError as erro:
+            raise HTTPException(422, str(erro)) from erro
+        except RuntimeError as erro:
+            raise HTTPException(503, str(erro)) from erro
+
+    @app.post("/c/{token}/medir/video")
+    async def medir_video(token: str, request: Request) -> dict:
+        conferir(token)
+        tipo = request.headers.get("content-type", "")
+        extensao = {"video/quicktime": ".mov", "video/webm": ".webm", "video/3gpp": ".3gp"}.get(tipo.split(";")[0], ".mp4")
+        try:
+            return {"id": await _em_fio(modo.receber_video_medicao, await request.body(), extensao)}
         except ValueError as erro:
             raise HTTPException(422, str(erro)) from erro
         except RuntimeError as erro:

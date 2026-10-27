@@ -48,8 +48,11 @@ núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Te
   (mede nos dois modelos, sem e com referência, e grava em `registro.py`: fotos com os bytes originais). O celular só tira e envia a foto:
   `/c/{token}/medir` (`app/estatico/medir_celular.*`, QR em "Fotos do celular"), original sem recomprimir; a medida é sempre no
   computador. Fotos guardadas na faixa com setas (`/api/medicao/fotos`), zoom, nome do objeto e "Medir: Os dois / Com / Sem post-it";
-  histórico e CSV em Modelos › Medição. Estado, erro e o botão Instalar: Modelos › Medição
-  (`js/modelos/medicao.js`, `/api/medicao/instalar`; pacotes que faltam + pesos por `nucleo/medicao/instalar.py`, que nunca troca o torch).
+  histórico e CSV em Modelos › Medição.
+  Vídeo: "Abrir vídeo" ou "Gravar vídeo" no celular; `video_keyframes.comparar_video` (quadros nítidos, pista seguida, mediana por
+  modelo e modo), `/api/medicao/video/comparar`, vídeos em `<dados>/medicao/videos/`. Estado, erro e o botão Instalar: Modelos › Medição
+  (`js/modelos/medicao.js`, `/api/medicao/instalar`; pacotes que faltam + pesos por `nucleo/medicao/instalar.py`, que nunca troca o torch). Placa de vídeo: seção em Modelos › Medição (`modelos.placa()`, motivo de não usar) e
+  `python -m nucleo.medicao.placa --instalar` com o Pyron fechado (testa o PyTorch com CUDA numa pasta à parte antes de trocar).
   Licenças: só MIT e Apache 2.0 (nada CC BY-NC, AGPL, GPL; Depth Pro fora). Sem os pesos, a aba abre no modo
   "Retângulo de referência".
 - Conferir: `testes/test_interface_nova.py` (regra dura do CSS, foco, módulos), axe (WCAG 2.2 AA, Etapa 6) e o catálogo

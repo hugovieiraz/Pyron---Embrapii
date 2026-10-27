@@ -225,3 +225,38 @@ def test_fp16_forcado_nao_refaz(monkeypatch):
     falso = _MogeFalso(fp16_quebrado=True)
     g = _prof_falsa(falso, meia_precisao=True).estimar(_foto())
     assert falso.chamadas == [True] and not g.validos.any()
+
+
+def test_placa_sem_cuda_segue_no_processador(monkeypatch):
+    """Sem placa que responda, a medição fica no processador e a tela recebe o motivo."""
+    from nucleo.medicao import modelos
+
+    monkeypatch.setattr(modelos, "_DISPOSITIVO", None)
+    monkeypatch.delenv("PYRON_MEDICAO_DISPOSITIVO", raising=False)
+    torch = pytest.importorskip("torch")
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    assert modelos.dispositivo() == "cpu"
+    info = modelos.placa()
+    assert info["usada"] is False and info["motivo"] in ("torch_cpu", "driver")
+    monkeypatch.setenv("PYRON_MEDICAO_DISPOSITIVO", "cuda")
+    assert modelos.dispositivo() == "cuda"
+
+
+def test_reserva_cpu_quando_a_placa_falha():
+    """Memória cheia na placa: o modelo vai para o processador e a mesma chamada roda de novo."""
+    pytest.importorskip("torch")
+    from nucleo.medicao import modelos
+
+    class Falso:
+        def __init__(self):
+            self.dispositivo, self._modelo, self.chamadas = "cuda", None, 0
+
+        @modelos.com_reserva_cpu
+        def estimar(self):
+            self.chamadas += 1
+            if self.dispositivo == "cuda":
+                raise RuntimeError("CUDA out of memory")
+            return "ok"
+
+    f = Falso()
+    assert f.estimar() == "ok" and f.dispositivo == "cpu" and f.chamadas == 2
