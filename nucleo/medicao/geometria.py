@@ -15,6 +15,8 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from nucleo.aceleradores import ransac_plano_3d
+
 # fração descartada em cada ponta (pontos soltos na borda da máscara)
 FRACAO_PONTA = 0.02
 
@@ -166,18 +168,7 @@ def plano(
 
     rng = np.random.default_rng(semente)
     amostra = p[rng.choice(len(p), size=min(len(p), 20000), replace=False)]
-    melhor_n, melhor = -1, None
-    for _ in range(iteracoes):
-        a, b, c = amostra[rng.choice(len(amostra), 3, replace=False)]
-        n = np.cross(b - a, c - a)
-        norma = np.linalg.norm(n)
-        if norma < 1e-12:
-            continue
-        n /= norma
-        dentro = np.abs((amostra - a) @ n) < tolerancia
-        if dentro.sum() > melhor_n:
-            melhor_n, melhor = int(dentro.sum()), (n, a)
-    n, a = melhor
+    n, a, _ = ransac_plano_3d(amostra, iteracoes=iteracoes, tolerancia=tolerancia, semente=semente)
     for _ in range(3):  # refino: SVD dos pontos de dentro
         dentro = np.abs((p - a) @ n) < tolerancia
         q = p[dentro]

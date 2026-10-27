@@ -2056,9 +2056,26 @@ def _biblioteca_contexto():
     return BibliotecaContexto(PASTA_DADOS / "medicao")
 
 
+@app.get("/api/medicao/acelerador")
+def medicao_acelerador_estado() -> dict:
+    """Diagnóstico do motor híbrido de aceleração (Mojo SIMD / C-LAPACK Batch)."""
+    from nucleo.aceleradores import estado_acelerador
+
+    return estado_acelerador()
+
+
+@app.post("/api/medicao/acelerador/benchmark")
+def medicao_acelerador_benchmark() -> dict:
+    """Executa benchmark em tempo real comparando motor legado vs aceleradores híbridos."""
+    from nucleo.aceleradores import benchmark_hibrido
+
+    return benchmark_hibrido()
+
+
 @app.get("/api/medicao/estado")
 def medicao_estado() -> dict:
     """Modelos da medição instalados e dispositivo (placa de vídeo ou processador)."""
+    from nucleo.aceleradores import estado_acelerador
     from nucleo.medicao import REFERENCIAS_PRONTAS, modelos as modelos_medicao
     from nucleo.medicao.referencia_auto import REFERENCIAS_AUTO
 
@@ -2067,6 +2084,7 @@ def medicao_estado() -> dict:
         "referencias": REFERENCIAS_PRONTAS,
         "referencias_auto": {k: {"nome": v["nome"], "lado_cm": v["lado_cm"]} for k, v in REFERENCIAS_AUTO.items()},
         "biblioteca_total": len(_biblioteca_contexto().listar()),
+        "acelerador": estado_acelerador(),
     }
 
 

@@ -14,6 +14,8 @@ import math
 
 import numpy as np
 
+from nucleo.aceleradores import monte_carlo_homografia_pontos
+
 ERRO_CLIQUE_PX = 1.0
 SORTEIOS = 400
 
@@ -99,12 +101,14 @@ def medir(cantos, tamanho_cm, pontos, erro_px: float = ERRO_CLIQUE_PX, semente: 
     a, b = aplicar(h, p)
     distancia = float(np.linalg.norm(b - a))
 
-    rng = np.random.default_rng(semente)
-    amostras = np.empty(SORTEIOS)
-    for i in range(SORTEIOS):
-        hc = homografia(c + rng.normal(0, erro_px, c.shape), real)
-        aa, bb = aplicar(hc, p + rng.normal(0, erro_px, p.shape))
-        amostras[i] = np.linalg.norm(bb - aa)
+    amostras = monte_carlo_homografia_pontos(
+        cantos_ordenados=c,
+        real=real,
+        pontos=p,
+        sorteios=SORTEIOS,
+        erro_px=erro_px,
+        semente=semente,
+    )
     incerteza = _meia_faixa(amostras)
 
     # pontos fora do retângulo: distância ao centro dele em múltiplos do lado maior (extrapolação)
