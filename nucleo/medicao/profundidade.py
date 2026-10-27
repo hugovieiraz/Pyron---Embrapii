@@ -130,6 +130,7 @@ class Profundidade:
                 self._modelo = modelo
         return self._modelo
 
+    @modelos.com_reserva_cpu
     def estimar(self, imagem, usar_exif: bool | None = None, num_tokens: int | None = None) -> Geometria:
         import torch
 
@@ -213,6 +214,7 @@ class ProfundidadeDA3:
                 self._modelo = rede.to(self.dispositivo).eval()
         return self._modelo
 
+    @modelos.com_reserva_cpu
     def estimar(self, imagem, **_) -> Geometria:
         import cv2
         import torch

@@ -67,6 +67,7 @@ class Segmentador:
                 self._cache.popitem(last=False)
         return item
 
+    @modelos.com_reserva_cpu
     def _decodificar(self, imagem, chave, multiplas: bool, **pistas) -> tuple[np.ndarray, float]:
         import torch
 

@@ -14,7 +14,9 @@ Profundidade padrão: o Depth Anything 3 Metric Large quando instalado (nas foto
 from __future__ import annotations
 
 import argparse
+import functools
 import importlib.util
+import logging
 import os
 from pathlib import Path
 
@@ -102,13 +104,73 @@ def pacote(nome: str) -> bool:
     return importlib.util.find_spec(nome) is not None
 
 
-def dispositivo() -> str:
-    """``cuda`` se houver placa de vídeo com o PyTorch que a enxerga; senão ``cpu``."""
-    if not pacote("torch"):
-        return "cpu"
-    import torch
+_DISPOSITIVO: str | None = None
 
-    return "cuda" if torch.cuda.is_available() else "cpu"
+
+def dispositivo() -> str:
+    """``cuda`` se a placa de vídeo responde de verdade (uma conta pequena nela); senão ``cpu``.
+
+    ``PYRON_MEDICAO_DISPOSITIVO=cpu`` (ou ``cuda``) força. O teste vale para o processo inteiro (fica guardado)."""
+    global _DISPOSITIVO
+    forcado = os.environ.get("PYRON_MEDICAO_DISPOSITIVO")
+    if forcado in ("cpu", "cuda"):
+        return forcado
+    if _DISPOSITIVO is None:
+        _DISPOSITIVO = "cpu"
+        if pacote("torch"):
+            try:
+                import torch
+
+                if torch.cuda.is_available():
+                    (torch.ones(8, device="cuda") * 2).sum().item()
+                    _DISPOSITIVO = "cuda"
+            except Exception as e:  # driver, DLL barrada pelo Windows: segue no processador
+                logging.getLogger(__name__).warning("placa de vídeo indisponível para a medição: %s", e)
+    return _DISPOSITIVO
+
+
+def placa() -> dict:
+    """O que a tela mostra sobre a placa de vídeo: se é usada e, se não, por quê (``motivo``)."""
+    info = {"usada": False, "nome": None, "torch": None, "cuda": None, "motivo": "sem_torch"}
+    if not pacote("torch"):
+        return info
+    try:
+        import torch
+    except Exception as e:  # o Windows (Controle Inteligente de Aplicativos) barrou uma DLL do torch
+        return {**info, "motivo": "bloqueado", "erro": str(e)[:300]}
+    info.update(torch=torch.__version__, cuda=torch.version.cuda)
+    if not torch.version.cuda:
+        return {**info, "motivo": "torch_cpu"}
+    try:
+        if not torch.cuda.is_available():
+            return {**info, "motivo": "driver"}
+        info["nome"] = torch.cuda.get_device_name(0)
+    except Exception as e:
+        return {**info, "motivo": "bloqueado", "erro": str(e)[:300]}
+    return {**info, "usada": dispositivo() == "cuda", "motivo": "ok" if dispositivo() == "cuda" else "falhou"}
+
+
+def com_reserva_cpu(metodo):
+    """Se a placa falhar no meio (memória cheia: a RTX 3050 do notebook tem 4 GB para três modelos), o modelo vai
+    para o processador e a mesma chamada roda de novo; a medida sai, só mais devagar."""
+    @functools.wraps(metodo)
+    def envolvido(self, *args, **kwargs):
+        try:
+            return metodo(self, *args, **kwargs)
+        except RuntimeError as e:
+            if self.dispositivo != "cuda":
+                raise
+            import torch
+
+            logging.getLogger(__name__).warning("%s: placa de vídeo falhou (%s); segue no processador", type(self).__name__, e)
+            self.dispositivo = "cpu"
+            if getattr(self, "_modelo", None) is not None:
+                self._modelo = self._modelo.to("cpu")
+            if hasattr(self, "_cache"):
+                self._cache.clear()
+            torch.cuda.empty_cache()
+            return metodo(self, *args, **kwargs)
+    return envolvido
 
 
 def estado() -> dict:
@@ -117,6 +179,7 @@ def estado() -> dict:
     return {
         "pacotes": pacotes,
         "dispositivo": dispositivo() if pacotes["torch"] else None,
+        "placa": placa(),
         "profundidade": {**{v: caminho_moge(v).exists() for v in MOGE}, "da3": da3_instalado()},
         "contorno": {v: sam_instalado(v) for v in SAM},
         "modelos": disponiveis(),

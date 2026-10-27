@@ -29,6 +29,8 @@ SEM_DEPENDENCIAS = {
 def fontes(mod: str) -> list[str]:
     repo, commit = SEM_DEPENDENCIAS[mod]
     return [f"https://github.com/{repo}/archive/{commit}.zip", f"git+https://github.com/{repo}.git@{commit}"]
+
+
 COMUNS = [("torch", "torch"), ("torchvision", "torchvision"), ("transformers", "transformers>=4.56"),
           ("huggingface_hub", "huggingface_hub"), ("safetensors", "safetensors"), ("cv2", "opencv-python-headless"),
           ("pillow_heif", "pillow-heif")]

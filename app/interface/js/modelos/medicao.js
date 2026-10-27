@@ -121,12 +121,21 @@ export async function montar(no) {
       instalacao.erro && instalacao.modelo === c.id ? el("pre", { class: "comando erro-instalar" }, `${M.falhou}: ${instalacao.erro}`) : null,
       el("p", { class: "nota" }, M.terminal), el("pre", { class: "comando" }, M.comando(c.id)),
     ] : [el("p", { class: "em-uso" }, icone("check", "ic p"), M.instalado), el("p", { class: "nota" }, M.dispositivo(estado.dispositivo))];
+    const p = estado.placa || {};
+    // a placa de vídeo: em uso, ou por que não e o que fazer (a troca do PyTorch é com o Pyron fechado, pelo terminal)
+    const secaoPlaca = secao({ titulo: M.placaTitulo, conteudo: p.usada ? [el("p", { class: "em-uso" }, icone("check", "ic p"), M.placaUsada(p.nome))] : [
+      el("p", {}, M.placaMotivo[p.motivo] || M.placaMotivo.falhou),
+      p.motivo === "torch_cpu" ? el("pre", { class: "comando" }, M.placaComando) : null,
+      p.motivo === "torch_cpu" ? el("p", { class: "nota" }, M.placaComandoNota) : null,
+      p.torch ? el("p", { class: "nota" }, M.placaVersao(p.torch, p.cuda)) : null,
+    ].filter(Boolean) });
     lado.replaceChildren(...[
       el("div", { class: "cab-lado cab-modelo" },
         el("div", { class: "titulo-lado" }, el("h2", {}, m.nome), el("p", { class: "nota" }, `${M.funcoes[m.funcao]}, ${m.licenca}`),
           c.id === estado.modelo_padrao && c.pacote && c.pesos ? el("span", { class: "chip-recomendado" }, M.padrao) : null),
         el("p", {}, m.texto),
         ...acao),
+      secaoPlaca,
       m.funcao === "profundidade" ? secao({ titulo: M.fotosTitulo, conteudo: [
         el("dl", { class: "pares" }, [[M.comPostit, m.comPostit], [M.semRef, m.semRef], [M.porFoto, m.tempo]].flatMap(([k, v]) => [el("dt", {}, k), el("dd", { class: "num" }, v)])),
       ] }) : null,
