@@ -1923,6 +1923,52 @@ def quadro_para_inspecao(id_: str, n: int) -> dict:
         return _completa(_nova_analise(caminho.read_bytes(), nome, modelo, fonte="video", limites=limites))
 
 
+@app.post("/api/videos/{id_}/gravar-pesos")
+def gravar_pesos_video(id_: str, corpo: dict = Body(...)) -> dict:
+    """Memoriza pesos multi-ângulo de um equipamento a partir de um vídeo processado."""
+    try:
+        info_vid = _video(videos.obter, id_, 0)
+    except KeyError as e:
+        raise HTTPException(404, "Vídeo não encontrado.") from e
+    pasta_vid = PASTA_DADOS / "videos" / id_
+    arq_video = next(pasta_vid.glob("original.*"), None)
+    bib = _biblioteca_contexto()
+    try:
+        return bib.gravar_de_video(
+            caminho_video=arq_video or pasta_vid,
+            nome=corpo.get("nome") or f"Ativo de {id_}",
+            classe=corpo.get("classe", "equipamento"),
+            caixa_inicial=corpo.get("caixa"),
+            quadro_n=corpo.get("quadro_n"),
+            altura_cm=corpo.get("altura_cm"),
+            largura_cm=corpo.get("largura_cm"),
+            comprimento_cm=corpo.get("comprimento_cm"),
+            quadros_analisados=info_vid.get("quadros"),
+            id_video=id_,
+        )
+    except ValueError as erro:
+        raise HTTPException(422, str(erro)) from erro
+
+
+@app.post("/api/videos/{id_}/reconhecer-biblioteca")
+def reconhecer_biblioteca_video(id_: str, corpo: dict = Body(default={})) -> dict:
+    """Reconhece ativos da biblioteca no vídeo informado."""
+    try:
+        info_vid = _video(videos.obter, id_, 0)
+    except KeyError as e:
+        raise HTTPException(404, "Vídeo não encontrado.") from e
+    pasta_vid = PASTA_DADOS / "videos" / id_
+    arq_video = next(pasta_vid.glob("original.*"), None)
+    bib = _biblioteca_contexto()
+    reconhecidos = bib.reconhecer_em_video(
+        caminho_video_ou_quadros=arq_video or pasta_vid,
+        quadros_analisados=info_vid.get("quadros"),
+        pasta_quadros=pasta_vid / "quadros",
+    )
+    return {"video_id": id_, "reconhecidos": reconhecidos}
+
+
+
 @app.get("/api/alertas/{id_}/whatsapp")
 def whatsapp_alerta(id_: str) -> dict:
     alerta = armazenamento.alerta(id_)
@@ -2003,14 +2049,24 @@ def _validar_pista_medicao(p: dict | None, nome: str, exige_tamanho: bool = Fals
     return saida
 
 
+def _biblioteca_contexto():
+    from nucleo.medicao.biblioteca_contexto import BibliotecaContexto
+
+    return BibliotecaContexto(PASTA_DADOS / "medicao")
+
+
 @app.get("/api/medicao/estado")
 def medicao_estado() -> dict:
     """Modelos da medição instalados e dispositivo (placa de vídeo ou processador)."""
     from nucleo.medicao import REFERENCIAS_PRONTAS, modelos as modelos_medicao
     from nucleo.medicao.referencia_auto import REFERENCIAS_AUTO
 
-    return {**modelos_medicao.estado(), "referencias": REFERENCIAS_PRONTAS,
-            "referencias_auto": {k: {"nome": v["nome"], "lado_cm": v["lado_cm"]} for k, v in REFERENCIAS_AUTO.items()}}
+    return {
+        **modelos_medicao.estado(),
+        "referencias": REFERENCIAS_PRONTAS,
+        "referencias_auto": {k: {"nome": v["nome"], "lado_cm": v["lado_cm"]} for k, v in REFERENCIAS_AUTO.items()},
+        "biblioteca_total": len(_biblioteca_contexto().listar()),
+    }
 
 
 # instalação dos modelos da medição pela tela (pip + pesos): uma por vez, numa linha de execução à parte
@@ -2321,6 +2377,88 @@ async def medicao_video_medir(
         raise HTTPException(503, f"Os modelos de medição não estão instalados ({type(e).__name__}: {e}).")
     except ValueError as e:
         raise HTTPException(422, str(e))
+
+
+# ---------------------------------------------------------------- biblioteca de contexto e medição 2D (nucleo/medicao/biblioteca_contexto.py)
+
+
+@app.get("/api/medicao/biblioteca")
+def listar_biblioteca_medicao() -> dict:
+    """Lista todos os equipamentos e padrões salvos na biblioteca de contexto."""
+    return {"itens": _biblioteca_contexto().listar()}
+
+
+@app.get("/api/medicao/biblioteca/{id_}/miniatura.jpg")
+def miniatura_biblioteca_medicao(id_: str) -> Response:
+    """Retorna a miniatura em JPEG do ativo registrado na biblioteca."""
+    bib = _biblioteca_contexto()
+    caminho = bib.caminho_miniatura(id_)
+    if not caminho.exists():
+        raise HTTPException(404, "Miniatura não encontrada.")
+    return Response(caminho.read_bytes(), media_type="image/jpeg")
+
+
+@app.delete("/api/medicao/biblioteca/{id_}")
+def remover_item_biblioteca_medicao(id_: str) -> dict:
+    """Remove um item da biblioteca de contexto."""
+    bib = _biblioteca_contexto()
+    if not bib.remover(id_):
+        raise HTTPException(404, "Item não encontrado na biblioteca.")
+    return {"ok": True, "id": id_}
+
+
+@app.post("/api/medicao/video/gravar-pesos")
+async def gravar_pesos_video_upload(
+    arquivo: UploadFile = File(...),
+    nome: str = Form(...),
+    classe: str = Form("equipamento"),
+    pista: str | None = Form(None),
+    altura_cm: float | None = Form(None),
+    largura_cm: float | None = Form(None),
+    comprimento_cm: float | None = Form(None),
+) -> dict:
+    """Recebe vídeo por upload e grava a assinatura multi-ângulo do ativo na biblioteca."""
+    dados = await arquivo.read()
+    if not dados:
+        raise HTTPException(422, "O arquivo de vídeo está vazio.")
+    pista_dict = _json_form(pista, "pista") if pista else None
+    caixa = pista_dict.get("caixa") if isinstance(pista_dict, dict) else None
+    bib = _biblioteca_contexto()
+    try:
+        return bib.gravar_de_video(
+            bytes_video=dados,
+            nome=nome,
+            classe=classe,
+            caixa_inicial=caixa,
+            altura_cm=altura_cm,
+            largura_cm=largura_cm,
+            comprimento_cm=comprimento_cm,
+        )
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from e
+
+
+@app.post("/api/medicao/contexto-2d")
+async def medicao_contexto_2d(
+    arquivo: UploadFile = File(...),
+    pista: str | None = Form(None),
+    id_contexto: str | None = Form(None),
+) -> dict:
+    """Mede objeto em imagem 2D única por ancoragem nos pesos e contexto multi-ângulo memorizados."""
+    dados = await arquivo.read()
+    if not dados:
+        raise HTTPException(422, "A imagem enviada está vazia.")
+    pista_dict = _json_form(pista, "pista") if pista else None
+    bib = _biblioteca_contexto()
+    try:
+        return bib.medir_imagem_2d(
+            imagem_bytes_ou_rgb=dados,
+            pista=pista_dict,
+            id_contexto=id_contexto,
+        )
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from e
+
 
 
 # ---------------------------------------------------------------- cadastro de medidas e câmeras (app/cadastro_medidas.py)

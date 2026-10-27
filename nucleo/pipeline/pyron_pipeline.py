@@ -137,8 +137,8 @@ def analisar_ativo(
 
     # Metrologia Inteligente: Método 1 (Telemetria Óptica/FLIR) prioritário; Método 2 (Criminisi) secundário
     try:
-        from src.geometry.vanishing_points import VanishingGeometryEstimator
-        from src.geometry.criminisi_metrology import ProjectiveMetrologyEngine
+        from nucleo.metrologia.vanishing_points import VanishingGeometryEstimator
+        from nucleo.metrologia.criminisi_metrology import ProjectiveMetrologyEngine
 
         p_engine = ProjectiveMetrologyEngine(default_unit="m")
 

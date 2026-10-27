@@ -49,10 +49,10 @@ medicao = [
 
 [tool.setuptools]
 packages = [
-    "nucleo", "nucleo.detectores", "nucleo.segmentacao", "nucleo.metrologia", "nucleo.pipeline", "nucleo.medicao",
-    "src", "src.geometry", "src.segmentation", "src.pipeline"
+    "nucleo", "nucleo.detectores", "nucleo.segmentacao", "nucleo.metrologia", "nucleo.pipeline", "nucleo.medicao"
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["testes", "tests"]
-pythonpath = [".", "src"]
+testpaths = ["testes"]
+pythonpath = ["."]
+

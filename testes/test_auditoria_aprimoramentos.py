@@ -25,7 +25,7 @@ from nucleo.classificacao.dinov2_engine import (
     gerar_padrao_sintetico,
 )
 from nucleo.detectores.sam2_dinov2 import SAM2DINOv2Detector, simplificar_contorno_binario
-from src.geometry.criminisi_metrology import (
+from nucleo.metrologia.criminisi_metrology import (
     ProjectiveMetrologyEngine,
     obter_hfov_camera,
 )

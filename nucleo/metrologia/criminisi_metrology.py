@@ -15,7 +15,7 @@ from typing import Sequence
 
 import numpy as np
 
-from src.geometry.vanishing_points import VanishingGeometry, line_from_points
+from nucleo.metrologia.vanishing_points import VanishingGeometry, line_from_points
 
 EPS = 1e-9
 

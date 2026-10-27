@@ -463,3 +463,12 @@ def selecionar_keyframes(*args, **kwargs):
 def medir_video(*args, **kwargs):
     from nucleo.medicao.video_keyframes import medir_video as _mv
     return _mv(*args, **kwargs)
+
+
+def biblioteca_contexto(pasta=None):
+    from nucleo.medicao.biblioteca_contexto import BibliotecaContexto
+    if pasta is None:
+        from pathlib import Path
+        pasta = Path("dados_app/medicao")
+    return BibliotecaContexto(pasta)
+

@@ -161,8 +161,8 @@ class SAM2DINOv2Detector(Detector):
     ) -> list[dict]:
         """Executa a detecção completa com máscaras SAM 2, classificações DINOv2 e metrologia projetiva."""
         from nucleo.classificacao.dinov2_engine import DINOv2Classifier
-        from src.geometry.vanishing_points import VanishingGeometryEstimator
-        from src.geometry.criminisi_metrology import ProjectiveMetrologyEngine
+        from nucleo.metrologia.vanishing_points import VanishingGeometryEstimator
+        from nucleo.metrologia.criminisi_metrology import ProjectiveMetrologyEngine
         from nucleo.pipeline.pyron_pipeline import estatisticas_termicas
 
         if imagem is None:

@@ -2,7 +2,7 @@
 // envio (primário: Enviar vídeo) e o vídeo aberto (#captura/video/<id>): quadro com as regiões, reprodução,
 // máxima no tempo, momentos com anomalia e o que há no quadro. Primário do vídeo aberto: Salvar quadro.
 import { TEXTOS as T } from "../../textos.js";
-import { el, icone, api, fmt, temperatura, dataHora, lerNumero, animarEntrada } from "../base.js";
+import { el, icone, api, fmt, temperatura, dataHora, lerNumero, animarEntrada, json } from "../base.js";
 import { botao, campo, segmentado, secao, tabela, selo, estadoVazio, avisar, confirmar, ocupado, menu } from "../componentes.js";
 import { endereco } from "../rotas.js";
 import { graficoSerie } from "../grafico.js";
@@ -191,16 +191,152 @@ async function montarAberto(no, id) {
   const aoVivo = botao({ texto: V.voltarAoVivo, compacto: true, onclick: () => { pausar(); seguindo = true; mostrarQuadro(quadros.length - 1); } });
   const controles = el("div", { class: "controles-video" }, tocarBtn, linha, tempo, ritmo, aoVivo);
 
-  // ---------------------------------------------------------------- painel: números, gráfico, momentos, quadro
+  // ---------------------------------------------------------------- painel: números, gráfico, momentos, quadro, biblioteca
   const indicadores = el("div", { class: "indicadores" });
   const caixaGrafico = el("div", { class: "caixa-grafico-video" });
   const momentos = el("div", { class: "lista-momentos" });
   const nesteQuadro = el("div");
+
+  // ---------------------------------------------------------------- biblioteca de pesos (contexto)
+  const OPCOES_CLASSES = [
+    { valor: "bucha", texto: V.classes.bucha },
+    { valor: "transformador", texto: V.classes.transformador },
+    { valor: "isolador", texto: V.classes.isolador },
+    { valor: "disjuntor", texto: V.classes.disjuntor },
+    { valor: "para_raios", texto: V.classes.para_raios },
+    { valor: "chave_seccionadora", texto: V.classes.chave_seccionadora },
+    { valor: "conexao", texto: V.classes.conexao },
+    { valor: "equipamento", texto: V.classes.equipamento },
+  ];
+  const campoNomeObj = campo({ rotulo: V.objetoNome, marcador: V.objetoNomeMarcador });
+  const campoClasseObj = campo({ rotulo: V.objetoClasse, opcoes: OPCOES_CLASSES, valor: "bucha" });
+  const campoAlturaObj = campo({ rotulo: V.objetoAltura, tipo: "number", unidade: "cm", marcador: V.alturaAuto });
+  const caixaReconhecidos = el("div", { class: "reconhecidos-video" });
+  const caixaBibliotecaResumo = el("div", { class: "resumo-biblioteca-video" });
+
+  const btnGravarPesos = botao({
+    texto: V.gravarPesos,
+    icone: "modelos",
+    onclick: () => ocupado(btnGravarPesos, async () => {
+      const q = quadros[atual];
+      const nomeVal = campoNomeObj.querySelector("input").value.trim();
+      const nome = nomeVal || V.objetoPadrao;
+      const classe = campoClasseObj.querySelector("select").value;
+      const altVal = lerNumero(campoAlturaObj.querySelector("input").value);
+      const altura_cm = altVal != null && altVal > 0 ? altVal : null;
+      const caixa = q?.regioes?.[0]?.caixa ?? null;
+      try {
+        const res = await api(`/api/videos/${d.id}/gravar-pesos`, json("POST", {
+          nome,
+          classe,
+          quadro_n: q?.n ?? 0,
+          caixa,
+          altura_cm,
+        }));
+        avisar(V.pesosGravados(res?.nome || nome));
+        campoNomeObj.querySelector("input").value = "";
+        campoAlturaObj.querySelector("input").value = "";
+        await carregarBiblioteca();
+      } catch (e) {
+        avisar(e.message, { erro: true });
+      }
+    }),
+  });
+
+  const btnReconhecerVideo = botao({
+    texto: V.reconhecerVideo,
+    icone: "detectar",
+    onclick: () => ocupado(btnReconhecerVideo, async () => {
+      const q = quadros[atual];
+      try {
+        const res = await api(`/api/videos/${d.id}/reconhecer-biblioteca`, json("POST", {
+          quadro_n: q?.n ?? 0,
+        }));
+        desenharReconhecidos(res.objetos || res.itens || res.reconhecidos || []);
+      } catch (e) {
+        avisar(e.message, { erro: true });
+      }
+    }),
+  });
+
+  function desenharReconhecidos(lista) {
+    if (!lista || !lista.length) {
+      caixaReconhecidos.replaceChildren(el("p", { class: "nota" }, V.nenhumReconhecido));
+      return;
+    }
+    caixaReconhecidos.replaceChildren(
+      el("h3", { class: "subtitulo-secao" }, V.reconhecidosTitulo),
+      el("ul", { class: "lista-reconhecidos-video" }, lista.map((item) => {
+        const conf = item.confianca != null ? Math.round(item.confianca * 100) : null;
+        const h = item.altura_cm ?? item.dimensoes_cm?.altura;
+        const w = item.largura_cm ?? item.dimensoes_cm?.largura;
+        const dimTexto = h != null && w != null ? V.dimensoesCm(fmt(h, 1), fmt(w, 1)) : null;
+        const qNum = item.quadro_n ?? item.quadro ?? null;
+        return el("li", {},
+          el("button", {
+            type: "button",
+            class: "item-reconhecido-btn",
+            title: qNum != null ? V.irParaQuadroDica : "",
+            onclick: () => {
+              if (qNum != null) irParaQuadro(qNum);
+            },
+          },
+            el("div", { class: "item-topo" },
+              el("b", { class: "corta" }, item.nome || item.classe || V.objetoPadrao),
+              conf != null ? el("span", { class: "num nota" }, V.confianca(conf)) : null
+            ),
+            el("div", { class: "item-sub" },
+              el("span", { class: "classe-tag" }, V.classes[item.classe] || item.classe || ""),
+              dimTexto ? el("span", { class: "num dim" }, dimTexto) : null,
+              qNum != null ? el("span", { class: "num quadro-link" }, V.quadroN(qNum)) : null
+            )
+          )
+        );
+      }))
+    );
+  }
+
+  async function carregarBiblioteca() {
+    try {
+      const bib = await api("/api/medicao/biblioteca").catch(() => ({ itens: [] }));
+      const itens = bib.itens || [];
+      if (!itens.length) {
+        caixaBibliotecaResumo.replaceChildren(el("p", { class: "nota" }, V.bibliotecaVazia));
+        return;
+      }
+      caixaBibliotecaResumo.replaceChildren(
+        el("p", { class: "nota" }, V.bibliotecaItens(itens.length)),
+        el("ul", { class: "lista-itens-biblioteca" }, itens.slice(0, 8).map((it) => {
+          const dim = it.dimensoes_cm;
+          const dimTexto = dim?.altura != null && dim?.largura != null
+            ? ` · ${V.dimensoesCm(fmt(dim.altura, 1), fmt(dim.largura, 1))}`
+            : dim?.altura != null ? ` · ${fmt(dim.altura, 1)} cm` : "";
+          return el("li", {},
+            el("span", { class: "corta", title: it.nome }, it.nome),
+            el("span", { class: "sub" }, `${V.classes[it.classe] || it.classe || ""}${dimTexto}`)
+          );
+        }))
+      );
+    } catch {
+      caixaBibliotecaResumo.replaceChildren();
+    }
+  }
+
+  const corpoBiblioteca = el("div", { class: "grupo-campos" },
+    campoNomeObj,
+    el("div", { class: "grade-campos-2" }, campoClasseObj, campoAlturaObj),
+    el("div", { class: "grupo-btn" }, btnGravarPesos, btnReconhecerVideo),
+    caixaReconhecidos,
+    caixaBibliotecaResumo
+  );
+  const secaoBiblioteca = secao({ titulo: V.bibliotecaTitulo, aberta: true, conteudo: [corpoBiblioteca] });
+
   const lado = el("aside", { class: "painel-video", "aria-label": V.painel },
     indicadores,
     el("section", {}, el("div", { class: "titulo-bloco" }, el("h2", {}, V.graficoTitulo)), caixaGrafico, el("p", { class: "nota" }, V.graficoDica)),
     secao({ titulo: V.momentos, conteudo: [momentos] }),
-    secao({ titulo: V.neste, conteudo: [nesteQuadro] }));
+    secao({ titulo: V.neste, conteudo: [nesteQuadro] }),
+    secaoBiblioteca);
 
   no.append(cab, el("div", { class: "video-grade" }, el("div", { class: "coluna-video" }, palco, controles), lado));
   let grafico = null;
@@ -417,6 +553,7 @@ async function montarAberto(no, id) {
   };
   document.addEventListener("keydown", teclado);
 
+  carregarBiblioteca();
   receber(d, true);
   return () => { clearTimeout(relogioSonda); clearTimeout(relogioTocar); grafico?.encerrar(); document.removeEventListener("keydown", teclado); };
 }

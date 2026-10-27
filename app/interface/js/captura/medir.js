@@ -38,6 +38,9 @@ export async function montar(no, ctx = {}) {
   let medindo = false;
   let contador = 0;
   const NOMES = Object.fromEntries((estado.modelos || []).map((m) => [m.id, M.colunas[m.id] || m.id]));
+  NOMES.contexto = M.contextoTitulo;
+  let biblioteca = [];
+  let ultimaPista = null;
   let geracao = 0;
   let mira = { x: 0.5, y: 0.5 };
   let cotaDestacada = null;
@@ -147,12 +150,26 @@ export async function montar(no, ctx = {}) {
   const avisoModelos = estado.pronto ? null : el("div", { class: "aviso-modelos" }, el("p", { class: "nota" }, M.semModelosNota), el("code", { class: "mono comando-medir" }, M.comandoInstalar),
     el("a", { class: "btn compacto", href: endereco("modelos", ["medicao"]) }, M.abrirModelos));
   const secaoResultado = el("section", {}, el("div", { class: "titulo-bloco" }, el("h2", {}, M.resultado)), caixaResultado);
+
+  // biblioteca de pesos (contexto do vídeo)
+  const campoContexto = campo({ rotulo: M.contextoObjeto, valor: "auto", opcoes: [{ valor: "auto", texto: M.contextoAuto }] });
+  const btnMedirContexto = botao({ texto: M.medirComContexto, icone: "modelos", variante: "primario", onclick: () => ocupado(btnMedirContexto, medirComContexto) });
+  const caixaResultadoContexto = el("div", { class: "resultado-contexto-caixa", "aria-live": "polite" });
+  const listaItensContexto = el("div", { class: "lista-biblioteca-contexto" });
+  const corpoContexto = el("div", { class: "grupo-campos" },
+    el("p", { class: "nota" }, M.contextoTexto),
+    campoContexto,
+    el("div", { class: "grupo-btn" }, btnMedirContexto),
+    caixaResultadoContexto,
+    listaItensContexto);
+  const secaoContexto = secao({ titulo: M.contextoTitulo, conteudo: [corpoContexto] });
+
   const caixaRegistro = el("div", { class: "registro-medir" });
   const caixaCelular = el("div", { class: "celular-medir" });
   const secaoCelular = secao({ titulo: M.celularTitulo, conteudo: [el("p", { class: "nota" }, M.celularTexto), caixaCelular] });
   const secaoRegistro = secao({ titulo: M.registroTitulo, conteudo: [el("p", { class: "nota" }, M.registroTexto), caixaRegistro] });
   const painel = el("aside", { class: "painel-medir", "aria-label": M.resultado },
-    secaoResultado, secaoPlano, secaoRef, secaoCelular, secaoRegistro,
+    secaoResultado, secaoContexto, secaoPlano, secaoRef, secaoCelular, secaoRegistro,
     secao({ titulo: M.detalhes, aberta: false, conteudo: [caixaDetalhes] }),
     avisoModelos);
 
@@ -252,7 +269,7 @@ export async function montar(no, ctx = {}) {
     }
 
     const ultima = [...medicoes].reverse().find((m) => m.r);
-    if (ultima && modo !== "plano") {
+    if (ultima && (modo !== "plano" || ultima.r?.resultados?.contexto)) {
       poligonos(ultima.r.contorno_referencia || [], "contorno-ref");
       poligonos(ultima.r.contorno || [], "contorno-obj");
 
@@ -330,9 +347,10 @@ export async function montar(no, ctx = {}) {
   }
 
   function desenharResultado() {
-    secaoResultado.hidden = modo !== "plano";
-    blocoComparacao.hidden = modo === "plano";
-    if (modo === "plano") { desenharResultadoPlano(); return; }
+    const temContexto = medicoes.some((m) => m.r?.resultados?.contexto);
+    secaoResultado.hidden = modo !== "plano" && !medidasPlano.some((m) => m.r);
+    blocoComparacao.hidden = modo === "plano" && !temContexto;
+    if (modo === "plano") desenharResultadoPlano();
     if (!medicoes.length) { listaMedicoes.replaceChildren(el("p", { class: "nota" }, M.comparacaoVazia)); caixaDetalhes.replaceChildren(); return; }
     listaMedicoes.replaceChildren(...[...medicoes].reverse().map(cartao));
     const ultima = [...medicoes].reverse().find((m) => m.r);
@@ -439,7 +457,207 @@ export async function montar(no, ctx = {}) {
     caixaDetalhes.replaceChildren();
   }
 
-  function atualizarTudo() { acharPostit.disabled = !foto; desenharBarra(); desenharResultado(); atualizarHud(); desenharCamada(); secaoPlano.hidden = modo !== "plano"; secaoRef.hidden = modo === "plano"; }
+  function atualizarTudo() {
+    acharPostit.disabled = !foto;
+    btnMedirContexto.disabled = !foto;
+    desenharBarra();
+    desenharResultado();
+    atualizarHud();
+    desenharCamada();
+    secaoPlano.hidden = modo !== "plano";
+    secaoRef.hidden = modo === "plano";
+  }
+
+  // ---------------------------------------------------------------- biblioteca de pesos (contexto do vídeo)
+  async function carregarBiblioteca() {
+    try {
+      const bib = await api("/api/medicao/biblioteca").catch(() => ({ itens: [] }));
+      biblioteca = bib.itens || [];
+    } catch {
+      biblioteca = [];
+    }
+    atualizarOpcoesContexto();
+    desenharResumoContexto();
+  }
+
+  function atualizarOpcoesContexto() {
+    const select = campoContexto.querySelector("select");
+    if (!select) return;
+    const atual = select.value;
+    const opcoes = [
+      { valor: "auto", texto: M.contextoAuto },
+      ...biblioteca.map((i) => ({
+        valor: String(i.id),
+        texto: `${i.nome} (${fmt(i.dimensoes_cm?.altura, 1)} cm)`,
+      })),
+    ];
+    select.replaceChildren(...opcoes.map((o) => new Option(o.texto, o.valor)));
+    if (opcoes.some((o) => o.valor === atual)) select.value = atual;
+    else select.value = "auto";
+  }
+
+  function desenharResumoContexto() {
+    btnMedirContexto.disabled = !foto;
+    if (!biblioteca.length) {
+      listaItensContexto.replaceChildren(el("p", { class: "nota" }, M.semBiblioteca));
+      return;
+    }
+    listaItensContexto.replaceChildren(
+      el("p", { class: "nota" }, M.bibliotecaItens(biblioteca.length)),
+      el("ul", { class: "itens-contexto" }, biblioteca.map((item) => {
+        const h = item.dimensoes_cm?.altura;
+        const w = item.dimensoes_cm?.largura;
+        const dimTxt = h != null && w != null ? `${fmt(h, 1)} × ${fmt(w, 1)} cm` : h != null ? `${fmt(h, 1)} cm` : "";
+        const btnApagar = botao({
+          texto: M.apagarContexto(item.nome),
+          icone: "lixo",
+          soIcone: true,
+          compacto: true,
+          variante: "fantasma",
+          onclick: async () => {
+            try {
+              await api(`/api/medicao/biblioteca/${item.id}`, { method: "DELETE" });
+              avisar(M.contextoApagado);
+              await carregarBiblioteca();
+            } catch (e) {
+              avisar(e.message, { erro: true });
+            }
+          },
+        });
+        return el("li", { class: "item-contexto-linha" },
+          el("div", { class: "info" },
+            el("b", { class: "corta" }, item.nome),
+            el("span", { class: "sub" }, [item.classe, dimTxt].filter(Boolean).join(" · "))
+          ),
+          btnApagar
+        );
+      }))
+    );
+  }
+
+  async function medirComContexto() {
+    if (!foto) {
+      entrada.click();
+      return;
+    }
+    const idContexto = campoContexto.querySelector("select")?.value;
+    const pista = ultimaPista || { ponto: [Math.round(mira.x * foto.largura), Math.round(mira.y * foto.altura)] };
+    const dados = new FormData();
+    dados.append("arquivo", foto.arquivo);
+    dados.append("pista", JSON.stringify(pista));
+    if (idContexto && idContexto !== "auto") {
+      dados.append("id_contexto", idContexto);
+    }
+
+    medindo = true;
+    inicioMedida = Date.now();
+    atualizarHud();
+    try {
+      const res = await api("/api/medicao/contexto-2d", { method: "POST", body: dados });
+      processarResultadoContexto(res, pista);
+    } catch (e) {
+      avisar(`${M.erroMedir} ${e.message}`, { erro: true });
+    } finally {
+      medindo = false;
+      atualizarTudo();
+    }
+  }
+
+  function processarResultadoContexto(res, pista) {
+    const extrairValor = (v) => (typeof v === "object" && v !== null ? v.valor ?? v.altura_cm ?? v.largura_cm ?? v.comprimento_cm ?? null : typeof v === "number" ? v : null);
+    const extrairIncerteza = (v) => (typeof v === "object" && v !== null ? v.incerteza ?? null : null);
+
+    const altVal = extrairValor(res.altura);
+    const largVal = extrairValor(res.largura);
+    const compVal = extrairValor(res.comprimento);
+    const altInc = extrairIncerteza(res.altura) ?? (altVal ? altVal * 0.05 : null);
+    const largInc = extrairIncerteza(res.largura) ?? (largVal ? largVal * 0.05 : null);
+    const compInc = extrairIncerteza(res.comprimento) ?? (compVal ? compVal * 0.05 : null);
+
+    const nomeContexto = res.contexto?.nome || res.contexto?.classe || (biblioteca.find((b) => String(b.id) === String(res.contexto?.id))?.nome) || "";
+
+    const m = {
+      n: ++contador,
+      pista,
+      r: {
+        resultados: {
+          contexto: {
+            sem_referencia: {
+              altura_cm: altVal,
+              largura_cm: largVal,
+              comprimento_cm: compVal,
+              incerteza_cm: {
+                altura: altInc,
+                largura: largInc,
+                comprimento: compInc,
+              },
+              lente: "estimada",
+            },
+          },
+        },
+        contorno: res.contorno || [],
+        contorno_referencia: [],
+        cotas: res.cotas || {},
+        contexto: res.contexto,
+        escala_cm_px: res.escala_cm_px,
+        angulo_inclinacao_graus: res.angulo_inclinacao_graus,
+        area_cm2: res.area_cm2,
+      },
+      real: {},
+      id: res.id || `contexto-${Date.now()}`,
+      erros: null,
+      como: "sem",
+      nome: nomeContexto,
+    };
+
+    medicoes.push(m);
+    desenharResultadoContextoDestaque(res, altVal, largVal, compVal, altInc, largInc, compInc);
+  }
+
+  function desenharResultadoContextoDestaque(res, altVal, largVal, compVal, altInc, largInc, compInc) {
+    const ctx = res.contexto || {};
+    const conf = ctx.confianca != null ? Math.round(ctx.confianca * 100) : null;
+    const nome = ctx.nome || ctx.classe || M.resultado;
+
+    const itensMedida = [];
+    if (altVal != null) {
+      itensMedida.push(el("div", { class: "item-medida" },
+        el("span", { class: "rotulo" }, M.nomes.altura),
+        el("b", { class: "valor" }, `${fmt(altVal, 1)} cm`),
+        altInc != null ? el("span", { class: "nota mais" }, M.mais(fmt(altInc, 1))) : null
+      ));
+    }
+    if (largVal != null) {
+      itensMedida.push(el("div", { class: "item-medida" },
+        el("span", { class: "rotulo" }, M.nomes.largura),
+        el("b", { class: "valor" }, `${fmt(largVal, 1)} cm`),
+        largInc != null ? el("span", { class: "nota mais" }, M.mais(fmt(largInc, 1))) : null
+      ));
+    }
+    if (compVal != null) {
+      itensMedida.push(el("div", { class: "item-medida" },
+        el("span", { class: "rotulo" }, M.nomes.comprimento),
+        el("b", { class: "valor" }, `${fmt(compVal, 1)} cm`),
+        compInc != null ? el("span", { class: "nota mais" }, M.mais(fmt(compInc, 1))) : null
+      ));
+    }
+
+    const metas = [];
+    if (res.escala_cm_px != null) metas.push(el("span", {}, M.escalaContexto(fmt(res.escala_cm_px, 4))));
+    if (res.angulo_inclinacao_graus != null) metas.push(el("span", {}, M.inclinacaoCompensada(fmt(res.angulo_inclinacao_graus, 1))));
+    if (res.area_cm2 != null) metas.push(el("span", {}, M.areaCm2(fmt(res.area_cm2, 1))));
+
+    caixaResultadoContexto.replaceChildren(
+      el("div", { class: "resultado-contexto-card" },
+        el("div", { class: "topo-res" },
+          el("b", { class: "corta" }, conf != null ? M.objetoReconhecido(nome, conf) : nome),
+          el("span", { class: "selo normal" }, M.contextoTitulo)
+        ),
+        el("div", { class: "medidas-grade" }, itensMedida),
+        metas.length ? el("div", { class: "metas-contexto" }, metas) : null
+      )
+    );
+  }
 
   function tamanhoPlano() {
     const a = lerNumero(campoMaior.value), b = lerNumero(campoMenor.value);
@@ -535,6 +753,8 @@ export async function montar(no, ctx = {}) {
       pistaRef = primeiroPonto = pontoPlano = null;
       cantos = []; medidasPlano = []; medicoes = [];
       alvo = "objeto";
+      ultimaPista = null;
+      caixaResultadoContexto.replaceChildren();
       geracao++; medindo = false;  // a medida da foto anterior não aparece nesta
       imagem.src = url;
       zoom = 1; quadro.style.width = ""; janela.style.height = ""; janela.classList.remove("ampliada"); rotuloZoom.textContent = M.zoomPct(100);
@@ -569,6 +789,8 @@ export async function montar(no, ctx = {}) {
     pistaRef = primeiroPonto = pontoPlano = null;
     cantos = []; medidasPlano = []; medicoes = [];
     alvo = "objeto";
+    ultimaPista = null;
+    caixaResultadoContexto.replaceChildren();
     geracao++;
     medindo = false;
     desenharReferencia(); atualizarTudo();
@@ -583,6 +805,7 @@ export async function montar(no, ctx = {}) {
 
   /** Uma marca na foto (coordenadas da imagem): vira a pista do objeto ou da referência. */
   function marcar(p) {
+    if (alvo !== "referencia") ultimaPista = p;
     if (alvo === "referencia") {
       pistaRef = p;
       alvo = "objeto";
@@ -757,6 +980,7 @@ export async function montar(no, ctx = {}) {
   const relogioCelular = setInterval(vigiarCelular, 2000);
 
   desenharReferencia();
+  carregarBiblioteca();
   atualizarTudo();
   desenharVazio();
   atualizarRegistro();

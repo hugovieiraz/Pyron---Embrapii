@@ -27,6 +27,8 @@ apresentacao/.celular/
 
 # Dumps e backups SQL
 *.sql
+exportacao_pyron.sql
+
 
 # configuração pessoal do Claude Code (permissões desta máquina)
 .claude/settings.local.json
