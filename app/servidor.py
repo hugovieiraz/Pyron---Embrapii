@@ -91,7 +91,9 @@ CONFIG_PADRAO = {
     "modelo_ativo": "pontos-quentes",
     "empresa": {"nome": "", "subtitulo": ""},
     "responsavel": {"nome": "", "registro": ""},  # formato antigo (um só); migra para "responsaveis"
-    "responsaveis": [],  # [{"id", "nome", "funcao", "registro"}]: o laudo só aceita quem está aqui
+    # time operacional: [{"id", "nome", "perfil", "funcao", "registro", "email", "telefone", "assina"}];
+    # o laudo só aceita quem assina (com registro profissional), a pendência aceita qualquer um
+    "responsaveis": [],
     "responsavel_padrao": None,
     "tema": "claro",
     "criterios": None,  # None: critério padrão (modelo brasileiro, NBR 15866)
@@ -117,31 +119,49 @@ def _config() -> dict:
     if not cfg["responsaveis"] and (antigo.get("nome") or "").strip():  # migração do responsável único
         cfg["responsaveis"] = [{"id": "r1", "nome": antigo["nome"].strip(), "funcao": "", "registro": (antigo.get("registro") or "").strip()}]
         cfg["responsavel_padrao"] = "r1"
+    cfg["responsaveis"] = [_membro(r) for r in cfg["responsaveis"]]
     return cfg
 
 
+PERFIS = ("engenheiro", "tecnico")
+
+
+def _membro(r: dict) -> dict:
+    """Completa um membro do time gravado antes do cadastro operacional (todos assinavam laudo)."""
+    return {"perfil": "engenheiro", "email": "", "telefone": "", "assina": True, **r}
+
+
 def _responsavel(id_: str | None) -> dict | None:
-    """Responsável técnico cadastrado (o padrão, se ``id_`` vier vazio)."""
+    """Responsável técnico que assina laudo (o padrão, se ``id_`` vier vazio)."""
     cfg = _config()
-    lista = cfg["responsaveis"]
+    lista = [r for r in cfg["responsaveis"] if r["assina"]]
     escolhido = id_ or cfg.get("responsavel_padrao")
     return next((r for r in lista if r["id"] == escolhido), None)
 
 
 def _validar_responsaveis(lista) -> list[dict]:
-    if not isinstance(lista, list) or len(lista) > 50:
-        raise HTTPException(422, "Lista de responsáveis inválida.")
+    if not isinstance(lista, list) or len(lista) > 100:
+        raise HTTPException(422, "Lista do time inválida.")
     saida, ids = [], set()
     for i, r in enumerate(lista, start=1):
         nome = str(r.get("nome", "")).strip()[:120]
         registro = str(r.get("registro", "")).strip()[:60]
-        if not nome or not registro:
-            raise HTTPException(422, f"Responsável {i}: preencha o nome e o registro profissional.")
+        assina = bool(r.get("assina", True))
+        if not nome:
+            raise HTTPException(422, f"Membro {i} do time: preencha o nome.")
+        if assina and not registro:
+            raise HTTPException(422, f"{nome}: quem assina laudo precisa do registro profissional (CREA ou CFT).")
+        perfil = r.get("perfil") if r.get("perfil") in PERFIS else "tecnico"
+        email = str(r.get("email", "")).strip()[:120]
+        if email and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+            raise HTTPException(422, f"{nome}: e-mail inválido.")
+        telefone = re.sub(r"[^\d+() -]", "", str(r.get("telefone", "")))[:30].strip()
         id_ = str(r.get("id") or "").strip()[:12]
         if not re.fullmatch(r"[a-z0-9]{1,12}", id_) or id_ in ids:
             id_ = uuid.uuid4().hex[:8]
         ids.add(id_)
-        saida.append({"id": id_, "nome": nome, "funcao": str(r.get("funcao", "")).strip()[:80], "registro": registro})
+        saida.append({"id": id_, "nome": nome, "perfil": perfil, "funcao": str(r.get("funcao", "")).strip()[:80], "registro": registro,
+                      "email": email, "telefone": telefone, "assina": assina})
     return saida
 
 
@@ -1203,7 +1223,7 @@ def _escolher_responsavel(id_: str | None, a: dict | None = None) -> dict:
     escolhido = id_ or ((a or {}).get("identificacao") or {}).get("responsavel_id")
     resp = _responsavel(escolhido)
     if resp is None:
-        raise HTTPException(422, "Escolha o responsável técnico. Se ainda não houver, cadastre em Configurações › Empresa e responsáveis.")
+        raise HTTPException(422, "Escolha o responsável técnico. Se ainda não houver, cadastre em Configurações › Empresa e time.")
     return resp
 
 
@@ -1447,13 +1467,13 @@ def salvar_configuracoes(corpo: dict = Body(...)) -> dict:
     if "responsaveis" in corpo:
         cfg["responsaveis"] = _validar_responsaveis(corpo["responsaveis"])
         cfg["responsavel"] = {"nome": "", "registro": ""}  # o formato antigo não volta a migrar
-        ids = [r["id"] for r in cfg["responsaveis"]]
+        ids = [r["id"] for r in cfg["responsaveis"] if r["assina"]]
         if cfg.get("responsavel_padrao") not in ids:
             cfg["responsavel_padrao"] = ids[0] if ids else None
     if "responsavel_padrao" in corpo:
-        ids = [r["id"] for r in cfg["responsaveis"]]
+        ids = [r["id"] for r in cfg["responsaveis"] if r["assina"]]
         if corpo["responsavel_padrao"] not in ids:
-            raise HTTPException(422, "Responsável padrão não está no cadastro.")
+            raise HTTPException(422, "Responsável padrão não está no cadastro de quem assina laudo.")
         cfg["responsavel_padrao"] = corpo["responsavel_padrao"]
     if "tema" in corpo:
         if corpo["tema"] not in ("sistema", "claro", "escuro"):

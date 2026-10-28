@@ -1,9 +1,9 @@
-// Configurações › Empresa e responsáveis: o cabeçalho do laudo (nome, subtítulo, logotipo) e o cadastro dos
-// responsáveis técnicos (o laudo só sai com alguém daqui). Salva sozinho; responsável sem nome ou registro
-// ainda não vai para o servidor, que o recusaria enquanto a pessoa digita.
+// Configurações › Empresa e time: o cabeçalho do laudo (nome, subtítulo, logotipo) e o time operacional
+// (engenheiros e técnicos; o laudo só sai com quem assina, a pendência aceita qualquer um). Salva sozinho;
+// membro sem nome, ou que assina sem registro, ainda não vai para o servidor, que o recusaria enquanto a pessoa digita.
 import { TEXTOS as T } from "../../textos.js";
 import { el, api, json } from "../base.js";
-import { botao, campo, avisar, confirmar } from "../componentes.js";
+import { botao, campo, marcar, avisar, confirmar } from "../componentes.js";
 
 const C = T.config;
 const novoId = () => Math.random().toString(36).slice(2, 10);
@@ -39,26 +39,45 @@ export async function montar(no) {
   }
   desenharLogo();
 
-  // ---------------------------------------------------------------- responsáveis técnicos
+  // ---------------------------------------------------------------- time operacional
   const lista = el("div", { class: "lista-tecnicos" });
-  function linha(r = { id: novoId(), nome: "", funcao: "", registro: "" }) {
-    const padrao = el("label", { class: "alvo-marcar", title: C.respPadraoDica }, el("input", { type: "radio", name: "resp-padrao", value: r.id, checked: r.id === cfg.responsavel_padrao, "aria-label": C.respPadraoDe(r.nome || C.respNovo) }));
+  const contagem = el("span", { class: "nota" });
+  const valor = (l, k) => l.querySelector(`[data-campo=${k}]`);
+  function linha(r = { id: novoId(), nome: "", perfil: "tecnico", funcao: "", registro: "", email: "", telefone: "", assina: false }) {
+    const comCampo = (k, n) => { n.querySelector("input, select").dataset.campo = k; return n; };
+    const padrao = el("label", { class: "padrao-tecnico", title: C.respPadraoDica },
+      el("input", { type: "radio", name: "resp-padrao", value: r.id, checked: r.id === cfg.responsavel_padrao, disabled: !r.assina, "aria-label": C.respPadraoDe(r.nome || C.respNovo) }), C.respPadrao);
     padrao.querySelector("input").addEventListener("change", definirPadrao);
-    const tirar = botao({ texto: C.respTirar(r.nome || C.respNovo), icone: "lixo", variante: "fantasma", soIcone: true, onclick: () => { l.remove(); salvarDepois(0); } });
-    const l = el("div", { class: "linha-tecnico", dataset: { id: r.id } }, padrao,
-      campo({ rotulo: C.respNome, valor: r.nome, autocomplete: "off" }),
-      campo({ rotulo: C.respFuncao, valor: r.funcao || "", marcador: C.respFuncaoMarcador, autocomplete: "off" }),
-      campo({ rotulo: C.respRegistro, valor: r.registro, marcador: C.respRegistroMarcador, autocomplete: "off" }), tirar);
+    const assina = marcar({ rotulo: C.respAssina, marcado: r.assina !== false, onchange: () => { padrao.querySelector("input").disabled = !assina.querySelector("input").checked; salvarDepois(0); } });
+    assina.querySelector("input").dataset.campo = "assina";
+    const tirar = botao({ texto: C.respTirar(r.nome || C.respNovo), icone: "lixo", variante: "fantasma", soIcone: true, onclick: () => { l.remove(); contar(); salvarDepois(0); } });
+    const l = el("div", { class: "linha-tecnico", dataset: { id: r.id } },
+      comCampo("nome", campo({ rotulo: C.respNome, valor: r.nome, autocomplete: "off" })),
+      comCampo("perfil", campo({ rotulo: C.respPerfil, opcoes: Object.entries(C.perfis).map(([valor, texto]) => ({ valor, texto })), valor: r.perfil || "tecnico" })),
+      comCampo("funcao", campo({ rotulo: C.respFuncao, valor: r.funcao || "", marcador: C.respFuncaoMarcador, autocomplete: "off" })),
+      tirar,
+      comCampo("registro", campo({ rotulo: C.respRegistro, valor: r.registro, marcador: C.respRegistroMarcador, autocomplete: "off" })),
+      comCampo("email", campo({ rotulo: C.respEmail, tipo: "email", valor: r.email || "", marcador: C.respEmailMarcador, autocomplete: "off" })),
+      comCampo("telefone", campo({ rotulo: C.respTelefone, tipo: "tel", valor: r.telefone || "", marcador: C.respTelefoneMarcador, autocomplete: "off" })),
+      el("div", { class: "marcas-tecnico" }, assina, padrao));
     return l;
   }
+  function contar() {
+    const perfis = [...lista.querySelectorAll("[data-campo=perfil]")].map((s) => s.value);
+    contagem.textContent = C.respContagem(perfis.filter((p) => p === "engenheiro").length, perfis.filter((p) => p === "tecnico").length);
+    semNinguem.hidden = perfis.length > 0;
+  }
   lista.append(...cfg.responsaveis.map((r) => linha(r)));
-  const semNinguem = el("p", { class: "nota", hidden: cfg.responsaveis.length > 0 }, C.semResponsaveis);
-  const adicionar = botao({ texto: C.respAdicionar, icone: "adicionar", compacto: true, onclick: () => { const l = linha(); lista.append(l); semNinguem.hidden = true; l.querySelectorAll("input")[1].focus(); } });
+  const semNinguem = el("p", { class: "nota" }, C.semResponsaveis);
+  const adicionar = botao({ texto: C.respAdicionar, icone: "adicionar", compacto: true, onclick: () => { const l = linha(); lista.append(l); contar(); valor(l, "nome").focus(); } });
+  contar();
 
-  const lerResponsaveis = () => [...lista.querySelectorAll(".linha-tecnico")].map((l) => {
-    const [, n, f, reg] = l.querySelectorAll("input");
-    return { id: l.dataset.id, nome: n.value.trim(), funcao: f.value.trim(), registro: reg.value.trim() };
-  }).filter((r) => r.nome && r.registro);
+  // só vai quem o servidor aceita: com nome, com registro se assina e com e-mail válido (ou vazio)
+  const lerResponsaveis = () => [...lista.querySelectorAll(".linha-tecnico")]
+    .filter((l) => valor(l, "email").checkValidity())
+    .map((l) => ({ id: l.dataset.id, assina: valor(l, "assina").checked,
+      ...Object.fromEntries(["nome", "perfil", "funcao", "registro", "email", "telefone"].map((k) => [k, valor(l, k).value.trim()])) }))
+    .filter((r) => r.nome && (!r.assina || r.registro));
 
   let relogio = null;
   function salvarDepois(espera = 700) {
@@ -73,7 +92,7 @@ export async function montar(no) {
       // o servidor pode ter trocado o id de um responsável novo: as linhas passam a usar o id guardado
       const guardados = cfg.responsaveis;
       [...lista.querySelectorAll(".linha-tecnico")].forEach((l) => {
-        const nomeLinha = l.querySelectorAll("input")[1].value.trim();
+        const nomeLinha = valor(l, "nome").value.trim();
         const r = guardados.find((x) => x.id === l.dataset.id) || guardados.find((x) => x.nome === nomeLinha);
         if (r) { l.dataset.id = r.id; l.querySelector("input[type=radio]").value = r.id; l.querySelector("input[type=radio]").checked = r.id === cfg.responsavel_padrao; }
       });
@@ -93,13 +112,14 @@ export async function montar(no) {
     clearTimeout(relogio);
     if (await salvar({ responsaveis: lerResponsaveis() })) await salvar({ responsavel_padrao: ev.target.value });
   }
-  no.addEventListener("input", (ev) => { if (ev.target.matches("input:not([type=radio]):not([type=file])")) salvarDepois(); });
+  no.addEventListener("input", (ev) => { if (ev.target.matches("input:not([type=radio]):not([type=file]):not([type=checkbox])")) salvarDepois(); });
+  no.addEventListener("change", (ev) => { if (ev.target.matches("select")) { contar(); salvarDepois(0); } });
 
   no.append(el("div", { class: "coluna-form coluna-config" },
     el("div", { class: "titulo-bloco" }, el("h2", {}, C.empresaTitulo), salvo),
     erro,
     el("div", { class: "grupo-campos" }, el("div", { class: "grade-campos-2" }, nome, sub), el("div", { class: "campo" }, el("span", { class: "rotulo" }, C.logo), logo)),
-    el("div", { class: "titulo-bloco" }, el("h2", {}, C.responsaveisTitulo)),
+    el("div", { class: "titulo-bloco" }, el("h2", {}, C.responsaveisTitulo), contagem),
     el("p", { class: "nota" }, C.responsaveisNota),
     semNinguem, lista, el("div", {}, adicionar)));
   return () => clearTimeout(relogio);

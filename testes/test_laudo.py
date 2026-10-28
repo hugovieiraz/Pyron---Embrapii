@@ -146,3 +146,17 @@ def test_logotipo_da_empresa_no_cabecalho(cliente) -> None:
     assert cliente.delete("/api/configuracoes/logo").status_code == 200
     assert cliente.get("/api/configuracoes").json()["tem_logo"] is False
     assert cliente.get("/api/configuracoes/logo.png").status_code == 404
+
+
+def test_time_operacional_separa_quem_assina_laudo(cliente) -> None:
+    time = [
+        {"nome": "Ana Souza", "perfil": "engenheiro", "registro": "CREA-PB 123456", "email": "ana@empresa.com.br", "assina": True},
+        {"nome": "Bruno Lima", "perfil": "tecnico", "registro": "", "telefone": "(83) 99999-0000", "assina": False},
+    ]
+    c = cliente.put("/api/configuracoes", json={"responsaveis": time}).json()
+    assert [(r["nome"], r["perfil"], r["assina"]) for r in c["responsaveis"]] == [("Ana Souza", "engenheiro", True), ("Bruno Lima", "tecnico", False)]
+    assert c["responsavel_padrao"] == c["responsaveis"][0]["id"]
+    tecnico = c["responsaveis"][1]["id"]
+    assert cliente.put("/api/configuracoes", json={"responsavel_padrao": tecnico}).status_code == 422
+    assert cliente.put("/api/configuracoes", json={"responsaveis": [{**time[1], "assina": True}]}).status_code == 422
+    assert cliente.put("/api/configuracoes", json={"responsaveis": [{**time[0], "email": "sem-arroba"}]}).status_code == 422

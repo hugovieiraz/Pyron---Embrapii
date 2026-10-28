@@ -7,12 +7,21 @@ import { endereco } from "./rotas.js";
 
 const P = T.pendencia;
 
+// o campo Responsável sugere o time operacional (Configurações › Empresa e time), mas aceita qualquer nome
+async function sugerirTime(no) {
+  try {
+    const { responsaveis = [] } = await api("/api/configuracoes");
+    no.append(el("datalist", { id: "dl-time" }, responsaveis.map((r) => el("option", { value: r.nome, label: [T.config.perfis[r.perfil], r.funcao].filter(Boolean).join(" · ") }))));
+  } catch { /* sem a lista o campo continua livre */ }
+}
+
 /** Seções do formulário; aoSalvar(pendênciaNova) roda depois do servidor aceitar. */
 export function formularioPendencia(p, { primario = false, aoSalvar } = {}) {
   const situacao = campo({ rotulo: P.situacao, opcoes: Object.entries(P.status).map(([valor, texto]) => ({ valor, texto })), valor: p.status });
   const prazo = campo({ rotulo: P.prazo, tipo: "date", valor: p.prazo, ajuda: p.vencida ? P.vencida(relativa(p.prazo)) : ["aberta", "programada"].includes(p.status) ? P.vence(relativa(p.prazo)) : null });
   const os = campo({ rotulo: P.os, valor: p.ordem_servico || "", marcador: P.osExemplo, autocomplete: "off", maxlength: "40" });
-  const resp = campo({ rotulo: P.responsavel, valor: p.responsavel || "", marcador: P.responsavelExemplo, autocomplete: "off", maxlength: "80" });
+  const resp = campo({ rotulo: P.responsavel, valor: p.responsavel || "", marcador: P.responsavelExemplo, autocomplete: "off", maxlength: "80", list: "dl-time" });
+  sugerirTime(resp);
   const nota = campo({ rotulo: P.nota, area: true, marcador: P.notaExemplo, maxlength: "500", rows: "2" });
   const salvar = botao({ texto: P.salvar, variante: primario ? "primario" : "secundario", compacto: !primario, onclick: () => ocupado(salvar, async () => {
     try {

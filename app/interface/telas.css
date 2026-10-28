@@ -497,9 +497,13 @@ body:has(.painel-lateral) .avisos { right: calc(var(--detalhe) + var(--e-6) * 2)
 .logo-empresa, .logo-vazio { grid-row: span 2; width: var(--col-m); height: calc(var(--e-16) * 1.5); border: 1px solid var(--borda); border-radius: var(--r-m); background: var(--branco); }
 .logo-empresa { object-fit: contain; padding: var(--e-2); }
 .logo-vazio { display: grid; place-items: center; color: var(--texto-3); background: var(--superficie-2); font-size: var(--t-1); }
-.lista-tecnicos { display: grid; gap: var(--e-2); }
-.linha-tecnico { display: grid; grid-template-columns: var(--alvo) repeat(3, minmax(0, 1fr)) auto; align-items: end; gap: var(--e-3); }
-.linha-tecnico + .linha-tecnico .campo > label { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* time operacional: um cartão por membro (duas linhas de campos; rótulos sempre visíveis) */
+.lista-tecnicos { display: grid; gap: var(--e-3); }
+.linha-tecnico { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; align-items: end; gap: var(--e-3); padding: var(--e-4); border: 1px solid var(--borda); border-radius: var(--r-g); background: var(--superficie); }
+.marcas-tecnico { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-6); }
+.padrao-tecnico { display: inline-flex; align-items: center; gap: var(--e-2); min-height: var(--alvo); cursor: pointer; font-size: var(--t-1); }
+.padrao-tecnico input { width: var(--e-5); height: var(--e-5); accent-color: var(--acao); margin: 0; }
+.padrao-tecnico:has(input:disabled) { color: var(--texto-apagado); cursor: default; }
 .grade-criterio { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-4); }
 .grupo-criterio { display: grid; gap: var(--e-3); align-content: start; padding: var(--e-4); border: 1px solid var(--borda); border-radius: var(--r-g); background: var(--superficie); }
 .grupo-criterio h3 { font-size: var(--t-2); line-height: var(--a-2); }

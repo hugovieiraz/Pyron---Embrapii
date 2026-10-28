@@ -152,6 +152,8 @@ button.indicador:hover, a.indicador:hover { border-color: var(--borda-forte); ba
 .tabela th:last-child, .tabela td:last-child { padding-right: var(--e-4); }
 .tabela .dir { text-align: right; }
 .tabela .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tabela .sem-quebra { white-space: nowrap; }
+.tabela .col-elastica { width: 100%; max-width: 0; } /* coluna que absorve a sobra e corta com reticências (texto inteiro no title) */ /* código que não pode partir no meio (OS) */
 .tabela .forte { font-weight: var(--p-medio); color: var(--texto); }
 .tabela td > a.forte { display: block; margin: calc(var(--e-2) * -1) 0; padding: var(--e-2) 0; } /* o alvo do link cobre a célula */
 .tabela td > a.forte:hover { text-decoration: none; color: var(--acao-hover); }

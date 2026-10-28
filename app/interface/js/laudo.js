@@ -32,7 +32,7 @@ async function pedirPdf(ids, responsavel, art) {
  * diálogo vira o fim da tarefa (ilustração do laudo, Abrir laudo e Salvar PDF).
  */
 export function abrirLaudo({ ids, config, responsavel = null, art = "" }) {
-  const resps = config?.responsaveis || [];
+  const resps = (config?.responsaveis || []).filter((r) => r.assina !== false);
   if (!resps.length) {
     dialogo({ titulo: L.titulo(ids.length), corpo: [el("p", {}, L.semResponsavel)], acoes: [el("a", { class: "btn primario", href: endereco("configuracoes"), onclick: () => document.querySelector("dialog[open]")?.close() }, L.cadastrar)] }).abrir();
     return;

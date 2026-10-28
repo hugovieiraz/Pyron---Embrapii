@@ -110,7 +110,7 @@ function avisoConfiguracao(config) {
   if (!config) return null;
   const falta = [];
   if (!(config.empresa?.nome || "").trim()) falta.push(P.faltaEmpresa);
-  if (!(config.responsaveis || []).length) falta.push(P.faltaResponsavel);
+  if (!(config.responsaveis || []).some((r) => r.assina !== false)) falta.push(P.faltaResponsavel);
   if (!falta.length) return null;
   return el("div", { class: "aviso-config" }, icone("info"),
     el("p", {}, P.falta(falta)),

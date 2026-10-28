@@ -21,7 +21,7 @@ ScienceDB 10185, CC BY-NC-SA).
 
 | Aba | Salvar | Conteúdo |
 |---|---|---|
-| Empresa e responsáveis | sozinho ("Salvo às …") | nome, subtítulo, logotipo (enviar, trocar, remover); responsáveis técnicos (nome, função, registro; o marcado à esquerda é o padrão do laudo) |
+| Empresa e time | sozinho ("Salvo às …") | nome, subtítulo, logotipo (enviar, trocar, remover); time operacional em cartões (nome, perfil engenheiro ou técnico, função, registro, e-mail, telefone, "Assina laudo" e "Padrão do laudo"; desde 28/10) |
 | Critério | **Salvar critério** | partir de um modelo (Brasil ou NETA); quatro grupos (% da MTA, ΔT entre semelhantes condutores, ΔT de para-raios e isoladores, ΔT sobre o ambiente com "Usar este grupo"), um valor por nível com o selo ao lado; nome, expoente da carga, carga mínima; Restaurar padrão |
 | Componentes | **Salvar biblioteca** | tabela: componente, aquecimento, MTA (com o padrão quando mudou), fonte; Restaurar padrão |
 | Aparência | na hora | Claro, Escuro, Seguir o Windows |

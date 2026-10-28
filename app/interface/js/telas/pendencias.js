@@ -64,14 +64,14 @@ export async function montar(pagina, rota) {
       rotulo: T.telas.pendencias,
       colunas: [
         { chave: "sev", titulo: P.colSeveridade, celula: (p) => selo(p.severidade) },
-        { chave: "equip", titulo: P.colEquipamento, link: true, celula: (p) => [
+        { chave: "equip", titulo: P.colEquipamento, classe: "col-elastica", link: true, celula: (p) => [
           el("span", { class: "corta", title: p.equipamento || p.arquivo }, p.equipamento || p.arquivo),
           el("span", { class: "sub corta" }, [p.instalacao || (p.equipamento ? null : P.semEquipamento), p.regiao, temperatura(p.t_max)].filter(Boolean).join(", ")),
         ] },
         { chave: "detectada", titulo: P.colDetectada, celula: (p) => data(p.detectada_em) },
         { chave: "prazo", titulo: P.colPrazo, celula: celulaPrazo },
         { chave: "situacao", titulo: P.colSituacao, celula: (p) => [el("span", {}, S.status[p.status]), p.reinspecao && !["verificada", "descartada"].includes(p.status) ? el("span", { class: "sub" }, P.normalEm(data(p.reinspecao.data))) : null] },
-        { chave: "os", titulo: P.colOs, celula: (p) => p.ordem_servico || el("span", { class: "fraco" }, T.geral.semValor) },
+        { chave: "os", titulo: P.colOs, classe: "sem-quebra", celula: (p) => p.ordem_servico || el("span", { class: "fraco" }, T.geral.semValor) },
         { chave: "resp", titulo: P.colResponsavel, celula: (p) => (p.responsavel ? el("span", { class: "corta", title: p.responsavel }, p.responsavel) : el("span", { class: "fraco" }, T.geral.semValor)) },
       ],
       linhas: itens,

@@ -1,0 +1,88 @@
+/* ==========================================================================
+   Pyron · tokens do site (landing e teste no navegador)
+
+   Mesma família do aplicativo (app/interface/tokens.css), com papéis de vitrine:
+   - palco grafite do termograma como fundo (o produto mostra imagem térmica, que pede fundo escuro neutro);
+   - cor da marca (chama: brasa, âmbar, miolo) na ação principal e nos realces; no app a ação é cobalto,
+     aqui a marca ocupa esse lugar porque o site vende a marca, não opera dados;
+   - paleta ferro e severidade continuam sendo dado: só no termograma, na escala e nos selos.
+   Regra: nenhuma página do site usa valor fora deste arquivo.
+   ========================================================================== */
+
+:root {
+  /* marca (marca/vetor/LEIA-ME.md) */
+  --brasa: #EF5F0C;
+  --brasa-forte: #D24F05;
+  --ambar: #FEC31F;
+  --miolo: #A70F3C;
+  --tinta: #0A0A0A;
+  --marca-clara: #E6EAF0;
+
+  /* palco grafite (o mesmo do app) */
+  --fundo: #0E1013;
+  --palco: #121418;
+  --palco-2: #1C1F25;
+  --palco-3: #262A31;
+  --linha: rgba(255, 255, 255, .12);
+  --linha-forte: rgba(255, 255, 255, .24);
+  --texto: #E6EAF0;          /* 15,9:1 sobre o fundo */
+  --texto-2: #B4BCC8;        /* 9,9:1 */
+  --texto-3: #8D94A1;        /* 6,1:1: menor contraste para texto */
+
+  /* seção clara (onde aparecem as telas do app) */
+  --claro: #F7F8FA;
+  --claro-2: #EEF1F4;
+  --claro-linha: #DDE2E8;
+  --claro-texto: #161B22;
+  --claro-texto-2: #424B59;
+
+  /* paleta ferro (dado térmico) */
+  --ferro-0: #000000;
+  --ferro-1: #1E046E;
+  --ferro-2: #780696;
+  --ferro-3: #C81E6E;
+  --ferro-4: #F0641E;
+  --ferro-5: #FCB414;
+  --ferro-6: #FFF08C;
+  --gradiente-ferro: linear-gradient(90deg, var(--ferro-1), var(--ferro-2), var(--ferro-3), var(--ferro-4), var(--ferro-5), var(--ferro-6));
+
+  /* severidade (dado, nunca botão) */
+  --normal: #1E9E63;    --normal-fundo: #E3F6EE;    --normal-texto: #0B6645;
+  --atencao: #B58900;   --atencao-fundo: #FBF1D3;   --atencao-texto: #6B4E00;
+  --programar: #E07012; --programar-fundo: #FDEBDC; --programar-texto: #8A3B05;
+  --urgente: #D63A22;   --urgente-fundo: #FCE6E1;   --urgente-texto: #93220F;
+  --imediato: #A3123A;  --imediato-fundo: #FAE3EA;  --imediato-texto: #86082A;
+
+  /* luzes de fundo (brilho de brasa atrás do herói e das faixas) */
+  --brilho-brasa: rgba(239, 95, 12, .28);
+  --brilho-miolo: rgba(167, 15, 60, .30);
+  --veu-foto: rgba(14, 16, 19, .78);
+  --veu-foto-2: rgba(14, 16, 19, .2);
+  --vidro: rgba(18, 20, 24, .82);
+  --rotulo-imagem: rgba(18, 20, 24, .9);
+  --marca-imagem: #FFFFFF;
+  --sombra-flutua: 0 24px 60px -24px rgba(0, 0, 0, .7);
+
+  /* tipografia: as três famílias do app */
+  --fonte: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --fonte-titulo: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --fonte-estrutura: "Bahnschrift", "DIN Alternate", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  --fonte-num: "Cascadia Mono", "Cascadia Code", Consolas, "SFMono-Regular", monospace;
+  --t-1: 14px;  --t-2: 17px;  --t-3: 20px;  --t-4: 24px;  --t-5: 29px;
+  --t-hero: clamp(40px, 7vw, 84px);
+  --t-secao: clamp(29px, 4vw, 44px);
+  --espaco-estrutura: .08em;
+
+  /* espaço (múltiplos de 4) e medidas */
+  --e-1: 4px; --e-2: 8px; --e-3: 12px; --e-4: 16px; --e-5: 20px; --e-6: 24px; --e-8: 32px; --e-10: 40px; --e-12: 48px; --e-16: 64px; --e-24: 96px;
+  --r-p: 4px; --r-m: 8px; --r-g: 12px; --r-pilula: 999px;
+  --alvo: 44px;
+  --largura: 1200px;
+  --medida: 62ch;
+  --gutter: clamp(16px, 4vw, 40px);
+
+  --dur-rapida: 150ms;
+  --dur-media: 250ms;
+  --dur-lenta: 400ms;
+  --ease: cubic-bezier(.2, .7, .2, 1);
+}

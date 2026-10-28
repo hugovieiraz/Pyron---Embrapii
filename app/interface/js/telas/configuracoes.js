@@ -1,4 +1,4 @@
-// Configurações (Etapa 5d): o que muda o laudo e o sistema. Abas Empresa e responsáveis, Critério, Componentes,
+// Configurações (Etapa 5d): o que muda o laudo e o sistema. Abas Empresa e time, Critério, Componentes,
 // Aparência, Dados e backup e Sobre (decisão da Etapa 1); cada aba é um módulo em js/configuracoes/.
 import { TEXTOS as T } from "../../textos.js";
 import { telaComAbas } from "../telaAbas.js";

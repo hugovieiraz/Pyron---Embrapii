@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pyron · Manutenção preditiva por termografia</title>
+  <meta name="description" content="O Pyron lê a temperatura de cada pixel do termograma, encontra pontos quentes em transformadores e subestações, classifica a severidade pela NBR 15866 e acompanha cada pendência até a correção verificada.">
+  <meta name="theme-color" content="#0E1013">
+  <meta property="og:title" content="Pyron · Manutenção preditiva por termografia">
+  <meta property="og:description" content="Do termograma ao laudo, no computador da sua equipe.">
+  <meta property="og:image" content="img/termograma-transformador.webp">
+  <link rel="icon" href="img/pyron-icone.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="estilo.css">
+  <script>document.documentElement.classList.add("js")</script>
+</head>
+<body>
+<a class="pular" href="#principal">Pular para o conteúdo</a>
+
+<header class="topo">
+  <div class="conteiner">
+    <a class="logo" href="#" aria-label="Pyron, início"><img src="img/pyron-logo-escuro.svg" alt="Pyron" width="110" height="36"></a>
+    <nav class="nav" aria-label="Principal">
+      <ul>
+        <li><a href="#como-funciona">Como funciona</a></li>
+        <li><a href="#produto">Produto</a></li>
+        <li><a href="#time">Time operacional</a></li>
+        <li><a href="#baixar">Baixar</a></li>
+        <li><a href="#contato">Contato</a></li>
+      </ul>
+    </nav>
+    <div class="acoes-topo">
+      <a class="btn secundario" href="#contato">Falar com a equipe</a>
+      <a class="btn primario" href="teste.html">Testar agora</a>
+    </div>
+  </div>
+</header>
+
+<main id="principal">
+  <!-- ============================================================ herói -->
+  <section class="heroi">
+    <div class="conteiner">
+      <div>
+        <span class="rotulo-secao">Manutenção preditiva por termografia</span>
+        <h1>Ache o ponto quente <em>antes da falha.</em></h1>
+        <p class="lead">O Pyron lê a temperatura de cada pixel do termograma, encontra conexões e buchas aquecidas, compara cada fase com as outras e com o limite do componente, e entrega o laudo pronto para a equipe de campo agir.</p>
+        <div class="acoes">
+          <a class="btn primario" href="teste.html">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 3l14 9-14 9V3z"/></svg>
+            Testar no navegador
+          </a>
+          <a class="btn secundario" href="#baixar" aria-describedby="nota-download">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12m0 0l-5-5m5 5l5-5M4 21h16"/></svg>
+            Baixar para Windows <span class="etiqueta">em breve</span>
+          </a>
+        </div>
+        <p class="nota-acao" id="nota-download">O teste roda aqui mesmo, sem instalar nada. O instalador sai na primeira versão pública.</p>
+      </div>
+      <figure class="termo">
+        <img src="img/termograma-transformador.webp" alt="Termograma de transformador de subestação com uma bucha bem mais quente que as outras" width="735" height="640" fetchpriority="high">
+        <div class="leitura l1" aria-hidden="true"><span>Bucha fase C</span><b>78,4 °C</b><span class="selo urgente">Urgente</span></div>
+        <div class="leitura l2" aria-hidden="true"><span>ΔT entre fases</span><b>+21,3 °C</b><span>NBR 15866 · carga 70 %</span></div>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ============================================================ pilares -->
+  <section class="pilares" aria-label="O que o Pyron mede">
+    <div class="conteiner">
+      <ul>
+        <li><b>pixel a pixel</b><span>Temperatura real do termograma radiométrico, não a cor da imagem</span></li>
+        <li><b>ΔT + MTA</b><span>Comparação entre fases e com a máxima admissível do componente</span></li>
+        <li><b>5 níveis</b><span>Severidade de Atenção a Imediato, com prazo de correção sugerido</span></li>
+        <li><b>até verificar</b><span>Pendência acompanhada até a reinspeção confirmar o reparo</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ============================================================ como funciona -->
+  <section class="secao" id="como-funciona">
+    <div class="conteiner surge">
+      <span class="rotulo-secao">Como funciona</span>
+      <h2 class="titulo-secao">Do termograma à ordem de serviço em quatro passos</h2>
+      <p class="lead">O mesmo fluxo que a equipe já faz, sem planilha no meio e sem perder o histórico do equipamento.</p>
+      <ol class="passos">
+        <li class="passo"><span class="passo-num">1</span><h3>Importar</h3><p>Arraste os termogramas da câmera (FLIR e outras radiométricas), aponte uma pasta monitorada ou tire a foto pelo celular.</p></li>
+        <li class="passo"><span class="passo-num">2</span><h3>Analisar</h3><p>O modelo de visão encontra buchas, conexões e para-raios; a regra de pontos quentes acha o que o modelo não conhece.</p></li>
+        <li class="passo"><span class="passo-num">3</span><h3>Classificar</h3><p>Cada região é comparada com a fase igual e com a MTA, corrigida pela carga. Vale o pior critério.</p></li>
+        <li class="passo"><span class="passo-num">4</span><h3>Agir</h3><p>Laudo em PDF assinado pelo engenheiro, pendência com prazo e OS para o técnico, alerta por WhatsApp.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ============================================================ produto -->
+  <section class="secao claro" id="produto">
+    <div class="conteiner">
+      <div class="surge">
+        <span class="rotulo-secao">O produto</span>
+        <h2 class="titulo-secao">Feito para quem abre o programa todo dia</h2>
+        <p class="lead">Telas reais do Pyron. Leitura ampla, nada abaixo de 14 px, funciona no projetor da sala de manutenção e no notebook do campo.</p>
+      </div>
+      <div class="produto surge">
+        <div class="texto-produto">
+          <h3>Painel: o que pede atenção agora</h3>
+          <p>Ao abrir, a equipe vê os equipamentos mais graves, as pendências vencidas e a agenda das próximas inspeções.</p>
+          <ul class="lista-check">
+            <li>Severidade por equipamento, sempre a situação mais recente</li>
+            <li>Inspeções vencidas pela periodicidade de cada ativo</li>
+            <li>Alertas da pasta monitorada e do celular</li>
+          </ul>
+        </div>
+        <figure class="janela">
+          <img src="img/tela-painel.webp" alt="Painel do Pyron com a lista Atenção agora, indicadores de críticas e pendências vencidas e a agenda de próximas inspeções" width="1536" height="900" loading="lazy">
+          <figcaption>Painel com dados simulados de três subestações</figcaption>
+        </figure>
+      </div>
+      <div class="produto invertido surge">
+        <figure class="janela">
+          <img src="img/tela-pendencias.webp" alt="Tela de Pendências do Pyron com severidade, prazo, situação, ordem de serviço e responsável de cada anomalia" width="1536" height="900" loading="lazy">
+          <figcaption>Pendências com prazo, OS e responsável do time</figcaption>
+        </figure>
+        <div class="texto-produto">
+          <h3>Pendências: nenhuma anomalia esquecida</h3>
+          <p>Cada anomalia vira uma pendência com prazo pela severidade, ordem de serviço e responsável. Quando a reinspeção sai normal, o Pyron sugere fechar.</p>
+          <ul class="lista-check">
+            <li>Filtros por situação: em andamento, vencidas, aguardando reinspeção</li>
+            <li>Histórico de cada mudança, com nota de quem mexeu</li>
+            <li>Exportação para Postgres, Grafana e BI da empresa</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ time operacional -->
+  <section class="secao" id="time">
+    <div class="conteiner time surge">
+      <figure class="foto">
+        <img src="img/tecnico-campo.webp" alt="Técnico com equipamento de proteção inspeciona um transformador de subestação com câmera termográfica" width="1200" height="655" loading="lazy">
+      </figure>
+      <div>
+        <span class="rotulo-secao">Time operacional</span>
+        <h2 class="titulo-secao">Cada pessoa da equipe no seu papel</h2>
+        <p class="lead">Cadastre engenheiros e técnicos uma vez. O Pyron sabe quem assina o laudo e quem recebe a pendência.</p>
+        <div class="papeis">
+          <article class="papel">
+            <h3>Engenheiro responsável <span class="estrutura">CREA</span></h3>
+            <p>Assina o laudo com nome e registro do cadastro (nunca digitado na hora), define o critério de severidade e acompanha os prazos.</p>
+          </article>
+          <article class="papel">
+            <h3>Técnico de campo <span class="estrutura">CFT</span></h3>
+            <p>Faz a inspeção, envia as fotos pelo celular, recebe a pendência com OS e prazo e marca a correção para a reinspeção.</p>
+          </article>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ local e privado -->
+  <section class="faixa-foto" aria-labelledby="titulo-local">
+    <img src="img/subestacao-noite.webp" alt="" width="1408" height="768" loading="lazy">
+    <div class="conteiner surge">
+      <span class="rotulo-secao">Local e privado</span>
+      <h2 class="titulo-secao" id="titulo-local">Roda no computador da equipe</h2>
+      <p class="lead">As imagens da sua subestação não saem da empresa. O motor de análise carrega em poucos segundos e funciona sem internet, no escritório ou no notebook de campo.</p>
+      <ul class="garantias">
+        <li><b>Sem nuvem obrigatória</b><span>Dados numa pasta sua, com backup e lixeira</span></li>
+        <li><b>Critério aberto</b><span>NBR 15866 e NETA MTS, editáveis pela engenharia</span></li>
+        <li><b>Placa de vídeo opcional</b><span>Usa a GPU quando há; sem ela, roda no processador</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ============================================================ teste e download -->
+  <section class="secao" id="baixar">
+    <div class="conteiner">
+      <div class="chamada surge">
+        <div>
+          <span class="rotulo-secao">Experimente</span>
+          <h2>Veja a análise funcionando agora</h2>
+          <p class="lead">A versão de teste mostra um termograma de buchas de transformador, a leitura de temperatura em cada ponto e a severidade calculada pela mesma regra do programa.</p>
+          <div class="acoes"><a class="btn primario" href="teste.html">Abrir o teste</a></div>
+        </div>
+        <div class="versoes" aria-label="Versões">
+          <div class="versao">
+            <div><b>Teste no navegador</b><span>Visualização simplificada, sem instalar</span></div>
+            <a class="btn secundario" href="teste.html">Abrir</a>
+          </div>
+          <div class="versao">
+            <div><b>Pyron para Windows</b><span>Windows 10 e 11 · versão completa</span></div>
+            <span class="btn secundario" aria-disabled="true" role="link">Em breve</span>
+          </div>
+          <div class="versao">
+            <div><b>Celular da equipe de campo</b><span>Abre pelo QR code do programa, sem loja</span></div>
+            <span class="btn secundario" aria-disabled="true" role="link">Com o app</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ contato -->
+  <section class="secao" id="contato">
+    <div class="conteiner contato surge">
+      <div>
+        <span class="rotulo-secao">Contato</span>
+        <h2 class="titulo-secao">Quer o Pyron na sua equipe?</h2>
+        <p class="lead">Conte o tamanho do parque e como a inspeção é feita hoje. Avisamos quando o instalador sair e combinamos um piloto com os seus termogramas.</p>
+      </div>
+      <form class="form" id="form-contato" novalidate>
+        <div class="dois">
+          <label>Nome<input name="nome" autocomplete="name" required></label>
+          <label>Empresa<input name="empresa" autocomplete="organization"></label>
+        </div>
+        <div class="dois">
+          <label>E-mail<input name="email" type="email" autocomplete="email" required></label>
+          <label>Papel na equipe
+            <select name="papel"><option>Engenheiro(a)</option><option>Técnico(a)</option><option>Gestor(a) de manutenção</option><option>Outro</option></select>
+          </label>
+        </div>
+        <label>Mensagem<textarea name="mensagem" rows="3" placeholder="Quantas subestações, qual câmera, quantas inspeções por mês"></textarea></label>
+        <div><button class="btn primario" type="submit">Enviar pelo e-mail</button></div>
+        <p class="nota-acao" id="aviso-form" role="status">Abre o seu programa de e-mail com a mensagem pronta; nada é enviado sem você.</p>
+      </form>
+    </div>
+  </section>
+</main>
+
+<div class="faixa-ferro" aria-hidden="true"></div>
+<footer class="rodape">
+  <div class="conteiner">
+    <div class="linha-rodape">
+      <img src="img/pyron-logo-escuro.svg" alt="Pyron" width="74" height="24">
+      <span>Manutenção preditiva por termografia · <a href="https://github.com/hugovieiraz/Pyron---Embrapii">código no GitHub</a></span>
+    </div>
+    <div class="linha-rodape">
+      <span>© 2026 Pyron. Telas com dados simulados. Fotos de contexto ilustrativas.</span>
+      <a href="#principal">Voltar ao topo</a>
+    </div>
+  </div>
+</footer>
+
+<script src="site.js" defer></script>
+</body>
+</html>

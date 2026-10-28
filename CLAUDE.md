@@ -121,6 +121,19 @@ núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Te
 
 ## 5. Estrutura, comandos e fluxo de trabalho
 
+**Site (`site/`, 28/10/2026):** landing (`index.html`) e teste no navegador (`teste.html`), HTML/CSS/JS puro, estático
+(publicável em GitHub Pages). Valores só de `site/tokens.css`: palco grafite do app como fundo, cor da chama da marca
+na ação principal (no app a ação continua cobalto), paleta ferro e severidade só como dado. O teste gera um termograma
+sintético de três buchas e classifica com a mesma regra de `nucleo/analise.py` (critério padrão, MTA da bucha 95 °C):
+mudou a regra ou o critério padrão, mudar `site/teste.js` junto. O botão de download fica "em breve" até haver
+instalador; o e-mail de contato em `site/site.js` é provisório. Imagens em WebP (`site/img/`): fotos de contexto
+ilustrativas vindas do modelo de design e telas reais capturadas do `pyron-demo`. Pré-visualização: `esbocos`
+(porta 8794) em `/site/`.
+
+**Time operacional** (Configurações › Empresa e time): `responsaveis` no `config.json` com perfil (engenheiro ou
+técnico), função, registro, e-mail, telefone e `assina`. Só quem assina (com registro) aparece no laudo e pode ser o
+padrão; o campo Responsável da pendência sugere todo o time. Cadastros antigos viram engenheiro que assina.
+
 **Dois aplicativos no mesmo repositório:**
 - `app/` + `nucleo/` + `ml/`: o Pyron completo (inspeções, equipamentos, pendências, laudos, monitor, celular).
 - `apresentacao/`: versão enxuta para apresentações (abas Análise · Avaliação do modelo · Câmera do

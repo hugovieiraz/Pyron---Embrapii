@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Teste do Pyron</title>
+  <meta name="description" content="Versão de teste do Pyron no navegador: termograma de buchas de transformador, temperatura em cada ponto e severidade pela NBR 15866.">
+  <meta name="theme-color" content="#0E1013">
+  <link rel="icon" href="img/pyron-icone.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="estilo.css">
+  <link rel="stylesheet" href="teste.css">
+</head>
+<body class="pagina-teste">
+<a class="pular" href="#palco">Pular para o termograma</a>
+
+<header class="topo">
+  <div class="conteiner largo">
+    <a class="logo" href="index.html" aria-label="Pyron, voltar ao site"><img src="img/pyron-logo-escuro.svg" alt="Pyron" width="110" height="36"></a>
+    <span class="selo-teste estrutura">Teste no navegador</span>
+    <div class="acoes-topo">
+      <a class="btn secundario" href="index.html#baixar">Versão completa</a>
+    </div>
+  </div>
+</header>
+
+<main class="analise conteiner largo">
+  <div class="barra-ferramentas" role="toolbar" aria-label="Cenário do teste">
+    <div class="segmentado" role="group" aria-label="Cenário" id="cenarios"></div>
+    <label class="controle">Carga
+      <input type="range" id="carga" min="30" max="100" step="5" value="80" aria-describedby="carga-valor">
+      <output id="carga-valor" class="num">80 %</output>
+    </label>
+    <label class="controle">Ambiente
+      <input type="range" id="ambiente" min="10" max="40" step="1" value="25" aria-describedby="ambiente-valor">
+      <output id="ambiente-valor" class="num">25 °C</output>
+    </label>
+  </div>
+
+  <div class="area">
+    <section class="palco" id="palco" aria-label="Termograma">
+      <div class="moldura">
+        <canvas id="termo" width="640" height="420" role="img" aria-label="Termograma sintético de três buchas de transformador, fases A, B e C"></canvas>
+        <div class="mira" id="mira" hidden><span class="num" id="mira-valor"></span></div>
+      </div>
+      <div class="escala" aria-hidden="true">
+        <span class="num" id="escala-min"></span><span class="barra-escala"></span><span class="num" id="escala-max"></span>
+      </div>
+      <p class="dica-palco">Passe o mouse ou o dedo sobre a imagem para ler a temperatura do ponto.</p>
+    </section>
+
+    <aside class="painel" aria-label="Resultado da análise">
+      <div class="resumo" id="resumo" aria-live="polite"></div>
+      <table class="tabela">
+        <caption class="sr">Regiões medidas</caption>
+        <thead><tr><th scope="col">Bucha</th><th scope="col" class="dir">Tmáx</th><th scope="col" class="dir"><abbr title="ΔT entre semelhantes, corrigido para plena carga">ΔT</abbr></th><th scope="col" class="dir"><abbr title="Temperatura projetada em % da máxima admissível">MTA</abbr></th><th scope="col">Nível</th></tr></thead>
+        <tbody id="regioes"></tbody>
+      </table>
+      <details class="como">
+        <summary>Como o nível é calculado</summary>
+        <p>Cada bucha é comparada com a mediana das três fases (ΔT entre semelhantes). O ΔT é corrigido para plena carga: ΔT × (100 / carga)². A temperatura também é projetada para plena carga e comparada com a máxima admissível da bucha (95 °C, IEC 60137). Vale o pior dos dois critérios, com as faixas da NBR 15866.</p>
+      </details>
+      <div class="fim-painel">
+        <button class="btn secundario" type="button" aria-disabled="true" aria-describedby="nota-laudo">Gerar laudo em PDF</button>
+        <p class="nota-acao" id="nota-laudo">Laudo, histórico, pendências e o time operacional ficam na versão completa para Windows.</p>
+      </div>
+    </aside>
+  </div>
+  <p class="aviso-teste">Imagem sintética gerada no navegador para demonstração. No programa, a temperatura vem do arquivo radiométrico da câmera e as regiões são achadas pelo modelo de visão.</p>
+</main>
+
+<script src="teste.js" type="module"></script>
+</body>
+</html>

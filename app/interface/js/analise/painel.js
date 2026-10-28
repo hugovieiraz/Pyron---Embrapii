@@ -138,7 +138,7 @@ export function montarPainel(ctx, { equipamentos }) {
     const lista = (nome, valores) => el("datalist", { id: nome }, [...new Set(valores.filter(Boolean))].map((v) => el("option", { value: v })));
     const inst = campo({ rotulo: A.instalacao, valor: id.instalacao || "", list: "dl-instalacoes", autocomplete: "off" });
     const equip = campo({ rotulo: A.equipamento, valor: id.equipamento || "", list: "dl-equipamentos", autocomplete: "off" });
-    const resps = ctx.config.responsaveis || [];
+    const resps = (ctx.config.responsaveis || []).filter((r) => r.assina !== false);
     const resp = campo({ rotulo: T.laudo.responsavel, opcoes: [{ valor: "", texto: A.semResponsavelOpcao }, ...resps.map((r) => ({ valor: r.id, texto: [r.nome, r.registro].filter(Boolean).join(", ") }))], valor: id.responsavel_id || "" });
     const art = campo({ rotulo: T.laudo.art, valor: id.art || "", marcador: T.laudo.artMarcador, autocomplete: "off" });
     const obs = campo({ rotulo: A.observacoes, area: true, valor: id.observacoes || "", marcador: A.observacoesMarcador });
