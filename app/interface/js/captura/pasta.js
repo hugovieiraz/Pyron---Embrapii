@@ -1,10 +1,12 @@
-// Captura › Pasta monitorada: a pasta onde a câmera grava, a regra do alerta e quem recebe. Cada mudança
+// Captura › Pasta monitorada: a pasta onde a câmera grava, a regra do alerta e quem recebe (vem do time
+// operacional, em Configurações › Empresa e time; aqui só se mostra). Cada mudança
 // salva sozinha ("Salvo às …"); Ligar é o primário da aba. Com a pasta vigiada, o estado se atualiza a cada 5 s.
 // Só a fonte que funciona aparece (pasta); RTSP, SDK e envio automático continuam fora até existirem.
 import { TEXTOS as T } from "../../textos.js";
 import { el, api, json, lerNumero, dataHora, relativa } from "../base.js";
 import { botao, campo, marcar, segmentado, secao, avisar, ocupado } from "../componentes.js";
 import { ilustracao } from "../ilustracoes.js";
+import { endereco } from "../rotas.js";
 
 const P = T.pasta;
 const NIVEIS = ["atencao", "programar", "urgente", "imediato"];
@@ -27,20 +29,20 @@ export async function montar(no, { aoMudarEstado }) {
   let minima = cfg.severidade_minima;
   const nivel = segmentado({ rotulo: P.minima, valor: minima, opcoes: NIVEIS.map((n) => ({ valor: n, texto: T.niveis[n] })), aoMudar: (v) => { minima = v; salvarDepois(); } });
   const repetir = campo({ rotulo: P.repetir, tipo: "number", valor: String(cfg.repetir_min), unidade: "min", ajuda: P.repetirAjuda });
-  const responsaveis = el("div", { class: "lista-responsaveis" });
+  const responsaveis = el("ul", { class: "lista-recebe" });
   const erro = el("p", { class: "erro-dialogo", role: "alert", hidden: true });
   const salvo = el("span", { class: "estado-salvo", role: "status" });
 
-  function linhaResponsavel(d = { nome: "", telefone: "" }) {
-    const nome = campo({ rotulo: P.nome, valor: d.nome, autocomplete: "off" });
-    const tel = campo({ rotulo: P.whatsapp, tipo: "tel", valor: d.telefone, marcador: P.whatsappMarcador, autocomplete: "off" });
-    const tirar = botao({ texto: P.tirar(d.nome || P.responsavel), icone: "lixo", variante: "fantasma", soIcone: true, onclick: () => { linha.remove(); salvarDepois(0); } });
-    const linha = el("div", { class: "linha-responsavel" }, nome, tel, tirar);
-    return linha;
+  // quem recebe: nome, WhatsApp e a partir de que nível; quem pede menos que o monitor só recebe a partir do monitor
+  function desenharResponsaveis() {
+    const quem = cfg.destinatarios || [];
+    const abaixo = (d) => NIVEIS.indexOf(d.minima) < NIVEIS.indexOf(minima);
+    responsaveis.replaceChildren(...quem.map((d) => el("li", {}, el("b", {}, d.nome), el("span", { class: "mono" }, d.telefone),
+      el("span", { class: "nota" }, abaixo(d) ? `${P.aPartirDe(T.niveis[d.minima])} (${P.abaixoDoMonitor})` : P.aPartirDe(T.niveis[d.minima])))));
+    semResponsaveis.hidden = quem.length > 0;
   }
-  responsaveis.append(...cfg.destinatarios.map(linhaResponsavel));
-  const semResponsaveis = el("p", { class: "nota", hidden: cfg.destinatarios.length > 0 }, P.semResponsaveis);
-  const adicionar = botao({ texto: P.adicionar, icone: "adicionar", compacto: true, onclick: () => { const l = linhaResponsavel(); responsaveis.append(l); semResponsaveis.hidden = true; l.querySelector("input").focus(); } });
+  const semResponsaveis = el("p", { class: "nota" }, P.semResponsaveis);
+  const editarTime = el("a", { class: "btn compacto", href: endereco("configuracoes", ["empresa"]) }, P.editarTime);
 
   function lerFormulario() {
     return {
@@ -51,8 +53,6 @@ export async function montar(no, { aoMudarEstado }) {
       equipamento: equipamento.querySelector("input").value.trim(),
       severidade_minima: minima,
       repetir_min: Math.round(lerNumero(repetir.querySelector("input").value) ?? cfg.repetir_min),
-      // linha ainda sem telefone não vai: o servidor recusaria o WhatsApp vazio enquanto a pessoa digita o nome
-      destinatarios: [...responsaveis.querySelectorAll(".linha-responsavel")].map((l) => ({ nome: l.querySelectorAll("input")[0].value.trim(), telefone: l.querySelectorAll("input")[1].value.trim() })).filter((d) => d.telefone),
     };
   }
 
@@ -72,6 +72,7 @@ export async function montar(no, { aoMudarEstado }) {
       salvo.dataset.estado = "salvo";
       salvo.textContent = T.analise.salvoEm(new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }));
       desenharEstado();
+      desenharResponsaveis();
       return true;
     } catch (e) {
       erro.textContent = e.message;
@@ -141,9 +142,10 @@ export async function montar(no, { aoMudarEstado }) {
       el("div", { class: "grupo-campos" },
         el("div", { class: "campo" }, el("span", { class: "rotulo", id: "rotulo-minima" }, P.minima), nivel),
         repetir,
-        el("div", { class: "campo" }, el("span", { class: "rotulo" }, P.responsaveis), semResponsaveis, responsaveis, el("div", {}, adicionar)))),
+        el("div", { class: "campo" }, el("span", { class: "rotulo" }, P.responsaveis), el("p", { class: "nota" }, P.responsaveisNota), semResponsaveis, responsaveis, el("div", {}, editarTime)))),
     el("div", { class: "coluna-lado" }, blocoEstado, blocoPrevia)));
   desenharEstado();
+  desenharResponsaveis();
 
   // com a pasta vigiada, o estado anda sozinho (última verificação, analisadas, alertas)
   const relogio = setInterval(async () => {

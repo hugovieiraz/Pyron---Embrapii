@@ -43,7 +43,7 @@ export async function montar(no) {
   const lista = el("div", { class: "lista-tecnicos" });
   const contagem = el("span", { class: "nota" });
   const valor = (l, k) => l.querySelector(`[data-campo=${k}]`);
-  function linha(r = { id: novoId(), nome: "", perfil: "tecnico", funcao: "", registro: "", email: "", telefone: "", assina: false }) {
+  function linha(r = { id: novoId(), nome: "", perfil: "tecnico", funcao: "", registro: "", email: "", telefone: "", assina: false, alertas: null }) {
     const comCampo = (k, n) => { n.querySelector("input, select").dataset.campo = k; return n; };
     const padrao = el("label", { class: "padrao-tecnico", title: C.respPadraoDica },
       el("input", { type: "radio", name: "resp-padrao", value: r.id, checked: r.id === cfg.responsavel_padrao, disabled: !r.assina, "aria-label": C.respPadraoDe(r.nome || C.respNovo) }), C.respPadrao);
@@ -59,7 +59,8 @@ export async function montar(no) {
       comCampo("registro", campo({ rotulo: C.respRegistro, valor: r.registro, marcador: C.respRegistroMarcador, autocomplete: "off" })),
       comCampo("email", campo({ rotulo: C.respEmail, tipo: "email", valor: r.email || "", marcador: C.respEmailMarcador, autocomplete: "off" })),
       comCampo("telefone", campo({ rotulo: C.respTelefone, tipo: "tel", valor: r.telefone || "", marcador: C.respTelefoneMarcador, autocomplete: "off" })),
-      el("div", { class: "marcas-tecnico" }, assina, padrao));
+      el("div", { class: "marcas-tecnico" }, assina, padrao,
+        comCampo("alertas", campo({ rotulo: C.respAlertas, opcoes: Object.entries(C.alertaOpcoes).map(([valor, texto]) => ({ valor, texto })), valor: r.alertas || "", classe: "campo-alertas" }))));
     return l;
   }
   function contar() {
@@ -76,7 +77,8 @@ export async function montar(no) {
   const lerResponsaveis = () => [...lista.querySelectorAll(".linha-tecnico")]
     .filter((l) => valor(l, "email").checkValidity())
     .map((l) => ({ id: l.dataset.id, assina: valor(l, "assina").checked,
-      ...Object.fromEntries(["nome", "perfil", "funcao", "registro", "email", "telefone"].map((k) => [k, valor(l, k).value.trim()])) }))
+      ...Object.fromEntries(["nome", "perfil", "funcao", "registro", "email", "telefone"].map((k) => [k, valor(l, k).value.trim()])),
+      alertas: valor(l, "alertas").value || null }))
     .filter((r) => r.nome && (!r.assina || r.registro));
 
   let relogio = null;

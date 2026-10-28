@@ -133,6 +133,9 @@ ilustrativas vindas do modelo de design e telas reais capturadas do `pyron-demo`
 **Time operacional** (Configurações › Empresa e time): `responsaveis` no `config.json` com perfil (engenheiro ou
 técnico), função, registro, e-mail, telefone e `assina`. Só quem assina (com registro) aparece no laudo e pode ser o
 padrão; o campo Responsável da pendência sugere todo o time. Cadastros antigos viram engenheiro que assina.
+Alertas do monitor: quem recebe pelo WhatsApp é quem do time tem `alertas` (nível a partir do qual recebe, com
+telefone válido); a Pasta monitorada só mostra a lista (`_destinatarios()` em `servidor.py`). A lista antiga
+`monitoramento.destinatarios` migra para o time na primeira leitura (mesmo telefone ou membro novo que não assina).
 
 **Dois aplicativos no mesmo repositório:**
 - `app/` + `nucleo/` + `ml/`: o Pyron completo (inspeções, equipamentos, pendências, laudos, monitor, celular).
@@ -142,7 +145,9 @@ padrão; o campo Responsável da pendência sugere todo o time. Cadastros antigo
   apresentação o modo celular é **só identificação** (sem leitura da barra de cores).
 
 **Comandos** (na raiz, sempre com o Python do `.venv`):
-- Testes: `.venv/Scripts/python.exe -m pytest -q` (pastas `testes` e `tests`, ≈255 testes, ~40 s).
+- Testes: no dia a dia `.venv/Scripts/python.exe -m pytest -q -m "not lento"` (≈370 testes, ~85 s); antes de publicar no
+  `main`, `pytest -q` completo (≈390, 2 a 3 min). `lento` = carrega PyTorch e os modelos de medição ou do SAM 2. O que
+  sobra de tempo vem dos testes de medição com cenas sintéticas de 1000 × 800 (1 a 4 s cada); medido em 28/10/2026.
 - Pyron para testar sem dados reais: pré-visualização `pyron-demo` (`.claude/launch.json`, porta 8790,
   dados em `saida/dados_demo`). Apresentação: pré-visualização `apresentacao` (porta 8792).
 - Medição em foto: tudo de uma vez `.venv/Scripts/python.exe -m nucleo.medicao.instalar` (ou o botão em Modelos › Medição). À mão: `.venv/Scripts/pip install --no-deps git+https://github.com/microsoft/MoGe.git` (mais o

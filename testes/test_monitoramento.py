@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import time
 from urllib.parse import unquote
@@ -137,3 +138,45 @@ def test_cada_subpasta_e_um_equipamento(cliente, tmp_path) -> None:
     equips = {a["arquivo"]: a["identificacao"].get("equipamento") for a in cliente.get("/api/analises").json()}
     assert equips == {"a.jpg": "TR-01", "b.jpg": "TR-02", "solta.jpg": "Geral"}
     assert {e["equipamento"] for e in cliente.get("/api/equipamentos").json()} == {"TR-01", "TR-02", "Geral"}
+
+
+def test_quem_recebe_vem_do_time_com_nivel_de_cada_um(cliente, tmp_path) -> None:
+    time = [
+        {"nome": "Ana Souza", "perfil": "engenheiro", "registro": "CREA-PB 1", "telefone": "+55 83 98888-0000", "assina": True, "alertas": "imediato"},
+        {"nome": "Bruno Lima", "perfil": "tecnico", "telefone": "+55 83 97777-0000", "assina": False, "alertas": "programar"},
+        {"nome": "Caio Reis", "perfil": "tecnico", "telefone": "+55 83 96666-0000", "assina": False},
+    ]
+    assert cliente.put("/api/configuracoes", json={"responsaveis": time}).status_code == 200
+    sem_telefone = {"nome": "Dora", "assina": False, "alertas": "urgente"}
+    assert cliente.put("/api/configuracoes", json={"responsaveis": [sem_telefone]}).status_code == 422
+
+    pasta = tmp_path / "camera"
+    pasta.mkdir()
+    cfg = cliente.put("/api/monitoramento", json={"ativo": True, "pasta": str(pasta), "intervalo_s": 3600, "severidade_minima": "urgente"}).json()["config"]
+    assert [(d["nome"], d["minima"]) for d in cfg["destinatarios"]] == [("Ana Souza", "imediato"), ("Bruno Lima", "programar")]
+
+    _gravar_antigo(pasta / "quente.jpg", _termograma(80.0))  # urgente
+    cliente.post("/api/monitoramento/verificar")
+    alerta = cliente.get("/api/alertas").json()["alertas"][0]
+    assert alerta["severidade"] == "urgente" and alerta["destinatarios"] == ["Bruno Lima"]  # Ana só recebe Imediato
+    links = cliente.get(f"/api/alertas/{alerta['id']}/whatsapp").json()["links"]
+    assert [l["nome"] for l in links] == ["Bruno Lima"]
+
+
+def test_lista_antiga_da_pasta_entra_no_time(cliente, tmp_path) -> None:
+    cliente.put("/api/configuracoes", json={"responsaveis": [
+        {"nome": "Ana Souza", "perfil": "engenheiro", "registro": "CREA-PB 1", "telefone": "(83) 99999-0000 ", "assina": True}]})
+    import app.servidor as servidor
+    cfg = json.loads((servidor.PASTA_DADOS / "config.json").read_text(encoding="utf-8"))
+    cfg["responsaveis"][0]["telefone"] = "+55 83 99999-0000"
+    cfg["monitoramento"]["severidade_minima"] = "programar"
+    cfg["monitoramento"]["destinatarios"] = [{"nome": "Ana", "telefone": "+55 (83) 99999-0000"}, {"nome": "Plantão", "telefone": "+55 83 95555-0000"}]
+    (servidor.PASTA_DADOS / "config.json").write_text(json.dumps(cfg), encoding="utf-8")
+
+    c = cliente.get("/api/configuracoes").json()
+    por_nome = {r["nome"]: r for r in c["responsaveis"]}
+    assert por_nome["Ana Souza"]["alertas"] == "programar"  # mesmo telefone: o membro existente passa a receber
+    assert por_nome["Plantão"]["alertas"] == "programar" and por_nome["Plantão"]["assina"] is False
+    assert cliente.get("/api/monitoramento").json()["config"]["destinatarios"][1]["nome"] == "Plantão"
+    salvo = json.loads((servidor.PASTA_DADOS / "config.json").read_text(encoding="utf-8"))
+    assert salvo["monitoramento"]["destinatarios"] == []  # migra uma vez só

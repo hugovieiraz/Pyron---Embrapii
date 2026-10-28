@@ -500,7 +500,12 @@ body:has(.painel-lateral) .avisos { right: calc(var(--detalhe) + var(--e-6) * 2)
 /* time operacional: um cartão por membro (duas linhas de campos; rótulos sempre visíveis) */
 .lista-tecnicos { display: grid; gap: var(--e-3); }
 .linha-tecnico { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; align-items: end; gap: var(--e-3); padding: var(--e-4); border: 1px solid var(--borda); border-radius: var(--r-g); background: var(--superficie); }
-.marcas-tecnico { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-6); }
+.marcas-tecnico { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: end; gap: var(--e-3) var(--e-6); }
+.marcas-tecnico .campo-alertas { margin-left: auto; min-width: var(--col-m); }
+.lista-recebe { display: grid; gap: var(--e-1); margin: 0; padding: 0; list-style: none; }
+.lista-recebe li { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--e-1) var(--e-3); min-height: var(--alvo); padding: var(--e-2) 0; border-bottom: 1px solid var(--borda); }
+.lista-recebe li:last-child { border-bottom: 0; }
+.lista-recebe .nota { margin-left: auto; }
 .padrao-tecnico { display: inline-flex; align-items: center; gap: var(--e-2); min-height: var(--alvo); cursor: pointer; font-size: var(--t-1); }
 .padrao-tecnico input { width: var(--e-5); height: var(--e-5); accent-color: var(--acao); margin: 0; }
 .padrao-tecnico:has(input:disabled) { color: var(--texto-apagado); cursor: default; }

@@ -55,4 +55,6 @@ packages = [
 [tool.pytest.ini_options]
 testpaths = ["testes"]
 pythonpath = ["."]
+# dia a dia: pytest -q -m "not lento"; antes de publicar no main: pytest -q (tudo)
+markers = ["lento: carrega PyTorch e os modelos de medição ou do SAM 2 (dezenas de segundos)"]
 

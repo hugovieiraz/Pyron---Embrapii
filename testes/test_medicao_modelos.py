@@ -17,6 +17,8 @@ pytest.importorskip("transformers")
 
 from nucleo.medicao import modelos  # noqa: E402
 
+pytestmark = pytest.mark.lento  # carrega os modelos de verdade: fica fora do teste rápido do dia a dia
+
 GABARITO = Path(__file__).parent / "gabarito"
 
 

@@ -51,6 +51,8 @@ def _verificar_disponibilidade() -> str | None:
     return None
 
 
+pytestmark = pytest.mark.lento  # SAM 2 de verdade nos termogramas reais
+
 MOTIVO_SKIP = _verificar_disponibilidade()
 requer_sam2_real = pytest.mark.skipif(MOTIVO_SKIP is not None, reason=MOTIVO_SKIP or "")
 

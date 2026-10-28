@@ -91,8 +91,9 @@ CONFIG_PADRAO = {
     "modelo_ativo": "pontos-quentes",
     "empresa": {"nome": "", "subtitulo": ""},
     "responsavel": {"nome": "", "registro": ""},  # formato antigo (um só); migra para "responsaveis"
-    # time operacional: [{"id", "nome", "perfil", "funcao", "registro", "email", "telefone", "assina"}];
-    # o laudo só aceita quem assina (com registro profissional), a pendência aceita qualquer um
+    # time operacional: [{"id", "nome", "perfil", "funcao", "registro", "email", "telefone", "assina", "alertas"}];
+    # o laudo só aceita quem assina (com registro profissional), a pendência aceita qualquer um e o alerta
+    # do monitor vai pelo WhatsApp a quem tem "alertas" (severidade a partir da qual recebe)
     "responsaveis": [],
     "responsavel_padrao": None,
     "tema": "claro",
@@ -120,15 +121,50 @@ def _config() -> dict:
         cfg["responsaveis"] = [{"id": "r1", "nome": antigo["nome"].strip(), "funcao": "", "registro": (antigo.get("registro") or "").strip()}]
         cfg["responsavel_padrao"] = "r1"
     cfg["responsaveis"] = [_membro(r) for r in cfg["responsaveis"]]
+    if _migrar_destinatarios(cfg):
+        _salvar_config(cfg)
     return cfg
 
 
 PERFIS = ("engenheiro", "tecnico")
+NIVEIS_ALERTA = ("atencao", "programar", "urgente", "imediato")
 
 
 def _membro(r: dict) -> dict:
     """Completa um membro do time gravado antes do cadastro operacional (todos assinavam laudo)."""
-    return {"perfil": "engenheiro", "email": "", "telefone": "", "assina": True, **r}
+    return {"perfil": "engenheiro", "email": "", "telefone": "", "assina": True, "alertas": None, **r}
+
+
+def _migrar_destinatarios(cfg: dict) -> bool:
+    """Quem recebia pela lista própria da Pasta monitorada (formato antigo) passa a ser do time.
+
+    Mesmo telefone: o membro passa a receber a partir do nível do monitor. Sem ninguém igual: entra como
+    técnico que não assina laudo, para ninguém deixar de receber alerta. A lista antiga fica vazia.
+    """
+    mon = cfg.get("monitoramento") or {}
+    antigos = mon.get("destinatarios") or []
+    if not antigos:
+        return False
+    minima = mon.get("severidade_minima") or "urgente"
+    for d in antigos:
+        digitos = monitoramento.telefone_digitos(d.get("telefone"))
+        if not digitos:
+            continue
+        membro = next((r for r in cfg["responsaveis"] if monitoramento.telefone_digitos(r.get("telefone")) == digitos), None)
+        if membro is None:
+            membro = _membro({"id": f"w{digitos[-11:]}", "nome": (d.get("nome") or "Responsável")[:120], "perfil": "tecnico",
+                              "funcao": "", "registro": "", "telefone": d["telefone"], "assina": False})
+            cfg["responsaveis"].append(membro)
+        membro["alertas"] = membro.get("alertas") or minima
+    mon["destinatarios"] = []
+    return True
+
+
+def _destinatarios(cfg: dict | None = None) -> list[dict]:
+    """Quem do time recebe o alerta do monitor pelo WhatsApp, com o nível a partir do qual recebe."""
+    cfg = cfg or _config()
+    return [{"id": r["id"], "nome": r["nome"], "telefone": r["telefone"], "minima": r["alertas"]}
+            for r in cfg["responsaveis"] if r.get("alertas") and monitoramento.telefone_digitos(r.get("telefone"))]
 
 
 def _responsavel(id_: str | None) -> dict | None:
@@ -156,12 +192,17 @@ def _validar_responsaveis(lista) -> list[dict]:
         if email and not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
             raise HTTPException(422, f"{nome}: e-mail inválido.")
         telefone = re.sub(r"[^\d+() -]", "", str(r.get("telefone", "")))[:30].strip()
+        alertas = r.get("alertas") or None
+        if alertas is not None and alertas not in NIVEIS_ALERTA:
+            raise HTTPException(422, f"{nome}: nível de alerta desconhecido.")
+        if alertas and not 10 <= len(monitoramento.telefone_digitos(telefone)) <= 15:
+            raise HTTPException(422, f"{nome}: para receber alertas pelo WhatsApp, informe o telefone com DDI e DDD, por exemplo +55 83 99999-0000.")
         id_ = str(r.get("id") or "").strip()[:12]
         if not re.fullmatch(r"[a-z0-9]{1,12}", id_) or id_ in ids:
             id_ = uuid.uuid4().hex[:8]
         ids.add(id_)
         saida.append({"id": id_, "nome": nome, "perfil": perfil, "funcao": str(r.get("funcao", "")).strip()[:80], "registro": registro,
-                      "email": email, "telefone": telefone, "assina": assina})
+                      "email": email, "telefone": telefone, "assina": assina, "alertas": alertas})
     return saida
 
 
@@ -1508,11 +1549,17 @@ def _analisar_do_monitor(dados: bytes, nome: str, identificacao: dict) -> dict:
 
 monitor = monitoramento.Monitor(
     analisar=_analisar_do_monitor,
-    configuracao=lambda: _config()["monitoramento"],
+    configuracao=lambda: _config_monitor(),
     salvar_alerta=lambda alerta: armazenamento.salvar_alerta(alerta),
     alertas_recentes=lambda: armazenamento.alertas(50),
     pasta_estado=lambda: PASTA_DADOS,
 )
+
+
+def _config_monitor() -> dict:
+    """Configuração do monitor com quem recebe vindo do time (Configurações › Empresa e time)."""
+    cfg = _config()
+    return {**cfg["monitoramento"], "destinatarios": _destinatarios(cfg)}
 
 
 def _estado_monitor() -> dict:
@@ -1531,7 +1578,7 @@ def status() -> dict:
 
 @app.get("/api/monitoramento")
 def obter_monitoramento() -> dict:
-    return {"config": _config()["monitoramento"], "estado": _estado_monitor(), "disponivel": monitoramento.DISPONIVEL}
+    return {"config": _config_monitor(), "estado": _estado_monitor(), "disponivel": monitoramento.DISPONIVEL}
 
 
 @app.put("/api/monitoramento")
@@ -1994,7 +2041,7 @@ def whatsapp_alerta(id_: str) -> dict:
     alerta = armazenamento.alerta(id_)
     if alerta is None:
         raise HTTPException(404, "Alerta não encontrado.")
-    destinatarios = _config()["monitoramento"].get("destinatarios", [])
+    destinatarios = monitoramento.para_severidade(_destinatarios(), alerta["severidade"])
     return {"mensagem": alerta["mensagem"], "links": monitoramento.links_whatsapp(alerta["mensagem"], destinatarios)}
 
 

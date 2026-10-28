@@ -137,6 +137,11 @@ def mensagem(analise: dict, cfg: dict) -> str:
     return "\n".join(linhas)
 
 
+def para_severidade(destinatarios: list[dict], severidade: str) -> list[dict]:
+    """Só quem recebe a partir deste nível (``minima`` de cada um; sem ela, recebe todo alerta)."""
+    return [d for d in destinatarios if ORDEM.get(severidade, -9) >= ORDEM.get(d.get("minima") or "atencao", 1)]
+
+
 def links_whatsapp(texto: str, destinatarios: list[dict]) -> list[dict]:
     """Links wa.me: abrem o WhatsApp (celular ou computador) com a mensagem pronta para o responsável enviar."""
     return [
@@ -277,7 +282,7 @@ class Monitor:
             "mensagem": texto,
             "instalacao": cfg.get("instalacao", ""),
             "equipamento": cfg.get("equipamento", ""),
-            "destinatarios": [d["nome"] for d in cfg.get("destinatarios", [])],
+            "destinatarios": [d["nome"] for d in para_severidade(cfg.get("destinatarios", []), sev)],
             "status": "pendente",
         }
 
