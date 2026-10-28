@@ -168,8 +168,12 @@ telefone válido); a Pasta monitorada só mostra a lista (`_destinatarios()` em 
 
 **Ambiente** (Windows 11 com Controle Inteligente de Aplicativos ligado):
 - Detecção na placa de vídeo pelo `onnxruntime-directml` (DLLs assinadas pela Microsoft). Atenção: o `rapidocr-onnxruntime` depende do
-  `onnxruntime` comum (só CPU), que ocupa o mesmo módulo; em 28/10/2026 o `.venv` estava com ele e sem o DirectML
-  (`onnxruntime.get_available_providers()` sem `DmlExecutionProvider`). Leitura de imagem estimada: OCR com detecção
+  `onnxruntime` comum (só CPU), que ocupa o mesmo módulo e tira o DirectML. Em 28/10/2026 o `.venv` estava assim;
+  corrigido com `pip uninstall -y onnxruntime` e `pip install onnxruntime-directml==1.24.4` (repetir depois de
+  instalar ou atualizar o RapidOCR; conferir com `onnxruntime.get_available_providers()`).
+  Imagem que chega sozinha (`FONTES_AUTOMATICAS`: monitor, celular, vídeo): o modelo escolhido roda na placa
+  quando pronta (`_na_placa`), sem SAM 2 (fica no botão Medir da Análise) e sem o `sam2-dinov2` (vira pontos
+  quentes, com aviso em `avisos_analise`); com o monitor ligado, modelo e OCR carregam ao subir (`_preaquecer`). Leitura de imagem estimada: OCR com detecção
   até 320 px e cache de recortes (`OCRPreguicoso`), projeção na paleta por cor distinta e mediana do OpenCV, todos
   conferidos idênticos nas imagens de `app/dados_app`. O PyTorch
   com CUDA e o pacote `onnx` são bloqueados de forma intermitente pelo SAC: não depender deles em

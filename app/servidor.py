@@ -73,6 +73,7 @@ async def _ciclo_de_vida(_app):
     """Ao subir, retoma o monitoramento que estava ligado; ao descer, para a thread da pasta vigiada."""
     if _config()["monitoramento"].get("ativo"):
         monitor.iniciar()
+        _preaquecer()
     yield
     monitor.parar()
 
@@ -313,6 +314,8 @@ def _calcular(a: dict, matriz: np.ndarray) -> dict:
     a["regioes"], a["resumo"] = analise.analisar_regioes(
         matriz, base, cond.get("ambiente_c"), cond.get("carga_pct"), criterios=_criterios(), componentes=_componentes()
     )
+    # notas da própria análise (modelo trocado, SAM 2 sob demanda): o resumo é refeito a cada abertura
+    a["resumo"]["avisos"].extend(a.get("avisos_analise", []))
     campos_med = ("id", "tipo", "x", "y", "x0", "y0", "x1", "y1")
     a["medicoes"] = analise.medir_medicoes(matriz, [{k: v for k, v in m.items() if k in campos_med} for m in a.get("medicoes", [])])
     return a
@@ -444,18 +447,56 @@ def _simplificar_contorno(mascara: np.ndarray, epsilon: float = 1.0) -> list[lis
     return [[float(p[0][0]), float(p[0][1])] for p in aproximado]
 
 
+# Fontes em que a imagem chega sozinha e a resposta tem de ser rápida: a análise fica com a detecção e a
+# severidade. A segmentação SAM 2 (1 a 8 s por imagem na CPU) fica para quando alguém abre a peça na Análise
+# (botão Medir, /api/analises/{id}/segmentar), e o SAM 2 + DINOv2 (até minutos por imagem) dá lugar aos pontos quentes.
+FONTES_AUTOMATICAS = ("monitoramento", "celular", "video")
+DETECTORES_LENTOS = ("sam2-dinov2",)
+
+
+def _na_placa(det: detectores.Detector) -> detectores.Detector:
+    """O mesmo modelo escolhido, rodando na placa de vídeo (DirectML) se ela já estiver pronta; senão ele mesmo.
+
+    Nunca troca pela versão INT8: a inspeção registra o modelo escolhido, e o DirectML dá as mesmas notas
+    da CPU (diferença de 0,0002, ``nucleo/detectores/placa.py``). A primeira chamada começa a carregar a
+    placa em outro fio; enquanto isso a inspeção segue na CPU.
+    """
+    combinado = isinstance(det, detectores.Combinado)
+    na_placa = placa.variante(det.partes[0] if combinado else det)
+    if na_placa is None:
+        return det
+    return detectores.Combinado(na_placa, det.partes[1]) if combinado else na_placa
+
+
+def _preaquecer() -> None:
+    """Deixa pronto o que a primeira imagem do monitor usaria (modelo na placa e OCR), sem segurar a subida."""
+    def trabalho() -> None:
+        try:
+            _na_placa(_detector(None))
+            ocr(np.zeros((32, 96, 3), np.uint8))
+        except Exception:  # noqa: BLE001 — pré-aquecer é só ganho de tempo; a análise carrega de novo se precisar
+            pass
+    threading.Thread(target=trabalho, name="pyron-preaquecer", daemon=True).start()
+
+
 def _nova_analise(dados: bytes, nome: str, modelo: str | None, fonte: str = "manual", identificacao: dict | None = None,
                   limites: tuple[float, float] | None = None, somente_imagem: bool = False) -> dict:
     t0 = perf_counter()
+    automatica = fonte in FONTES_AUTOMATICAS
     try:
         img = entrada.carregar(dados, ocr=ocr, limites=limites, somente_imagem=somente_imagem)
     except ValueError as erro:
         raise HTTPException(422, str(erro)) from erro
     t1 = perf_counter()
     det = _detector(modelo)
+    aviso_rapido = None
+    if automatica and det.id in DETECTORES_LENTOS:
+        aviso_rapido = (f"Imagem que chega sozinha usa os pontos quentes: o {det.nome} leva até minutos por imagem. "
+                        "Para usá-lo, analise de novo esta imagem com ele.")
+        det = detectores.obter("pontos-quentes", PASTA_MODELOS)
     try:
         if img.tem_temperatura or getattr(det, "precisa_imagem", False):
-            regioes = _regioes_do_detector(det, img.temperatura_c, img.exibida_rgb, metadados=img.metadados)
+            regioes = _regioes_do_detector(_na_placa(det), img.temperatura_c, img.exibida_rgb, metadados=img.metadados)
         else:
             regioes = []  # o modelo lê temperatura, que esta imagem não tem
     except ValueError as erro:
@@ -494,7 +535,9 @@ def _nova_analise(dados: bytes, nome: str, modelo: str | None, fonte: str = "man
     t_seg_ms = 0
     aviso_sam2 = None
     segmentador = None
-    if modelo_sam2 and img.tem_temperatura and any(not r.get("segmentacao") for r in a["regioes"]):
+    if modelo_sam2 and automatica:
+        aviso_sam2 = "Segmentação SAM 2 sob demanda: abra a peça na Análise e use Medir."
+    elif modelo_sam2 and img.tem_temperatura and any(not r.get("segmentacao") for r in a["regioes"]):
         # Sem o SAM 2 instalado a análise segue sem segmentação, com aviso, em vez de falhar.
         try:
             segmentador = _obter_segmentador_sam2()
@@ -538,12 +581,14 @@ def _nova_analise(dados: bytes, nome: str, modelo: str | None, fonte: str = "man
         t_seg_ms = round((perf_counter() - t_seg_ini) * 1000)
 
     t_calc_ini = perf_counter()
-    _calcular(a, img.temperatura_c)
+    notas = []
     if not img.tem_temperatura and not getattr(det, "precisa_imagem", False):
-        a["resumo"]["avisos"].append(f"O modelo {det.nome} procura pelo calor; sem temperatura, ele não identifica componentes. "
-                                     "Escolha um modelo que olha a imagem colorida.")
-    if aviso_sam2:
-        a["resumo"]["avisos"].append(aviso_sam2)
+        notas.append(f"O modelo {det.nome} procura pelo calor; sem temperatura, ele não identifica componentes. "
+                     "Escolha um modelo que olha a imagem colorida.")
+    notas += [n for n in (aviso_sam2, aviso_rapido) if n]
+    if notas:
+        a["avisos_analise"] = notas
+    _calcular(a, img.temperatura_c)
     t3 = perf_counter()
     etapas = [
         {"nome": "Leitura da temperatura", "ms": round((t1 - t0) * 1000), **({} if img.tem_temperatura else {"sem_dado": True})},
@@ -1596,6 +1641,8 @@ def salvar_monitoramento(corpo: dict = Body(...)) -> dict:
         monitor.linha_de_base(novo["pasta"], novo.get("subpastas", False))  # só o que chegar a partir de agora
     if novo["ativo"]:
         monitor.iniciar()
+        if ligando:
+            _preaquecer()
     else:
         monitor.parar()
     return obter_monitoramento()

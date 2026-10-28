@@ -180,3 +180,29 @@ def test_lista_antiga_da_pasta_entra_no_time(cliente, tmp_path) -> None:
     assert cliente.get("/api/monitoramento").json()["config"]["destinatarios"][1]["nome"] == "Plantão"
     salvo = json.loads((servidor.PASTA_DADOS / "config.json").read_text(encoding="utf-8"))
     assert salvo["monitoramento"]["destinatarios"] == []  # migra uma vez só
+
+
+@pytest.mark.parametrize("modelo, usado, aviso", [
+    ("sam2-dinov2", "pontos-quentes", "usa os pontos quentes"),
+    ("pontos-quentes-sam2", "pontos-quentes-sam2", "SAM 2 sob demanda"),
+])
+def test_imagem_que_chega_sozinha_fica_com_o_rapido(cliente, tmp_path, monkeypatch, modelo, usado, aviso) -> None:
+    import copy
+
+    from app import servidor
+    from nucleo import detectores
+
+    lento = copy.copy(detectores.obter("pontos-quentes", tmp_path))
+    lento.id, lento.nome = modelo, "Modelo lento"
+    monkeypatch.setattr(servidor, "_detector", lambda _id: lento)
+    monkeypatch.setattr(servidor, "_obter_segmentador_sam2", lambda: pytest.fail("o SAM 2 não roda na imagem automática"))
+
+    pasta = tmp_path / "camera"
+    pasta.mkdir()
+    cliente.put("/api/monitoramento", json={"ativo": True, "pasta": str(pasta), "intervalo_s": 3600})
+    _gravar_antigo(pasta / "quente.jpg", _termograma(80.0))
+    cliente.post("/api/monitoramento/verificar")
+    a = cliente.get(f"/api/analises/{cliente.get('/api/analises').json()[0]['id']}").json()
+    assert a["modelo"]["id"] == usado
+    assert any(aviso in texto for texto in a["resumo"]["avisos"])
+    assert a["resumo"]["severidade"] == "urgente"  # a detecção e a severidade continuam
