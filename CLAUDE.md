@@ -167,7 +167,11 @@ telefone válido); a Pasta monitorada só mostra a lista (`_destinatarios()` em 
 (Postgres, Grafana, BI). Havendo commits dele, integrar com merge (nunca forçar) e rodar os testes.
 
 **Ambiente** (Windows 11 com Controle Inteligente de Aplicativos ligado):
-- Detecção na placa de vídeo pelo `onnxruntime-directml` (DLLs assinadas pela Microsoft). O PyTorch
+- Detecção na placa de vídeo pelo `onnxruntime-directml` (DLLs assinadas pela Microsoft). Atenção: o `rapidocr-onnxruntime` depende do
+  `onnxruntime` comum (só CPU), que ocupa o mesmo módulo; em 28/10/2026 o `.venv` estava com ele e sem o DirectML
+  (`onnxruntime.get_available_providers()` sem `DmlExecutionProvider`). Leitura de imagem estimada: OCR com detecção
+  até 320 px e cache de recortes (`OCRPreguicoso`), projeção na paleta por cor distinta e mediana do OpenCV, todos
+  conferidos idênticos nas imagens de `app/dados_app`. O PyTorch
   com CUDA e o pacote `onnx` são bloqueados de forma intermitente pelo SAC: não depender deles em
   tempo de execução (testes que precisam deles se pulam sozinhos).
 - Tela de 1536 × 816 úteis: janelas `--start-maximized`; conferir telas nesse tamanho.

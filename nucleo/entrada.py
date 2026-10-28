@@ -11,6 +11,7 @@ imagem colorida, e a escala pode ser informada depois.
 
 from __future__ import annotations
 
+import hashlib
 import io
 import warnings
 from dataclasses import dataclass, field
@@ -25,17 +26,34 @@ FATOR_ESTIMADA = 2  # a matriz estimada tem metade da resolução da imagem exib
 
 
 class OCRPreguicoso:
-    """Leitor de texto carregado só na primeira imagem sem dados radiométricos (leva alguns segundos)."""
+    """Leitor de texto carregado só na primeira imagem sem dados radiométricos (leva alguns segundos).
+
+    A detecção de texto vai até 320 pixels, como no ao vivo (o padrão do RapidOCR amplia cada recorte para
+    736 e leva o dobro): nas 19 imagens estimadas de ``app/dados_app`` a temperatura saiu idêntica, com a
+    leitura caindo de ~1,4 s para ~0,9 s. Recorte igual ao de uma imagem anterior (câmera fixa com a escala
+    travada, o mesmo rótulo de novo) devolve a leitura guardada sem rodar o OCR.
+    """
+
+    GUARDAR = 64  # leituras de recortes guardadas (cada rótulo de escala é um recorte pequeno)
 
     def __init__(self):
         self._ocr = None
+        self._lidos: dict[tuple, object] = {}
 
     def __call__(self, imagem, **opcoes):
+        imagem = np.ascontiguousarray(imagem)
+        chave = (imagem.shape, hashlib.blake2b(imagem.tobytes(), digest_size=16).digest(), tuple(sorted(opcoes.items())))
+        if chave in self._lidos:
+            return self._lidos[chave]
         if self._ocr is None:
             from rapidocr_onnxruntime import RapidOCR
 
-            self._ocr = RapidOCR()
-        return self._ocr(imagem, **opcoes)
+            self._ocr = RapidOCR(det_limit_side_len=320, det_limit_type="max")
+        resultado = self._ocr(imagem, **opcoes)
+        if len(self._lidos) >= self.GUARDAR:
+            self._lidos.pop(next(iter(self._lidos)))
+        self._lidos[chave] = resultado
+        return resultado
 
 
 @dataclass

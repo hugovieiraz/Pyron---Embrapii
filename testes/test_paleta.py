@@ -108,3 +108,26 @@ def test_interpreta_numero_partido_pelo_ocr() -> None:
     assert paleta._interpretar([(caixa(0), "B", 0.6), (caixa(20), "19.", 0.99), (caixa(40), ".4", 0.97)])[0] == 19.4
     assert paleta._interpretar([(caixa(0), "51.3", 0.94), (caixa(30), "3", 1.0)])[0] == 51.3
     assert paleta._interpretar([(caixa(0), "-19.5", 0.99)])[0] == -19.5
+
+
+def test_projecao_agrupada_e_identica_a_pixel_a_pixel() -> None:
+    gerador = np.random.default_rng(3)
+    cores = gerador.integers(0, 256, (300, 3))
+    rgb = cores[gerador.integers(0, 300, 60_000)]  # 60 mil pixels, 300 cores: entra no caminho agrupado
+    lab = paleta.rgb_para_lab(rgb)
+    barra = paleta.rgb_para_lab(gerador.integers(0, 256, (120, 3)))
+    pos, dist = paleta.projetar_na_barra(lab, barra)
+    pos_ref, dist_ref = paleta._projetar(lab, barra)
+    assert np.array_equal(pos, pos_ref) and np.array_equal(dist, dist_ref)
+
+
+def test_ocr_reaproveita_recorte_igual() -> None:
+    from nucleo import entrada
+
+    chamadas = []
+    ocr = entrada.OCRPreguicoso()
+    ocr._ocr = lambda img, **op: chamadas.append(img.shape) or ([], 0.0)
+    recorte = np.zeros((20, 40, 3), np.uint8)
+    ocr(recorte); ocr(recorte.copy())
+    ocr(recorte, use_det=False)
+    assert len(chamadas) == 2  # o mesmo recorte com as mesmas opções não roda de novo

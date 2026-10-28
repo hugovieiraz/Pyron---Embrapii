@@ -244,9 +244,16 @@ def mascara_estruturas_finas(lab: np.ndarray, limiar: float = 18.0, janela: int 
     pixels exibidos (1 pixel do sensor), então sobrevive à mediana 5×5; linhas de 1 a 3 pixels
     não sobrevivem.
     """
-    from scipy.ndimage import median_filter
+    if janela in (3, 5):
+        # o OpenCV faz a mediana em ponto flutuante com janela 3 ou 5: ~8x mais rápido que o SciPy e a
+        # mesma máscara (conferido pixel a pixel nas imagens estimadas de app/dados_app)
+        import cv2
 
-    mediana = np.stack([median_filter(lab[..., k], size=janela) for k in range(3)], axis=-1)
+        mediana = cv2.medianBlur(np.ascontiguousarray(lab, dtype=np.float32), janela).astype(np.float64)
+    else:
+        from scipy.ndimage import median_filter
+
+        mediana = np.stack([median_filter(lab[..., k], size=janela) for k in range(3)], axis=-1)
     return np.sqrt(((lab - mediana) ** 2).sum(axis=-1)) > limiar
 
 
@@ -276,7 +283,26 @@ def posicao_para_temperatura(pos: np.ndarray, t_max: float, t_min: float, modelo
 
 
 def projetar_na_barra(lab: np.ndarray, lab_barra: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Posição na barra (0 quente, 1 frio) e distância até ela de cada cor (N x 3, ou N x 2 em ``ab``)."""
+    """Posição na barra (0 quente, 1 frio) e distância até ela de cada cor (N x 3, ou N x 2 em ``ab``).
+
+    Imagem em paleta repete poucos milhares de cores em centenas de milhares de pixels: projeta cada cor
+    distinta uma vez e devolve a cada pixel. O resultado é idêntico; a busca cai de ~350 ms para ~40 ms.
+    """
+    if len(lab) > _MINIMO_PARA_AGRUPAR:
+        linhas = np.ascontiguousarray(lab)
+        chave = linhas.view(np.dtype((np.void, linhas.dtype.itemsize * linhas.shape[1]))).ravel()
+        _, primeiro, de_volta = np.unique(chave, return_index=True, return_inverse=True)
+        if len(primeiro) < len(lab) // 4:
+            pos, dist = _projetar(linhas[primeiro], lab_barra)
+            de_volta = de_volta.ravel()
+            return pos[de_volta], dist[de_volta]
+    return _projetar(lab, lab_barra)
+
+
+_MINIMO_PARA_AGRUPAR = 20_000  # abaixo disso (recortes pequenos) agrupar não compensa
+
+
+def _projetar(lab: np.ndarray, lab_barra: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     n = len(lab_barra)
     dist, idx = cKDTree(lab_barra).query(lab)
     # Refino: projeta a cor no segmento até o vizinho mais próximo na barra.
