@@ -15,12 +15,19 @@ Saídas:
     app/estatico/marca/icone-192.png         ícone do aplicativo: atalhos e página do celular
     marca/pyron.ico e <destino_ico>          ícone do Windows multi-tamanho (atalhos e Pyron.exe), sem fundo
     apresentacao/estatico/marca/             cópias usadas pela apresentação
+    marca/vetor/pyron-icone-mascara.svg      ícone do aplicativo instalado (tablet): ladrilho sem cantos, símbolo
+                                             dentro da zona segura (círculo de 80 %), para o sistema recortar
+    app/estatico/marca/icone-app-192.png     ícones do aplicativo instalado (PWA, manifest.webmanifest): ladrilho
+    app/estatico/marca/icone-app-512.png
+    app/estatico/marca/icone-app-mascara-512.png   "maskable" do Android
+    app/estatico/marca/icone-app-180.png     ícone da tela de início do iPad e do iPhone (apple-touch-icon, sem transparência)
 
 Os SVG viram PNG no Edge sem janela, com fundo transparente: o Edge é assinado pela Microsoft e passa pelo
 Controle Inteligente de Aplicativos, e assim nada precisa ser instalado. Cada tamanho do .ico é desenhado
 no próprio tamanho, para a chama continuar nítida em 16 px.
 
 Uso: python marca/gerar_marca.py [destino.ico]
+     python marca/gerar_marca.py --pwa      só os ícones do aplicativo instalado (não mexe nos outros arquivos)
 """
 
 from __future__ import annotations
@@ -93,6 +100,27 @@ def montar_icone_sem_fundo() -> Path:
     return saida
 
 
+def montar_icone_mascara() -> Path:
+    """Ladrilho escuro de ponta a ponta (sem cantos arredondados: quem arredonda é o sistema) com o símbolo
+    reduzido para caber no círculo de 80 % que o Android e o iPadOS nunca cortam."""
+    texto = (VETOR / "pyron-icone.svg").read_text(encoding="utf-8")
+    texto = texto.replace('rx="56" ', "").replace("scale(1.12)", "scale(0.86)")
+    saida = VETOR / "pyron-icone-mascara.svg"
+    saida.write_text(texto, encoding="utf-8")
+    return saida
+
+
+def gerar_pwa() -> None:
+    """Ícones do aplicativo instalado pelo navegador (manifest.webmanifest e apple-touch-icon)."""
+    ESTATICO.mkdir(parents=True, exist_ok=True)
+    icone = VETOR / "pyron-icone.svg"
+    for lado in (192, 512):
+        rasterizar(icone, lado, lado).save(ESTATICO / f"icone-app-{lado}.png", optimize=True)
+    mascara = montar_icone_mascara()
+    rasterizar(mascara, 512, 512).save(ESTATICO / "icone-app-mascara-512.png", optimize=True)
+    rasterizar(mascara, 180, 180).convert("RGB").save(ESTATICO / "icone-app-180.png", optimize=True)
+
+
 def montar_abertura(vertical_escuro: Path) -> Image.Image:
     """Logo vertical clara com uma sombra suave em volta: a tela de abertura não tem fundo, e a sombra deixa a
     logo legível sobre qualquer papel de parede (claro ou escuro)."""
@@ -148,6 +176,10 @@ def _proporcao(svg: Path) -> float:
 
 
 def main() -> None:
+    if sys.argv[1:] == ["--pwa"]:
+        gerar_pwa()
+        print("ícones do aplicativo instalado gerados em", ESTATICO)
+        return
     destino_ico = Path(sys.argv[1]) if len(sys.argv) > 1 else PROJETO / "lancador" / "obj" / "pyron.ico"
     ESTATICO.mkdir(parents=True, exist_ok=True)
     destino_ico.parent.mkdir(parents=True, exist_ok=True)
@@ -170,6 +202,7 @@ def main() -> None:
     shutil.copyfile(VETOR / "pyron-logo-escuro.svg", ESTATICO / "logo-escuro.svg")
 
     montar_abertura(montar_vertical("escuro")).save(ESTATICO / "abertura.png", optimize=True)
+    gerar_pwa()
 
     camadas = [rasterizar(icone_janela, t, t) for t in TAMANHOS_ICO]
     # o mesmo símbolo sem fundo como ícone da página: é ele que aparece na barra de título e na barra de
