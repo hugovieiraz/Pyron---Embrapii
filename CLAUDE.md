@@ -195,8 +195,10 @@ telefone válido); a Pasta monitorada só mostra a lista (`_destinatarios()` em 
   tempo de execução (testes que precisam deles se pulam sozinhos).
 - Segunda máquina de desenvolvimento (GS87, desde 30/10/2026): Acer Nitro com GTX 1650 4 GB, CUDA 13.3 e **SAC
   desligado**. Prova de bloqueio do SAC só vale numa máquina com ele ligado. Testes rápidos lá: ~190 s.
-- **Versão 0.9** (servidor, tablet PWA, laudo Typst, TensorRT, Tauri): plano por fases com portão em `docs/v09/`;
-  diagnóstico e classificação das rotas por perfil em `docs/v09/0-diagnostico.md`. Branch por fase (`v09-f0-…`).
+- **Versão 0.9.0** (servidor, tablet PWA, laudo Typst, TensorRT, Tauri; 30/10/2026): índice, decisões e pendências
+  em `docs/v09/LEIA-ME.md`; um relatório por fase; diagnóstico e classificação das rotas por perfil em
+  `docs/v09/0-diagnostico.md`. Branch por fase (`v09-f0-…`, `v09-f5-desktop`). Versão nova: `VERSAO` em
+  `app/servidor.py`, `VERSAO_INTERFACE` em `js/base.js` e `app/estatico/app.js`, e `desktop/src-tauri` (Cargo.toml e tauri.conf.json).
 - **Modo servidor** (F1, `docs/v09/1-servidor.md`, implantação em `docs/servidor/implantacao.md`):
   `python -m app.iniciar --modo servidor --proxy 127.0.0.1`, com login. O modo local continua o padrão e sem login.
   `app/acesso.py` é a dependência global do FastAPI: **toda rota nova entra em `_GRUPOS_DAS_ROTAS`** (público,
@@ -215,7 +217,7 @@ telefone válido); a Pasta monitorada só mostra a lista (`_destinatarios()` em 
   Pontos de quebra em `em` (os testes proíbem `px`): 80em (topo e ferramentas só com ícone) e 60em (retrato:
   navegação por ícones, Análise e Pendências empilhadas). Conferir tablet em 1024 × 768, 1180 × 820, 820 × 1180 e 800 × 1280.
 - **Laudo em Typst** (F3, `docs/v09/3-laudo.md`): `app/laudo_typst.py` com as assinaturas de `app/laudo.py`; motor
-  por `laudo.motor` no `config.json` ("reportlab" padrão até o usuário aprovar o visual; Typst indisponível cai no
+  por `laudo.motor` no `config.json` ("typst" padrão desde 30/10/2026, visual aprovado; Typst indisponível cai no
   reportlab). Modelo em `app/laudo/modelo.typ` + `partes/`, fontes só de `app/laudo/fontes/` (Noto Sans + Noto Sans
   Math para ≥, OFL). **Texto do usuário só entra por `dados.json`**: nunca montar código Typst com texto, nunca `eval`.
   Mudou o conteúdo do laudo em `laudo.py`? Mudar `montar_dados()` e o modelo junto (os dois têm de dizer o mesmo).
@@ -228,11 +230,19 @@ telefone válido); a Pasta monitorada só mostra a lista (`_destinatarios()` em 
   `%LOCALAPPDATA%/Pyron/cache_trt`. O motor monta em **outro processo** (criar a sessão segura o GIL: o servidor
   parava minutos). TensorRT em **FP32 por padrão** (`PYRON_TRT_FP16=1` liga o FP16; perdeu uma detecção na paridade).
   Medir: `python -m nucleo.detectores.benchmark --modelo <pasta> [--paridade | --sobrecarga]`.
+- **Pyron desktop** (F5, `docs/v09/5-tauri.md`): `desktop/src-tauri` (Tauri v2, Rust) + `desktop/abertura`. Compilar
+  com `cargo build --release` em `desktop\src-tauri` pelo **PowerShell** (no Git Bash, o `link.exe` do Git pega o lugar
+  do linker do MSVC). O `build.rs` copia tokens, CSS, `textos.js`, `icones.js` e logo de `app/` para
+  `desktop/abertura/gerado` (fonte única continua em `app/`). Python local num Job Object (morre com o app, inclusive
+  em fim de tarefa). A página do servidor só ganha `PERMISSOES_DO_SERVIDOR` (main.rs), para a origem configurada;
+  **nunca** dar shell, fs ou o comando `reiniciar` a ela (`testes/test_janela.py`). `casca.js` fala com a janela só
+  por `js/janela.js` (Tauri, WebView2 do Pyron.exe ou nenhum). O `Pyron.exe` em C# continua o padrão até o
+  executável Tauri ser assinado e passar no Controle Inteligente.
 - Tela de 1536 × 816 úteis: janelas `--start-maximized`; conferir telas nesse tamanho.
 - Janela do aplicativo: o `Pyron.exe` abre a interface numa janela própria sem a barra de título do Windows
   (`lancador/Janela.cs`, WebView2; DLLs da Microsoft em `lancador/webview2`, carregadas de lá). O topo da
   interface vira a barra: `app-region: drag` e os botões de minimizar, maximizar e fechar (`ligarJanela()` em
-  `casca.js`, mensagens `janela:*`). Sem WebView2, cai na janela do Edge (`--app`, maximizada, barra clara pelo
+  `casca.js` pelo adaptador `js/janela.js`, mensagens `janela:*`). Sem WebView2, cai na janela do Edge (`--app`, maximizada, barra clara pelo
   tema do perfil que `app/iniciar.py` grava em `preparar_perfil_janela`). Ícone da janela e da barra de
   tarefas: o do `Pyron.exe`; da página, `app/estatico/marca/icone-janela-*.png`.
 - Ao testar no servidor real (porta 8765), fechar a aba de teste: ela conta como janela aberta e o

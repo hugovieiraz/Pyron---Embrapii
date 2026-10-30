@@ -88,10 +88,10 @@ def test_as_duas_rotas_nos_dois_motores(cliente) -> None:
     assert cliente.put("/api/configuracoes", json={"laudo": {"motor": "word"}}).status_code == 422
 
 
-def test_padrao_continua_reportlab_e_typst_barrado_cai_no_reportlab(cliente, monkeypatch) -> None:
+def test_padrao_e_typst_e_typst_barrado_cai_no_reportlab(cliente, monkeypatch) -> None:
     a = _inspecao(cliente)
-    assert _motor(cliente.get(f"/api/analises/{a['id']}/laudo.pdf").content) == "reportlab"
-    cliente.put("/api/configuracoes", json={"laudo": {"motor": "typst"}})
+    assert cliente.get("/api/configuracoes").json()["laudo"] == {"motor": "typst"}
+    assert _motor(cliente.get(f"/api/analises/{a['id']}/laudo.pdf").content) == "typst"
     monkeypatch.setattr(laudo_typst, "disponivel", lambda: "OSError: DLL barrada")
     assert _motor(cliente.get(f"/api/analises/{a['id']}/laudo.pdf").content) == "reportlab"
     assert cliente.put("/api/configuracoes", json={"laudo": {"motor": "typst"}}).status_code == 422

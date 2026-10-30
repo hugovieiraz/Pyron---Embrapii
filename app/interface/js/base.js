@@ -1,7 +1,7 @@
 // Utilitários da interface nova: DOM, API, formatação e preferências. Sem dependência externa.
 import { TEXTOS as T } from "../textos.js";
 
-export const VERSAO_INTERFACE = "0.8.0"; // igual a VERSAO em app/servidor.py
+export const VERSAO_INTERFACE = "0.9.0"; // igual a VERSAO em app/servidor.py
 
 export const $ = (s, raiz = document) => raiz.querySelector(s);
 export const $$ = (s, raiz = document) => [...raiz.querySelectorAll(s)];
