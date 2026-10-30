@@ -21,7 +21,7 @@ const CASCA = [
   "/js/casca.js", "/js/componentes.js", "/js/conferir.js",
   "/js/configuracoes/aparencia.js", "/js/configuracoes/componentes.js", "/js/configuracoes/criterio.js",
   "/js/configuracoes/dados.js", "/js/configuracoes/empresa.js", "/js/configuracoes/sobre.js",
-  "/js/grafico.js", "/js/icones.js", "/js/ilustracoes.js", "/js/importar.js", "/js/laudo.js",
+  "/js/grafico.js", "/js/icones.js", "/js/ilustracoes.js", "/js/importar.js", "/js/janela.js", "/js/laudo.js",
   "/js/modelos/avaliacao.js", "/js/modelos/emuso.js", "/js/modelos/medicao.js", "/js/modelos/treino.js",
   "/js/pendencia.js", "/js/rotas.js", "/js/rotulos.js", "/js/situacao.js", "/js/telaAbas.js",
   "/js/telas/analise.js", "/js/telas/captura.js", "/js/telas/configuracoes.js", "/js/telas/entrar.js",

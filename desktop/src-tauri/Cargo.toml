@@ -1,0 +1,43 @@
+# Pyron desktop (0.9, F5): janela Tauri v2, cliente fino do servidor local (sobe o Python do .venv) ou remoto (https).
+# Compila com `cargo build --release` (sem a CLI do Tauri). Ver docs/v09/5-tauri.md.
+# Dependências diretas: todas MIT/Apache 2.0.
+
+[package]
+name = "pyron-desktop"
+version = "0.9.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "pyron-desktop"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-single-instance = "2"
+tauri-plugin-notification = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+windows-sys = { version = "0.59", features = [
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_System_JobObjects",
+  "Win32_System_Threading",
+  "Win32_UI_Shell",
+  "Win32_UI_WindowsAndMessaging",
+] }
+
+[features]
+# sem a CLI do Tauri, o `cargo build` precisa embutir a abertura (desktop/abertura) no executável
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

@@ -34,6 +34,27 @@ export const TEXTOS = {
     versaoNova: (v) => `O servidor do Pyron foi atualizado para a versão ${v}. A tela vai recarregar.`,
   },
 
+  // Pyron desktop (Tauri, desktop/): tela de abertura, aviso do Windows e bandeja
+  desktop: {
+    abrindo: "Abrindo o Pyron…",
+    reiniciar: "Reiniciar",
+    tentarDeNovo: "Tentar de novo",
+    erros: {
+      projeto: "Não encontrei a pasta do Pyron. Defina a variável PYRON_PASTA ou o campo \"projeto\" em desktop.json.",
+      python: "O ambiente Python do Pyron (.venv) não foi encontrado. Crie-o seguindo o README (Instalação do zero).",
+      iniciar: "Não consegui iniciar o servidor do Pyron.",
+      demorou: "O servidor do Pyron não respondeu em 2 minutos.",
+      parou: "O servidor do Pyron parou.",
+      endereco: "O endereço do servidor em desktop.json não vale. Use https://… ou, neste computador, http://127.0.0.1:porta.",
+    },
+    registro: (arquivo) => `Detalhes no registro: ${arquivo}`,
+    alertas: (n) => (n === 1 ? "1 alerta novo no Pyron" : `${n} alertas novos no Pyron`),
+    alertasTexto: "Abra o Pyron para ver as imagens e decidir.",
+    monitorLigado: "Monitoramento ligado.",
+    monitorDesligado: "Monitoramento desligado.",
+    monitorFalhou: "Não deu para mudar o monitoramento.",
+  },
+
   // entrada no modo servidor (vários engenheiros pela rede, com login)
   entrar: {
     titulo: "Entrar no Pyron",
