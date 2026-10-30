@@ -2,7 +2,7 @@
 // cadastro. O PDF é pedido com o diálogo aberto e o fim mostra "Laudo pronto" com Abrir e Salvar:
 // abrir depende de um clique (o navegador bloqueia janela aberta depois de esperar o servidor).
 import { TEXTOS as T } from "../textos.js";
-import { el, icone, json, conexao } from "./base.js";
+import { el, icone, json, conexao, acesso, modoServidor } from "./base.js";
 import { botao, campo, dialogo, ocupado } from "./componentes.js";
 import { ilustracao } from "./ilustracoes.js";
 import { endereco } from "./rotas.js";
@@ -24,7 +24,8 @@ async function pedirPdf(ids, responsavel, art) {
     throw new Error(corpo.erro || corpo.detail || T.geral.erroServidor(r.status));
   }
   const nome = /filename="([^"]+)"/.exec(r.headers.get("content-disposition") || "")?.[1] || "laudo.pdf";
-  return { url: URL.createObjectURL(await r.blob()), nome };
+  const blob = await r.blob();
+  return { url: URL.createObjectURL(blob), nome, blob };
 }
 
 /**
@@ -32,13 +33,18 @@ async function pedirPdf(ids, responsavel, art) {
  * diálogo vira o fim da tarefa (ilustração do laudo, Abrir laudo e Salvar PDF).
  */
 export function abrirLaudo({ ids, config, responsavel = null, art = "" }) {
-  const resps = (config?.responsaveis || []).filter((r) => r.assina !== false);
+  // no servidor da equipe quem assina é sempre quem entrou (o servidor ignora outra escolha)
+  const eu = modoServidor() ? acesso.usuario : null;
+  const resps = eu ? [eu] : (config?.responsaveis || []).filter((r) => r.assina !== false);
   if (!resps.length) {
     dialogo({ titulo: L.titulo(ids.length), corpo: [el("p", {}, L.semResponsavel)], acoes: [el("a", { class: "btn primario", href: endereco("configuracoes"), onclick: () => document.querySelector("dialog[open]")?.close() }, L.cadastrar)] }).abrir();
     return;
   }
   const escolhido = [responsavel, config.responsavel_padrao, resps[0].id].find((id) => id && resps.some((r) => r.id === id));
   const resp = campo({ rotulo: L.responsavel, opcoes: resps.map((r) => ({ valor: r.id, texto: [r.nome, r.registro].filter(Boolean).join(", ") })), valor: escolhido });
+  const quemAssina = eu
+    ? el("div", { class: "campo" }, el("span", { class: "rotulo" }, L.assinaVoce), el("b", {}, [eu.nome, eu.registro].filter(Boolean).join(", ")), el("p", { class: "nota" }, L.assinaVoceNota))
+    : resp;
   const campoArt = campo({ rotulo: L.art, valor: art || "", marcador: L.artMarcador, autocomplete: "off" });
   const erro = el("p", { class: "erro-dialogo", role: "alert", hidden: true });
   let pdf = null;
@@ -57,7 +63,7 @@ export function abrirLaudo({ ids, config, responsavel = null, art = "" }) {
 
   const dlg = dialogo({
     titulo: L.titulo(ids.length),
-    corpo: [ids.length > 1 ? el("p", { class: "nota" }, L.ordem(ids.length)) : null, resp, campoArt, erro],
+    corpo: [ids.length > 1 ? el("p", { class: "nota" }, L.ordem(ids.length)) : null, quemAssina, campoArt, erro],
     acoes: [botao({ texto: T.geral.cancelar, onclick: () => dlg.fechar() }), gerar],
     aoFechar: () => { if (pdf) setTimeout(() => URL.revokeObjectURL(pdf.url), 60000); },
   }).abrir();
@@ -67,10 +73,15 @@ export function abrirLaudo({ ids, config, responsavel = null, art = "" }) {
     const abrir = () => window.open(pdf.url, "_blank"); // PDF do próprio Pyron; com noopener o endereço blob: pode não abrir
     const salvar = el("a", { class: "btn", href: pdf.url, download: pdf.nome }, icone("baixar"), el("span", {}, L.salvar));
     const abrirBtn = botao({ texto: L.abrir, icone: "externo", variante: "primario", onclick: abrir });
+    // tablet e celular: mandar o PDF para o e-mail, WhatsApp ou Arquivos pela folha de compartilhar do sistema
+    const arquivo = new File([pdf.blob], pdf.nome, { type: "application/pdf" });
+    const compartilhar = navigator.canShare?.({ files: [arquivo] })
+      ? botao({ texto: L.compartilhar, icone: "compartilhar", onclick: () => navigator.share({ files: [arquivo], title: pdf.nome }).catch(() => {}) })
+      : null;
     dlg.no.querySelector(".cab-dialogo h2").textContent = L.pronto;
     dlg.no.querySelector(".corpo-dialogo").replaceChildren(el("div", { class: "laudo-pronto", role: "status" },
       ilustracao("laudo", { rotulo: L.pronto }), el("p", {}, L.prontoTexto(ids.length, quem)), el("p", { class: "nota mono", title: pdf.nome }, pdf.nome)));
-    dlg.no.querySelector(".rodape-dialogo").replaceChildren(salvar, abrirBtn);
+    dlg.no.querySelector(".rodape-dialogo").replaceChildren(...[compartilhar, salvar, abrirBtn].filter(Boolean));
     abrirBtn.focus();
   }
 }

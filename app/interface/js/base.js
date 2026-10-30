@@ -94,6 +94,24 @@ export function guardarPreferencia(chave, valor) {
   try { localStorage.setItem(PREFIXO + chave, JSON.stringify(valor)); } catch { /* armazenamento bloqueado: segue sem lembrar */ }
 }
 
+// ---------------------------------------------------------------- acesso (modo servidor)
+// Modo local: sem login, tudo liberado. Modo servidor: o perfil de quem entrou (app/acesso.py). A tela só
+// esconde o que o perfil não faz; a regra de verdade fica no servidor, que responde 401 ou 403.
+const TODAS = ["leitura", "envio", "revisao", "laudo", "administracao"];
+export const acesso = { modo: "local", usuario: null, permissoes: new Set(TODAS) };
+export function definirAcesso(eu) {
+  acesso.modo = eu?.modo === "servidor" ? "servidor" : "local";
+  acesso.usuario = eu?.usuario || null;
+  acesso.permissoes = new Set(acesso.modo === "local" ? TODAS : eu?.permissoes || []);
+  document.documentElement.dataset.modo = acesso.modo;
+}
+export const pode = (permissao) => acesso.permissoes.has(permissao);
+export const modoServidor = () => acesso.modo === "servidor";
+/** A tela está no mesmo computador dos dados (Pyron.exe, janela local): só aí "Abrir pasta" e restaurar fazem sentido. */
+export const nesteComputador = () => ["127.0.0.1", "localhost", "[::1]"].includes(location.hostname);
+// A casca escuta "expirou" para pedir o login de novo (sessão vencida no meio do uso).
+export const sessao = new EventTarget();
+
 // ---------------------------------------------------------------- API
 // A casca escuta estes eventos para mostrar e esconder a faixa "sem conexão".
 export const conexao = new EventTarget();
@@ -112,6 +130,7 @@ export async function api(caminho, opcoes = {}) {
   const tipo = r.headers.get("content-type") || "";
   const corpo = tipo.includes("application/json") ? await r.json() : null;
   if (r.status === 404 && versaoServidor && versaoServidor !== VERSAO_INTERFACE) throw new Error(T.geral.versaoDiferente(versaoServidor, VERSAO_INTERFACE));
+  if (r.status === 401 && acesso.modo === "servidor" && !caminho.startsWith("/api/acesso/")) sessao.dispatchEvent(new Event("expirou"));
   if (!r.ok) throw Object.assign(new Error((corpo && (corpo.erro || corpo.detail)) || T.geral.erroServidor(r.status)), { status: r.status });
   return corpo;
 }

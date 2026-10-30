@@ -30,7 +30,18 @@ export async function montar(no) {
   const area = el("div", { class: "area-lista" });
   const lado = el("aside", { class: "painel-lateral", "aria-label": M.detalhe });
   const instalar = el("input", { type: "file", accept: ".zip", hidden: true, onchange: () => { instalarModelo(instalar.files[0]); instalar.value = ""; } });
-  no.append(el("div", { class: "barra-lista" }, el("p", { class: "nota" }, M.notaLista), el("span", { class: "empurrar" }),
+  // onde o modelo em uso roda: na placa, preparando a placa (TensorRT monta o motor uma vez) ou no processador
+  const onde = el("p", { class: "nota", role: "status" });
+  const desenharOnde = () => {
+    const p = dados.placa;
+    onde.textContent = !p ? "" : p.onde === "placa" ? M.ondePlaca(p.placa) : p.onde === "carregando" ? M.preparandoPlaca(p.acelerador) : M.ondeCpu;
+  };
+  desenharOnde();
+  const relogio = setInterval(async () => {
+    if (dados.placa?.onde !== "carregando") return;
+    try { dados = await api("/api/modelos"); desenharOnde(); } catch { /* a faixa de conexão avisa */ }
+  }, 5000);
+  no.append(el("div", { class: "barra-lista" }, el("div", {}, el("p", { class: "nota" }, M.notaLista), onde), el("span", { class: "empurrar" }),
     botao({ texto: M.instalar, icone: "importar", title: M.instalarDica, onclick: () => instalar.click() }), instalar), corpo);
   corpo.append(area, lado);
   desenhar();
@@ -111,11 +122,11 @@ export async function montar(no) {
     envio.append("arquivo", arquivo);
     try {
       const r = await api("/api/modelos/instalar", { method: "POST", body: envio });
-      dados = { ativo: r.ativo, modelos: r.modelos };
+      dados = { ...dados, ativo: r.ativo, modelos: r.modelos };
       escolhido = r.id;
       avisar(M.instalado(r.id));
       desenhar();
     } catch (e) { avisar(e.message, { erro: true }); }
   }
-  return null;
+  return () => clearInterval(relogio);
 }

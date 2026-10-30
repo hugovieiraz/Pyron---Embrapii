@@ -1,7 +1,7 @@
 // Acompanhamento de uma anomalia (situação, prazo, OS, responsável, nota e histórico). O mesmo formulário
 // serve à aba Pendência da Análise e ao painel de Pendências; a nota entra no histórico ao salvar.
 import { TEXTOS as T } from "../textos.js";
-import { el, api, json, data, dataHora, relativa } from "./base.js";
+import { el, api, json, data, dataHora, relativa, pode } from "./base.js";
 import { botao, campo, secao, avisar, ocupado } from "./componentes.js";
 import { endereco } from "./rotas.js";
 
@@ -22,6 +22,9 @@ export function formularioPendencia(p, { primario = false, aoSalvar } = {}) {
   const os = campo({ rotulo: P.os, valor: p.ordem_servico || "", marcador: P.osExemplo, autocomplete: "off", maxlength: "40" });
   const resp = campo({ rotulo: P.responsavel, valor: p.responsavel || "", marcador: P.responsavelExemplo, autocomplete: "off", maxlength: "80", list: "dl-time" });
   sugerirTime(resp);
+  // a regra é do servidor (app/acesso.py): o técnico não muda situação, prazo, OS nem responsável das urgentes e imediatas
+  const soNota = !pode("revisao") && ["urgente", "imediato"].includes(p.severidade);
+  if (soNota) for (const c of [situacao, prazo, os, resp]) c.querySelector("input, select").disabled = true;
   const nota = campo({ rotulo: P.nota, area: true, marcador: P.notaExemplo, maxlength: "500", rows: "2" });
   const salvar = botao({ texto: P.salvar, variante: primario ? "primario" : "secundario", compacto: !primario, onclick: () => ocupado(salvar, async () => {
     try {
@@ -40,9 +43,11 @@ export function formularioPendencia(p, { primario = false, aoSalvar } = {}) {
   const hist = (p.historico || []).slice().reverse();
   return [
     secao({ titulo: P.acompanhamento, conteudo: [
-      dica, el("div", { class: "grade-campos-2" }, situacao, prazo), el("div", { class: "grade-campos-2" }, os, resp), nota, el("div", { class: "grupo-btn" }, salvar),
+      dica, soNota ? el("p", { class: "nota" }, P.soEngenheiro) : null,
+      el("div", { class: "grade-campos-2" }, situacao, prazo), el("div", { class: "grade-campos-2" }, os, resp), nota, el("div", { class: "grupo-btn" }, salvar),
     ] }),
     hist.length ? secao({ titulo: P.historico, qtd: hist.length, aberta: false, conteudo: [el("ol", { class: "lista-historico" }, hist.map((h) => el("li", {},
-      el("span", { class: "nota" }, dataHora(h.quando)), el("b", {}, P.status[h.status] || h.status), h.nota ? el("span", {}, h.nota) : null)))] }) : null,
+      el("span", { class: "nota" }, dataHora(h.quando)), el("b", {}, P.status[h.status] || h.status), h.autor ? el("span", { class: "nota" }, P.por(h.autor)) : null,
+      h.nota ? el("span", {}, h.nota) : null)))] }) : null,
   ];
 }

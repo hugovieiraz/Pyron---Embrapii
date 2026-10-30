@@ -39,9 +39,11 @@ export function montarPalco(ctx) {
     grupos: [
       [
         { chave: "selecionar", texto: A.selecionar, icone: "selecionar", atalho: "V", pressionado: true, onclick: () => usar("selecionar") },
-        { chave: "regiao", texto: A.regiao, icone: "regiao", atalho: "R", pressionado: false, onclick: () => usar("regiao") },
-        { chave: "ponto", texto: A.ponto, icone: "ponto", atalho: "P", pressionado: false, onclick: () => usar("ponto") },
-        { chave: "linha", texto: A.linha, icone: "linha", atalho: "L", pressionado: false, onclick: () => usar("linha") },
+        ...(ctx.podeEditar ? [
+          { chave: "regiao", texto: A.regiao, icone: "regiao", atalho: "R", pressionado: false, onclick: () => usar("regiao") },
+          { chave: "ponto", texto: A.ponto, icone: "ponto", atalho: "P", pressionado: false, onclick: () => usar("ponto") },
+          { chave: "linha", texto: A.linha, icone: "linha", atalho: "L", pressionado: false, onclick: () => usar("linha") },
+        ] : []),
       ],
       [
         { chave: "paleta", texto: A.paleta, icone: "tema" },
@@ -69,7 +71,7 @@ export function montarPalco(ctx) {
   const marcarMenu = (m, ativos) => [...m.querySelectorAll('[role="menuitemradio"]')].forEach((b, i) => b.setAttribute("aria-checked", String(Boolean(ativos[i]))));
 
   function atualizarBarra() {
-    for (const f of ["selecionar", "regiao", "ponto", "linha"]) ferramenta(f).setAttribute("aria-pressed", String(ctx.ferramenta === f));
+    for (const f of ["selecionar", "regiao", "ponto", "linha"]) ferramenta(f)?.setAttribute("aria-pressed", String(ctx.ferramenta === f));
     const escalaBtn = ferramenta("escala");
     if (ctx.a.sem_temperatura) escalaBtn.setAttribute("aria-disabled", "true"); else escalaBtn.removeAttribute("aria-disabled");
     const itemFoto = [...menuCamadas.querySelectorAll('[role="menuitemradio"]')].at(-1);
@@ -81,6 +83,7 @@ export function montarPalco(ctx) {
   }
 
   function usar(f) {
+    if (!ctx.podeEditar && f !== "selecionar") return; // sem as ferramentas de edição (atalhos R, P, L)
     ctx.ferramenta = f;
     vista.dataset.ferramenta = f;
     ctx.mudou("ferramenta");
@@ -177,7 +180,7 @@ export function montarPalco(ctx) {
         title: `${r.nome} · ${temperatura(r.medida?.t_max)}`,
       });
       if (ctx.camadas.rotulos && (sel || !SEM_ALERTA.has(r.severidade))) caixa.append(el("span", { class: "etq" }, `${r.nome} · ${temperatura(r.medida?.t_max)}`));
-      if (sel && ctx.ferramenta === "selecionar") for (const canto of ["no", "ne", "so", "se"]) caixa.append(el("span", { class: `alca ${canto}`, dataset: { canto } }));
+      if (sel && ctx.ferramenta === "selecionar" && ctx.podeEditar) for (const canto of ["no", "ne", "so", "se"]) caixa.append(el("span", { class: `alca ${canto}`, dataset: { canto } }));
       caixas.append(caixa);
       const contorno = r.segmentacao?.contorno;
       if (ctx.camadas.contornos && contorno?.length > 2) {
@@ -237,6 +240,69 @@ export function montarPalco(ctx) {
   new ResizeObserver(medirBase).observe(vista);
   vista.addEventListener("wheel", (ev) => { ev.preventDefault(); zoomEm(ev.deltaY < 0 ? 1.2 : 1 / 1.2, ev.clientX, ev.clientY); }, { passive: false });
 
+  // ---------------------------------------------------------------- toque (tablet): pinça, arrasto com dois dedos, toque duplo
+  // Registrado antes dos gestos de um ponteiro: com o segundo dedo, o gesto de um dedo é desfeito e a pinça assume.
+  // Só o palco tem touch-action: none; o resto da tela rola normalmente.
+  const toques = new Map();
+  let pinca = null;
+  let ultimoToque = { t: 0, x: 0, y: 0 };
+  const entreDedos = () => {
+    const [a, b] = [...toques.values()];
+    return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, d: Math.hypot(a.x - b.x, a.y - b.y) };
+  };
+  vista.addEventListener("pointerdown", (ev) => {
+    if (ev.pointerType !== "touch") return;
+    toques.set(ev.pointerId, { x: ev.clientX, y: ev.clientY, x0: ev.clientX, y0: ev.clientY, t0: performance.now() });
+    if (toques.size < 2) return;
+    if (toques.size === 2) {
+      gesto = null;
+      rascunho.hidden = true;
+      linhas.querySelector(".rascunho")?.remove();
+      const m = entreDedos();
+      pinca = { d0: Math.max(m.d, 1), k0: zoom.k, x0: zoom.x, y0: zoom.y, mx: m.x, my: m.y };
+      vista.setPointerCapture(ev.pointerId);
+    }
+    ev.stopImmediatePropagation();
+  });
+  vista.addEventListener("pointermove", (ev) => {
+    const t = toques.get(ev.pointerId);
+    if (!t) return;
+    t.x = ev.clientX;
+    t.y = ev.clientY;
+    if (!pinca || toques.size < 2) return;
+    const m = entreDedos();
+    const r = vista.getBoundingClientRect();
+    const k = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, pinca.k0 * m.d / pinca.d0));
+    // o ponto da imagem que estava entre os dedos continua entre eles: zoom e arrasto no mesmo gesto
+    const px = pinca.mx - r.left - zoom.base.ox - pinca.x0, py = pinca.my - r.top - zoom.base.oy - pinca.y0;
+    zoom.k = k;
+    zoom.x = m.x - r.left - zoom.base.ox - px * (k / pinca.k0);
+    zoom.y = m.y - r.top - zoom.base.oy - py * (k / pinca.k0);
+    aplicarZoom();
+    ev.stopImmediatePropagation();
+  });
+  const soltarToque = (ev) => {
+    const t = toques.get(ev.pointerId);
+    if (!t) return;
+    toques.delete(ev.pointerId);
+    if (pinca) {
+      if (!toques.size) pinca = null;
+      ev.stopImmediatePropagation();
+      return;
+    }
+    // toque duplo (dois toques curtos no mesmo lugar): volta ao enquadramento, como o 0 do teclado
+    if (ev.type !== "pointerup" || Math.hypot(t.x - t.x0, t.y - t.y0) > 10 || performance.now() - t.t0 > 300) return;
+    const agora = performance.now();
+    if (agora - ultimoToque.t < 350 && Math.hypot(t.x - ultimoToque.x, t.y - ultimoToque.y) < 30) {
+      encaixar();
+      ultimoToque = { t: 0, x: 0, y: 0 };
+    } else {
+      ultimoToque = { t: agora, x: t.x, y: t.y };
+    }
+  };
+  vista.addEventListener("pointerup", soltarToque);
+  vista.addEventListener("pointercancel", soltarToque);
+
   // ---------------------------------------------------------------- ponteiro: mira, seleção, desenho, mover e redimensionar
   function naMatriz(ev) {
     const r = canvas.hidden ? fundo.getBoundingClientRect() : canvas.getBoundingClientRect();
@@ -274,10 +340,11 @@ export function montarPalco(ctx) {
     if (ctx.ferramenta === "selecionar") {
       const alca = ev.target.closest(".alca");
       const alvo = ev.target.closest(".caixa[data-id]");
-      if (alca && ctx.sel) {
+      if (alca && ctx.sel && ctx.podeEditar) {
         gesto = { tipo: "redimensionar", canto: alca.dataset.canto, caixa: [...ctx.regiao().caixa], p0: p };
       } else if (alvo) {
         if (alvo.dataset.id !== ctx.sel) ctx.selecionar(alvo.dataset.id);
+        if (!ctx.podeEditar) return; // só seleciona: mover e redimensionar é revisão
         gesto = { tipo: "mover-caixa", caixa: [...ctx.regiao().caixa], p0: p, moveu: false };
       } else {
         if (ctx.sel) ctx.selecionar(null);
@@ -288,8 +355,9 @@ export function montarPalco(ctx) {
     } else if (ctx.ferramenta === "regiao" || ctx.ferramenta === "linha") {
       gesto = { tipo: ctx.ferramenta, p0: p, p1: p };
     } else if (ctx.ferramenta === "ponto") {
-      adicionarMedicao({ tipo: "ponto", x: p.x, y: p.y });
-      return;
+      // no toque, o ponto entra ao soltar o dedo: se um segundo dedo chegar antes (pinça), não marca nada
+      if (ev.pointerType === "touch") gesto = { tipo: "ponto", p0: p };
+      else { adicionarMedicao({ tipo: "ponto", x: p.x, y: p.y }); return; }
     }
     vista.setPointerCapture(ev.pointerId);
   });
@@ -329,6 +397,7 @@ export function montarPalco(ctx) {
     rascunho.hidden = true;
     linhas.querySelector(".rascunho")?.remove();
     if (!g) return;
+    if (g.tipo === "ponto") { adicionarMedicao({ tipo: "ponto", x: g.p0.x, y: g.p0.y }); return; }
     if (g.tipo === "regiao") {
       const x0 = Math.min(g.p0.x, g.p1.x), x1 = Math.max(g.p0.x, g.p1.x), y0 = Math.min(g.p0.y, g.p1.y), y1 = Math.max(g.p0.y, g.p1.y);
       if (x1 - x0 < 2 || y1 - y0 < 2) return;

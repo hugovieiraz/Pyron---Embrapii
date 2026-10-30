@@ -31,7 +31,8 @@ RESTAURAVEIS = {"config.json", "logo.png", "monitor_vistos.json", "imagens", "ma
 def _arquivos(pasta: Path):
     for p in sorted(pasta.rglob("*")):
         rel = p.relative_to(pasta)
-        if p.is_dir() or rel.parts[0] in FORA or p.name == BANCO or p.suffix in (".tmp", ".log"):
+        # o banco vai pela API de backup; os arquivos -wal e -shm do modo WAL são do banco aberto, não se copiam
+        if p.is_dir() or rel.parts[0] in FORA or p.name.startswith(BANCO) or p.suffix in (".tmp", ".log"):
             continue
         yield p, rel
 
@@ -47,6 +48,7 @@ def gerar(pasta: Path) -> bytes:
                 origem, destino = sqlite3.connect(banco), sqlite3.connect(copia)
                 with destino:
                     origem.backup(destino)
+                    _sem_sessoes(destino)
                 origem.close()
                 destino.close()
                 z.write(copia, BANCO)
@@ -55,6 +57,12 @@ def gerar(pasta: Path) -> bytes:
         z.writestr("LEIA-ME.txt", f"Backup do Pyron gerado em {datetime.now():%d/%m/%Y %H:%M}.\n"
                                   "Restaure em Configurações › Dados e sistema › Restaurar backup.\n")
     return buf.getvalue()
+
+
+def _sem_sessoes(con: sqlite3.Connection) -> None:
+    """Sessões de quem entrou (modo servidor) não viajam no backup nem voltam numa restauração."""
+    if con.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'sessoes'").fetchone():
+        con.execute("DELETE FROM sessoes")
 
 
 def contar(pasta: Path) -> dict:
@@ -96,6 +104,8 @@ def restaurar(pasta: Path, dados: bytes) -> dict:
         src, dst = sqlite3.connect(origem / BANCO), sqlite3.connect(pasta / BANCO)
         try:
             src.backup(dst)
+            with dst:
+                _sem_sessoes(dst)
         finally:
             src.close()
             dst.close()
@@ -118,3 +128,35 @@ def restaurar(pasta: Path, dados: bytes) -> dict:
     finally:
         con.close()
     return {"inspecoes": n, "copia_anterior": str(seguranca)}
+
+
+def main(argv=None) -> int:
+    """Backup pela linha de comando (agendado no modo servidor; o banco é copiado com o Pyron no ar).
+
+    python -m app.backup --dados <pasta de dados> --saida <pasta>   (grava pyron_backup_<data>.zip; guarda os 30 últimos)
+    """
+    import argparse
+    import os
+
+    ap = argparse.ArgumentParser(prog="python -m app.backup", description="Gera o .zip de backup dos dados do Pyron.")
+    ap.add_argument("--dados", help="pasta de dados (padrão: PYRON_DADOS ou app/dados_app)")
+    ap.add_argument("--saida", required=True, help="pasta onde gravar o .zip")
+    ap.add_argument("--manter", type=int, default=30, help="quantos backups guardar nessa pasta (padrão 30)")
+    args = ap.parse_args(argv)
+    pasta = Path(args.dados or os.environ.get("PYRON_DADOS") or Path(__file__).resolve().parent / "dados_app")
+    if not (pasta / BANCO).exists():
+        print(f"Não há banco do Pyron em {pasta}.")
+        return 2
+    saida = Path(args.saida)
+    saida.mkdir(parents=True, exist_ok=True)
+    arquivo = saida / f"pyron_backup_{datetime.now():%Y%m%d_%H%M%S}.zip"
+    arquivo.write_bytes(gerar(pasta))
+    antigos = sorted(saida.glob("pyron_backup_*.zip"))[:-max(1, args.manter)]
+    for velho in antigos:
+        velho.unlink()
+    print(f"Backup gravado em {arquivo} ({arquivo.stat().st_size // 1024} KB).")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,15 @@
+Fontes do laudo em Typst (app/laudo_typst.py). Escolha do usuário em 30/10/2026: Noto Sans.
+
+O Typst carrega só esta pasta (sem as fontes do sistema e sem as embutidas nele), para o PDF sair igual
+no Windows e no Linux.
+
+Noto Sans (Regular, SemiBold, Bold, Italic): texto do laudo.
+  Origem: https://github.com/notofonts/notofonts.github.io  (fonts/NotoSans/hinted/ttf), baixada em 30/10/2026.
+  Licença: SIL Open Font License 1.1, em OFL-NotoSans.txt.
+
+Noto Sans Math (Regular): só os símbolos que a Noto Sans não tem e o laudo usa (≥ nos critérios).
+  Origem: https://github.com/notofonts/notofonts.github.io  (fonts/NotoSansMath/hinted/ttf), baixada em 30/10/2026.
+  Licença: SIL Open Font License 1.1, em OFL-NotoSansMath.txt.
+
+A OFL permite usar, embutir no PDF e redistribuir junto com o programa; as fontes não podem ser vendidas
+sozinhas e o arquivo da licença vai junto.

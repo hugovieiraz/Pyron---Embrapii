@@ -92,6 +92,24 @@ table { border-collapse: collapse; }
 .entra-item { animation: entrar-item var(--dur-lenta) var(--ease-entrada) both; animation-delay: calc(var(--i, 0) * var(--escalonar)); }
 @keyframes entrar-item { from { opacity: 0; transform: translateY(var(--e-2)); } }
 
+/* Janelas estreitas e tablets (1280, 960 px em em, a unidade das media queries): o topo encolhe para caber e a
+   página nunca rola de lado. Os textos escondidos continuam para o leitor de tela (mesma técnica de .so-leitor). */
+.nav .ic-nav { display: none; }
+@media (max-width: 80em) {
+  #btn-busca kbd { display: none; }
+  #btn-busca > span, .btn.conta .conta-texto { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .topo-marca { margin-right: var(--e-3); }
+}
+@media (max-width: 60em) {
+  .topo { padding: 0 var(--e-3); gap: var(--e-1); }
+  .topo-marca { margin-right: var(--e-1); }
+  .nav a { padding: 0 var(--e-3); }
+  .nav .ic-nav { display: block; }
+  .nav .nome-nav { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .nav .contador { position: absolute; top: var(--e-2); right: 0; }
+  .topo-dir { gap: 0; }
+}
+
 @media (pointer: coarse) {
   :root { --alvo-compacto: var(--alvo); }
 }

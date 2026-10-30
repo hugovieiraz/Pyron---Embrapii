@@ -1,4 +1,7 @@
-"""O mesmo modelo rodando na placa de vídeo, para o ao vivo (celular e vídeo).
+"""O mesmo modelo rodando na placa de vídeo (ao vivo do celular e do vídeo, e as imagens que chegam sozinhas).
+
+Desde a 0.9 (F4), o provedor do ONNX Runtime sai de ``provedores.py`` (``PYRON_ACELERADOR``): TensorRT > CUDA >
+DirectML no automático, entre os que o ONNX Runtime instalado oferece. Abaixo, o histórico de 0.7.
 
 Na CPU, o RF-DETR em ONNX leva ~270 ms por quadro mesmo na versão INT8: o celular fica em 2 a 3
 análises por segundo, e dividir o processador entre duas análises não rende mais (ele já está cheio:
@@ -12,8 +15,9 @@ análises por segundo, e dividir o processador entre duas análises não rende m
    as DLLs do PyTorch não têm assinatura e o Windows às vezes as barra (WinError 4551; aconteceu em
    11/10/2026 à noite, depois de passar de manhã). Fica de reserva para quando não há DirectML.
 
-O motor leva alguns segundos para carregar: carrega num fio à parte e, até ficar pronto (ou se
-falhar), o ao vivo segue na CPU. A captura que vira inspeção continua no ONNX da CPU.
+O motor leva alguns segundos para carregar (o TensorRT, minutos na primeira vez, até o cache do motor existir):
+carrega num fio à parte e, até ficar pronto (ou se falhar), segue na CPU. Desde a 0.8 a imagem que vira
+inspeção também usa a placa quando ela já está pronta (``_na_placa`` em ``app/servidor.py``).
 """
 
 from __future__ import annotations
@@ -22,6 +26,7 @@ import threading
 
 import numpy as np
 
+from nucleo.detectores import provedores
 from nucleo.detectores.onnx_modelo import DetectorONNX
 
 _trava = threading.Lock()
@@ -29,17 +34,11 @@ _prontos: dict[str, DetectorONNX] = {}
 _carregando: set[str] = set()
 _falhas: dict[str, str] = {}
 
-# Placa de alto desempenho, não a integrada: pela ordem dos adaptadores, a Intel vem antes e leva
-# ~440 ms por quadro (pior que a CPU).
-OPCOES_DIRECTML = {"performance_preference": "high_performance", "device_filter": "gpu"}
+OPCOES_DIRECTML = provedores.OPCOES_DIRECTML  # (nome antigo; a fonte é provedores.py)
 
 
 def tem_directml() -> bool:
-    try:
-        import onnxruntime as ort
-    except (ImportError, OSError):
-        return False
-    return "DmlExecutionProvider" in ort.get_available_providers()
+    return "directml" in provedores.disponiveis()
 
 
 def tem_pesos(det) -> bool:
@@ -48,12 +47,14 @@ def tem_pesos(det) -> bool:
     return isinstance(det, DetectorONNX) and bool(especificacao) and (det.pasta / especificacao["pesos"]).exists()
 
 
-def _motor(base) -> type | None:
+def _motor(base):
+    """O carregador da placa para este modelo: o ONNX no acelerador escolhido, ou o PyTorch com CUDA (reserva)."""
     if not isinstance(base, DetectorONNX):
         return None
-    if tem_directml():
-        return DetectorDirectML
-    if tem_pesos(base):
+    acelerador, _motivo = provedores.escolher()
+    if acelerador != "cpu":
+        return lambda b: DetectorAcelerado(b, acelerador)
+    if provedores.pedido() != "cpu" and tem_pesos(base):
         return DetectorPlaca
     return None
 
@@ -75,12 +76,16 @@ def variante(base) -> DetectorONNX | None:
 def situacao(base) -> dict:
     """Onde o ao vivo roda este modelo: ``placa`` (com o motor), ``carregando``, ``cpu`` e o motivo."""
     if _motor(base) is None:
-        return {"onde": "cpu", "motivo": "sem motor para a placa de vídeo (nem DirectML nem pesos do PyTorch)"}
+        motivo = ("PYRON_ACELERADOR=cpu" if provedores.pedido() == "cpu"
+                  else "sem motor para a placa de vídeo (nem TensorRT, CUDA ou DirectML, nem pesos do PyTorch)")
+        return {"onde": "cpu", "motivo": motivo}
+    acelerador = provedores.escolher()[0]
     with _trava:
         if base.id in _prontos:
             return {"onde": "placa", "placa": _prontos[base.id].nome_placa}
         if base.id in _carregando:
-            return {"onde": "carregando"}
+            # o TensorRT monta o motor na primeira vez (minutos); depois sai do cache em segundos
+            return {"onde": "carregando", "acelerador": provedores.NOMES.get(acelerador, acelerador)}
         return {"onde": "cpu", "motivo": _falhas.get(base.id, "")}
 
 
@@ -98,32 +103,37 @@ def _carregar(base, motor) -> None:
             _carregando.discard(base.id)
 
 
-class DetectorDirectML(DetectorONNX):
-    """O mesmo detector e o mesmo arquivo ONNX; a sessão roda na placa pelo DirectML."""
+class DetectorAcelerado(DetectorONNX):
+    """O mesmo detector e o mesmo arquivo ONNX; a sessão roda na placa pelo acelerador escolhido
+    (TensorRT, CUDA ou DirectML; ``provedores.py``)."""
 
-    def __init__(self, base: DetectorONNX):
+    def __init__(self, base: DetectorONNX, acelerador: str = "directml", meia_precisao: bool | None = None):
         super().__init__(base.pasta)
+        self.acelerador = acelerador
+        self.meia_precisao = meia_precisao
+        fp16 = acelerador == "tensorrt" and (provedores.fp16() if meia_precisao is None else meia_precisao)
         self.nome = f"{base.nome} · placa de vídeo"
-        self.nome_placa = "DirectML"
+        self.nome_placa = provedores.NOMES[acelerador] + (" FP16" if fp16 else "")
         self._trava_placa = threading.Lock()  # uma conta por vez na placa
 
     def carregar(self) -> None:
-        import onnxruntime as ort
-
-        opcoes = ort.SessionOptions()
-        opcoes.enable_mem_pattern = False  # exigências do DirectML
-        opcoes.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
-        sessao = ort.InferenceSession(str(self.arquivo), opcoes,
-                                      providers=[("DmlExecutionProvider", OPCOES_DIRECTML), "CPUExecutionProvider"])
-        if sessao.get_providers()[0] != "DmlExecutionProvider":
-            raise RuntimeError("o DirectML não assumiu o modelo")
-        self._sessao = sessao
+        if self.acelerador == "tensorrt":  # o motor monta (minutos, na 1ª vez) em outro processo: o servidor segue respondendo
+            provedores.montar_em_outro_processo(self.arquivo, self.cartao, self.meia_precisao)
+        self._sessao = provedores.criar_sessao(self.arquivo, self.acelerador, self.cartao, self.meia_precisao)
         e = self.entrada
         self._rodar(np.zeros((1, 3, int(e["altura"]), int(e["largura"])), np.float32))  # primeira conta é lenta
+        provedores.conferir(self._sessao, self.acelerador)
 
     def _rodar(self, x: np.ndarray) -> dict:
         with self._trava_placa:
             return super()._rodar(x)
+
+
+class DetectorDirectML(DetectorAcelerado):
+    """O nome de antes da 0.9: o detector acelerado no DirectML."""
+
+    def __init__(self, base: DetectorONNX):
+        super().__init__(base, "directml")
 
 
 class DetectorPlaca(DetectorONNX):

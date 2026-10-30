@@ -10,6 +10,10 @@ passaram de 80% da MTA neste ano" em SQL, com índice, e o caminho para um banco
 O esquema tem versão (``PRAGMA user_version``) e se atualiza sozinho ao abrir: um banco antigo, ou
 restaurado de um backup antigo, ganha as tabelas novas e é reindexado a partir do JSON.
 
+O banco fica em modo WAL (desde a 0.9): quem lê não espera quem grava, o que importa no modo servidor,
+com vários engenheiros ao mesmo tempo. Na versão 3 do esquema entram os comentários com autor, as
+sessões de quem entrou no modo servidor e o registro dos laudos emitidos (trilha de auditoria).
+
 Os arquivos (``imagens/<id>.jpg``, ``imagens/<id>_foto.jpg``, ``matrizes/<id>.npy``) passam pelo
 armazém de ``app.objetos``: a pasta de dados por padrão, ou um bucket S3 com ``PYRON_OBJETOS``.
 """
@@ -26,7 +30,8 @@ import numpy as np
 
 from app import objetos
 
-VERSAO_ESQUEMA = 2
+VERSAO_ESQUEMA = 3
+ESPERA_TRAVA_S = 15  # quanto uma gravação espera outra terminar antes de desistir (o padrão do sqlite3 é 5 s)
 
 
 def _destaque(a: dict) -> dict | None:
@@ -155,6 +160,42 @@ TABELAS_V2 = (
         GROUP BY e.id""",
 )
 
+# Versão 3 (0.9): autor no histórico da pendência, comentários, sessões e laudos emitidos.
+COLUNAS_V3 = {"historico_pendencias": {"autor": "TEXT"}}
+
+TABELAS_V3 = (
+    # Comentário de alguém do time sobre uma inspeção (ou uma região dela). Só se acrescenta: não há edição.
+    """CREATE TABLE IF NOT EXISTS comentarios (
+        id TEXT PRIMARY KEY,
+        analise_id TEXT NOT NULL REFERENCES analises(id) ON DELETE CASCADE,
+        regiao_id TEXT,
+        autor_id TEXT,
+        autor_nome TEXT NOT NULL,
+        criado_em TEXT NOT NULL,
+        texto TEXT NOT NULL)""",
+    "CREATE INDEX IF NOT EXISTS idx_comentarios_analise ON comentarios (analise_id, criado_em)",
+    # Sessão do modo servidor: só o SHA-256 do código do cookie fica guardado.
+    """CREATE TABLE IF NOT EXISTS sessoes (
+        codigo_hash TEXT PRIMARY KEY,
+        membro_id TEXT NOT NULL,
+        criada_em TEXT NOT NULL,
+        usada_em TEXT NOT NULL,
+        expira_em TEXT NOT NULL)""",
+    # Laudo emitido: quem pediu, quem assina, quando, quais inspeções e o SHA-256 do PDF entregue.
+    # Sem chave estrangeira: o registro fica mesmo que a inspeção seja apagada depois.
+    """CREATE TABLE IF NOT EXISTS laudos_emitidos (
+        id TEXT PRIMARY KEY,
+        emitido_em TEXT NOT NULL,
+        emitido_por_id TEXT,
+        emitido_por_nome TEXT,
+        responsavel_nome TEXT NOT NULL,
+        responsavel_registro TEXT,
+        analises TEXT NOT NULL,
+        sha256 TEXT NOT NULL,
+        bytes INTEGER NOT NULL)""",
+    "CREATE INDEX IF NOT EXISTS idx_laudos_emitidos ON laudos_emitidos (emitido_em)",
+)
+
 ARQUIVOS = {"original": "imagens/{id}.jpg", "foto": "imagens/{id}_foto.jpg", "matriz": "matrizes/{id}.npy"}
 
 
@@ -194,8 +235,9 @@ class Armazenamento:
     @contextmanager
     def _conexao(self):
         """Conexão que grava (commit) e fecha ao sair: no Windows, conexão aberta prende o arquivo."""
-        c = sqlite3.connect(self.banco)
+        c = sqlite3.connect(self.banco, timeout=ESPERA_TRAVA_S)
         try:
+            c.execute("PRAGMA journal_mode = WAL")  # fica gravado no arquivo; repetir custa nada (e vale após restaurar)
             c.execute("PRAGMA foreign_keys = ON")
             if c.execute("PRAGMA user_version").fetchone()[0] < VERSAO_ESQUEMA:
                 self._migrar(c)
@@ -222,6 +264,15 @@ class Armazenamento:
                             c.execute(f"ALTER TABLE {tabela} ADD COLUMN {nome} {tipo}")
                 for sql in TABELAS_V2:
                     c.execute(sql)
+            if versao < 3:
+                for tabela, colunas in COLUNAS_V3.items():
+                    existentes = {linha[1] for linha in c.execute(f"PRAGMA table_info({tabela})")}
+                    for nome, tipo in colunas.items():
+                        if nome not in existentes:
+                            c.execute(f"ALTER TABLE {tabela} ADD COLUMN {nome} {tipo}")
+                for sql in TABELAS_V3:
+                    c.execute(sql)
+            if versao < 2:  # reindexa depois de todas as colunas existirem (o índice grava o autor da v3)
                 for (dados,) in c.execute("SELECT dados FROM analises").fetchall():
                     a = json.loads(dados)
                     self._indexar(c, a)
@@ -335,8 +386,8 @@ class Armazenamento:
                  p["responsavel"] or None, p["nota"] or None),
             )
             for ordem, h in enumerate(p["historico"]):
-                c.execute("INSERT INTO historico_pendencias (analise_id, ordem, quando, status, nota) VALUES (?, ?, ?, ?, ?)",
-                          (id_, ordem, h.get("quando"), h.get("status"), h.get("nota")))
+                c.execute("INSERT INTO historico_pendencias (analise_id, ordem, quando, status, nota, autor) VALUES (?, ?, ?, ?, ?, ?)",
+                          (id_, ordem, h.get("quando"), h.get("status"), h.get("nota"), h.get("autor")))
 
     def reindexar(self) -> int:
         """Refaz todas as tabelas derivadas a partir do JSON (conserto, ou depois de um Pyron antigo gravar no banco)."""
@@ -450,6 +501,78 @@ class Armazenamento:
         with self._conexao() as c:
             linha = c.execute("SELECT dados FROM alertas WHERE id = ?", (id_,)).fetchone()
         return json.loads(linha[0]) if linha else None
+
+    # ------------------------------------------------------------ comentários
+
+    def comentar(self, analise_id: str, texto: str, autor_nome: str, autor_id: str | None = None,
+                 regiao_id: str | None = None) -> dict:
+        """Acrescenta um comentário (sem edição: o registro fica como foi escrito)."""
+        from uuid import uuid4
+
+        item = {"id": uuid4().hex[:12], "analise_id": analise_id, "regiao_id": regiao_id, "autor_id": autor_id,
+                "autor_nome": autor_nome, "criado_em": datetime.now().isoformat(timespec="seconds"), "texto": texto}
+        with self._conexao() as c:
+            c.execute("INSERT INTO comentarios (id, analise_id, regiao_id, autor_id, autor_nome, criado_em, texto) "
+                      "VALUES (:id, :analise_id, :regiao_id, :autor_id, :autor_nome, :criado_em, :texto)", item)
+        return item
+
+    def comentarios(self, analise_id: str) -> list[dict]:
+        """Comentários de uma inspeção, do mais antigo para o mais novo."""
+        with self._conexao() as c:
+            c.row_factory = sqlite3.Row
+            linhas = c.execute("SELECT id, analise_id, regiao_id, autor_id, autor_nome, criado_em, texto FROM comentarios "
+                               "WHERE analise_id = ? ORDER BY criado_em, rowid", (analise_id,)).fetchall()
+        return [dict(linha) for linha in linhas]
+
+    # ------------------------------------------------------------ sessões (modo servidor)
+
+    def criar_sessao(self, codigo_hash: str, membro_id: str, agora: datetime, expira: datetime) -> None:
+        with self._conexao() as c:
+            c.execute("DELETE FROM sessoes WHERE expira_em < ?", (agora.isoformat(timespec="seconds"),))
+            c.execute("INSERT INTO sessoes (codigo_hash, membro_id, criada_em, usada_em, expira_em) VALUES (?, ?, ?, ?, ?)",
+                      (codigo_hash, membro_id, agora.isoformat(timespec="seconds"), agora.isoformat(timespec="seconds"),
+                       expira.isoformat(timespec="seconds")))
+
+    def sessao(self, codigo_hash: str) -> dict | None:
+        with self._conexao() as c:
+            c.row_factory = sqlite3.Row
+            linha = c.execute("SELECT * FROM sessoes WHERE codigo_hash = ?", (codigo_hash,)).fetchone()
+        return dict(linha) if linha else None
+
+    def usar_sessao(self, codigo_hash: str, agora: datetime) -> None:
+        with self._conexao() as c:
+            c.execute("UPDATE sessoes SET usada_em = ? WHERE codigo_hash = ?", (agora.isoformat(timespec="seconds"), codigo_hash))
+
+    def encerrar_sessao(self, codigo_hash: str) -> None:
+        with self._conexao() as c:
+            c.execute("DELETE FROM sessoes WHERE codigo_hash = ?", (codigo_hash,))
+
+    def encerrar_sessoes_de(self, membro_id: str, menos: str | None = None) -> None:
+        """Encerra as sessões de uma pessoa (troca de senha, saiu do time), menos a ``menos``."""
+        with self._conexao() as c:
+            c.execute("DELETE FROM sessoes WHERE membro_id = ? AND codigo_hash != ?", (membro_id, menos or ""))
+
+    def encerrar_sessoes_fora(self, membros_validos: set[str]) -> None:
+        """Encerra as sessões de quem não pode mais entrar (saiu do time ou ficou sem senha)."""
+        with self._conexao() as c:
+            for (membro,) in c.execute("SELECT DISTINCT membro_id FROM sessoes").fetchall():
+                if membro not in membros_validos:
+                    c.execute("DELETE FROM sessoes WHERE membro_id = ?", (membro,))
+
+    # ------------------------------------------------------------ laudos emitidos (auditoria)
+
+    def registrar_laudo(self, registro: dict) -> None:
+        with self._conexao() as c:
+            c.execute("INSERT INTO laudos_emitidos (id, emitido_em, emitido_por_id, emitido_por_nome, responsavel_nome, "
+                      "responsavel_registro, analises, sha256, bytes) VALUES (:id, :emitido_em, :emitido_por_id, "
+                      ":emitido_por_nome, :responsavel_nome, :responsavel_registro, :analises, :sha256, :bytes)",
+                      {**registro, "analises": json.dumps(registro["analises"])})
+
+    def laudos_emitidos(self, limite: int = 200) -> list[dict]:
+        with self._conexao() as c:
+            c.row_factory = sqlite3.Row
+            linhas = c.execute("SELECT * FROM laudos_emitidos ORDER BY emitido_em DESC, rowid DESC LIMIT ?", (limite,)).fetchall()
+        return [{**dict(linha), "analises": json.loads(linha["analises"])} for linha in linhas]
 
     def apagar(self, id_: str) -> bool:
         with self._conexao() as c:

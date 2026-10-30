@@ -3,6 +3,15 @@
 Software de manutenção preditiva por termografia (FastAPI local + interface web em `app/estatico/`,
 núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Textos em português do Brasil.
 
+## Base de Conhecimento e Segundo Cérebro (Shlomo)
+- O projeto é embasado pelo cofre Zettelkasten **Shlomo** (`D:/hd_central/Antigravity projetos/Shlomo/`) e pelo índice
+  canônico `SHLOMO_KNOWLEDGE_BASE.md`.
+- **Requisitos e física:** consultar `Pyron Embrapii - Visão Geral e Roteiro de Requisitos.md` e
+  `Pyron Embrapii - Referências e Limiares de Temperatura.md` para normas ABNT NBR 15572/15866, NETA MTS, física de
+  degradação e modelo de Arrhenius.
+- **Engenharia de Software:** respeitar estritamente Clean Code (SOLID, funções pequenas, SRP, Boy Scout Rule) conforme
+  documentado no atlas do Shlomo.
+
 ## 0. Interface principal (`app/interface`, em `/`; histórico em `docs/plano-interface.md`)
 
 - Código em `app/interface/`, servido em `/` desde a 0.8.0 (`/nova` redireciona para `/`). A interface
@@ -178,6 +187,41 @@ telefone válido); a Pasta monitorada só mostra a lista (`_destinatarios()` em 
   conferidos idênticos nas imagens de `app/dados_app`. O PyTorch
   com CUDA e o pacote `onnx` são bloqueados de forma intermitente pelo SAC: não depender deles em
   tempo de execução (testes que precisam deles se pulam sozinhos).
+- Segunda máquina de desenvolvimento (GS87, desde 30/10/2026): Acer Nitro com GTX 1650 4 GB, CUDA 13.3 e **SAC
+  desligado**. Prova de bloqueio do SAC só vale numa máquina com ele ligado. Testes rápidos lá: ~190 s.
+- **Versão 0.9** (servidor, tablet PWA, laudo Typst, TensorRT, Tauri): plano por fases com portão em `docs/v09/`;
+  diagnóstico e classificação das rotas por perfil em `docs/v09/0-diagnostico.md`. Branch por fase (`v09-f0-…`).
+- **Modo servidor** (F1, `docs/v09/1-servidor.md`, implantação em `docs/servidor/implantacao.md`):
+  `python -m app.iniciar --modo servidor --proxy 127.0.0.1`, com login. O modo local continua o padrão e sem login.
+  `app/acesso.py` é a dependência global do FastAPI: **toda rota nova entra em `_GRUPOS_DAS_ROTAS`** (público,
+  leitura, envio, revisão, laudo, administração, só local), senão `testes/test_acesso.py` falha e o servidor
+  responde 403. Perfis vêm do time (`usuario`, `administrador`, `senha_hash`, nunca devolvido; até 20 pessoas):
+  técnico vê, envia e comenta; engenheiro revisa; quem assina emite laudo (assinado por quem entrou e registrado
+  em `laudos_emitidos`); administrador configura. Na interface, `pode()` de `js/base.js` só esconde o que o perfil
+  não faz; a regra fica no servidor. A Análise salva com `revisao` (409 se outra pessoa gravou antes).
+  Banco no esquema 3 com WAL; backup agendado por `python -m app.backup`. Contas: `python -m app.acesso usuario`.
+- **Tablet** (F2, `docs/v09/2-tablet.md`, passo a passo em `docs/servidor/tablet.md`): HTTPS pelo Tailscale
+  (`tailscale serve --bg 8766` + `--porta-proxy 8766`: tudo que chega por essa porta é de fora e em HTTPS).
+  PWA só no modo servidor (`js/aplicativo.js`): `manifest.webmanifest` (cores = tokens `--superficie` e
+  `--fundo-trabalho` do tema claro), ícones `icone-app-*` de `python marca/gerar_marca.py --pwa`, `sw.js` rede
+  primeiro, cache com a versão no nome, nunca `/api` nem PDF. **Módulo JS novo entra na lista `CASCA` do `sw.js`**
+  (`testes/test_pwa.py` confere). Toque: pinça, dois dedos e toque duplo no palco; `toqueLongo()` nas listas.
+  Pontos de quebra em `em` (os testes proíbem `px`): 80em (topo e ferramentas só com ícone) e 60em (retrato:
+  navegação por ícones, Análise e Pendências empilhadas). Conferir tablet em 1024 × 768, 1180 × 820, 820 × 1180 e 800 × 1280.
+- **Laudo em Typst** (F3, `docs/v09/3-laudo.md`): `app/laudo_typst.py` com as assinaturas de `app/laudo.py`; motor
+  por `laudo.motor` no `config.json` ("reportlab" padrão até o usuário aprovar o visual; Typst indisponível cai no
+  reportlab). Modelo em `app/laudo/modelo.typ` + `partes/`, fontes só de `app/laudo/fontes/` (Noto Sans + Noto Sans
+  Math para ≥, OFL). **Texto do usuário só entra por `dados.json`**: nunca montar código Typst com texto, nunca `eval`.
+  Mudou o conteúdo do laudo em `laudo.py`? Mudar `montar_dados()` e o modelo junto (os dois têm de dizer o mesmo).
+- **Provedor do ONNX** (F4, `docs/v09/4-tensorrt.md`): escolha num lugar só, `nucleo/detectores/provedores.py`
+  (`PYRON_ACELERADOR=auto|tensorrt|cuda|directml|cpu`; auto = TensorRT > CUDA > DirectML > CPU). A sessão da CPU é a
+  referência (`onnx_modelo.py`); a placa entra por `placa.DetectorAcelerado`. Sessão de placa com `disable_fallback`
+  e conferida depois da primeira conta (o ONNX Runtime volta para a CPU em silêncio se a placa falhar). Servidor NVIDIA:
+  ambiente `.venv-gpu` separado (`requirements-servidor-gpu.txt`; ONNX Runtime 1.24 usa TensorRT **10**, não 11).
+  Cache do motor TensorRT: no Windows, caminho acima de 260 caracteres não grava (sem erro); `PYRON_CACHE_TRT` ou
+  `%LOCALAPPDATA%/Pyron/cache_trt`. O motor monta em **outro processo** (criar a sessão segura o GIL: o servidor
+  parava minutos). TensorRT em **FP32 por padrão** (`PYRON_TRT_FP16=1` liga o FP16; perdeu uma detecção na paridade).
+  Medir: `python -m nucleo.detectores.benchmark --modelo <pasta> [--paridade | --sobrecarga]`.
 - Tela de 1536 × 816 úteis: janelas `--start-maximized`; conferir telas nesse tamanho.
 - Janela do aplicativo: o `Pyron.exe` abre a interface numa janela própria sem a barra de título do Windows
   (`lancador/Janela.cs`, WebView2; DLLs da Microsoft em `lancador/webview2`, carregadas de lá). O topo da

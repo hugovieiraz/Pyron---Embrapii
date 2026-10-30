@@ -1,7 +1,8 @@
-// Painel de detalhe da Análise: Resumo ou Região selecionada, Condições, Identificação e Pendência.
+// Painel de detalhe da Análise: Resumo ou Região selecionada, Condições, Identificação, Pendência e Comentários.
 // Edições salvam sozinhas (indicador "Salvo" no cabeçalho); ações que recalculam têm botão próprio.
+// Quem não revisa (técnico, no modo servidor) vê os campos travados e pode comentar.
 import { TEXTOS as T } from "../../textos.js";
-import { el, api, json, fmt, temperatura, lerNumero } from "../base.js";
+import { el, api, json, fmt, temperatura, lerNumero, dataHora, pode, modoServidor } from "../base.js";
 import { botao, campo, secao, selo, painelDetalhe, estadoVazio, avisar, ocupado } from "../componentes.js";
 import { apagarRegiao } from "./faixa.js";
 import { formularioPendencia } from "../pendencia.js";
@@ -12,6 +13,11 @@ const dl = (pares) => el("dl", { class: "pares" }, pares.filter(Boolean).flatMap
 
 export function montarPainel(ctx, { equipamentos }) {
   const sam2 = ctx.modelos.find((m) => m.id === "sam2-dinov2")?.disponivel === true;
+  /** Sem permissão de revisar: campos e botões de edição ficam desabilitados (continuam legíveis). */
+  const travar = (nos) => {
+    if (!ctx.podeEditar) for (const n of [nos].flat()) n?.querySelectorAll?.("input, select, textarea, button").forEach((c) => { c.disabled = true; });
+    return nos;
+  };
 
   // ---------------------------------------------------------------- resumo da inspeção (nenhuma região selecionada)
   function resumo() {
@@ -38,8 +44,8 @@ export function montarPainel(ctx, { equipamentos }) {
       const nome = m.nome || (m.tipo === "ponto" ? A.pontoN(i + 1) : A.linhaN(i + 1));
       const valor = m.tipo === "ponto" ? temperatura(v.t) : A.linhaValor(fmt(v.t_max, 1), fmt(v.t_min, 1), fmt(v.t_med, 1));
       return el("li", {}, el("span", {}, nome), el("span", { class: "num" }, valor),
-        botao({ texto: A.removerMedicao(nome), icone: "lixo", soIcone: true, compacto: true, variante: "fantasma", onclick: () => ctx.salvarMedicoes(meds.filter((x) => x.id !== m.id)).catch((e) => avisar(e.message, { erro: true })) }));
-    }))] : [el("p", { class: "nota" }, A.semMedicoes)] }));
+        ctx.podeEditar ? botao({ texto: A.removerMedicao(nome), icone: "lixo", soIcone: true, compacto: true, variante: "fantasma", onclick: () => ctx.salvarMedicoes(meds.filter((x) => x.id !== m.id)).catch((e) => avisar(e.message, { erro: true })) }) : null);
+    }))] : [el("p", { class: "nota" }, ctx.podeEditar ? A.semMedicoes : A.semMedicoesLeitura)] }));
     return partes;
   }
 
@@ -67,7 +73,7 @@ export function montarPainel(ctx, { equipamentos }) {
       ? dl([[A.dimensoes, A.dimAlturaLargura(fmt(geo.height_meters, 2), fmt(geo.mean_width_meters, 2))], [A.metodo, A.dimMetodo[geo.metodo_metrologia] || geo.metodo_metrologia],
           r.segmentacao.termica_isolada?.t_max != null && [A.tmaxPeca, temperatura(r.segmentacao.termica_isolada.t_max)]])
       : null;
-    const medir = sam2 ? botao({ texto: A.medir, icone: "regua", compacto: true, title: A.medirDica, onclick: (ev) => ocupado(ev.currentTarget, async () => {
+    const medir = sam2 && ctx.podeEditar ? botao({ texto: A.medir, icone: "regua", compacto: true, title: A.medirDica, onclick: (ev) => ocupado(ev.currentTarget, async () => {
       try {
         const resp = await api(`/api/analises/${ctx.a.id}/segmentar`, json("POST", { regiao_id: r.id }));
         ctx.aplicar(resp.analise);
@@ -77,7 +83,7 @@ export function montarPainel(ctx, { equipamentos }) {
     return [
       el("div", { class: "cab-regiao" }, botao({ texto: A.voltarResumo, icone: "anterior", soIcone: true, compacto: true, variante: "fantasma", onclick: () => ctx.selecionar(null) }),
         selo(r.severidade, { indicativa: r.indicativa }), r.confianca != null && r.origem !== "manual" ? el("span", { class: "nota" }, A.confianca(Math.round(r.confianca * 100))) : el("span", { class: "nota" }, A.origemManual)),
-      el("div", { class: "campos-regiao" }, nome, classe),
+      travar(el("div", { class: "campos-regiao" }, nome, classe)),
       secao({ titulo: A.leituras, conteudo: [leituras] }),
       secao({ titulo: A.diagnostico, conteudo: [
         el("p", { class: "rotulo-severidade" }, r.severidade_rotulo || T.niveis[r.severidade] || ""),
@@ -87,7 +93,7 @@ export function montarPainel(ctx, { equipamentos }) {
       ] }),
       r.referencia ? secao({ titulo: A.referencia, aberta: false, conteudo: [dl([[r.referencia.nome, r.referencia.mta_c != null ? `${A.mta} ${temperatura(r.referencia.mta_c, 0)}` : T.geral.semValor]]), r.referencia.fonte ? el("p", { class: "nota" }, r.referencia.fonte) : null] }) : null,
       dimensoes || medir ? secao({ titulo: A.dimensoes, conteudo: [dimensoes, medir ? el("div", { class: "grupo-btn" }, medir) : null] }) : null,
-      el("div", { class: "rodape-painel" }, botao({ texto: A.apagarRegiao, icone: "lixo", variante: "perigo", compacto: true, onclick: () => apagarRegiao(ctx, r.id) })),
+      ctx.podeEditar ? el("div", { class: "rodape-painel" }, botao({ texto: A.apagarRegiao, icone: "lixo", variante: "perigo", compacto: true, onclick: () => apagarRegiao(ctx, r.id) })) : null,
     ];
   }
 
@@ -129,7 +135,7 @@ export function montarPainel(ctx, { equipamentos }) {
           try { ctx.aplicar(await api(`/api/analises/${a.id}/escala`, json("POST", { t_min: lerNumero(tmin.querySelector("input").value), t_max: lerNumero(tmax.querySelector("input").value) }))); } catch (e) { avisar(e.message, { erro: true }); }
         }) }))] }));
     }
-    return partes;
+    return travar(partes);
   }
 
   // ---------------------------------------------------------------- identificação
@@ -146,8 +152,9 @@ export function montarPainel(ctx, { equipamentos }) {
       responsavel_id: resp.querySelector("select").value, art: art.querySelector("input").value.trim(), observacoes: obs.querySelector("textarea").value.trim() } });
     for (const n of [inst, equip, art, obs]) n.querySelector("input, textarea").addEventListener("input", () => ctx.salvarDepois("identificacao", ler, 900));
     resp.querySelector("select").addEventListener("change", () => ctx.salvarDepois("identificacao", ler, 0));
-    return [el("div", { class: "campos-regiao" }, inst, equip, resp, art, obs,
-      lista("dl-instalacoes", equipamentos.map((e) => e.instalacao)), lista("dl-equipamentos", equipamentos.map((e) => e.equipamento)))];
+    // no servidor quem assina o laudo é quem entrou: a escolha do responsável não vale lá
+    return [travar(el("div", { class: "campos-regiao" }, inst, equip, modoServidor() ? null : resp, art, obs,
+      lista("dl-instalacoes", equipamentos.map((e) => e.instalacao)), lista("dl-equipamentos", equipamentos.map((e) => e.equipamento))))];
   }
 
   // ---------------------------------------------------------------- pendência (acompanhamento da anomalia)
@@ -155,6 +162,37 @@ export function montarPainel(ctx, { equipamentos }) {
     const p = ctx.a.pendencia;
     if (!p) return [estadoVazio({ ilustracao: "pendencias", titulo: A.semPendencia, compacto: true })];
     return formularioPendencia(p, { aoSalvar: async () => ctx.aplicar(await api(`/api/analises/${ctx.a.id}`)) });
+  }
+
+  // ---------------------------------------------------------------- comentários (com autor e data; só se acrescenta)
+  function comentarios() {
+    const nomeRegiao = (id) => ctx.regiao(id)?.nome || A.regiaoRemovida;
+    const vazio = el("p", { class: "nota" }, A.semComentarios);
+    const lista = el("ol", { class: "lista-comentarios" });
+    const desenhar = (itens) => {
+      vazio.hidden = itens.length > 0;
+      lista.replaceChildren(...itens.map((c) => el("li", {},
+        el("div", { class: "cab-comentario" }, el("b", {}, c.autor_nome), el("span", { class: "nota num" }, dataHora(c.criado_em)),
+          c.regiao_id ? el("span", { class: "nota" }, A.sobreRegiao(nomeRegiao(c.regiao_id))) : null),
+        el("p", { class: "texto-comentario" }, c.texto))));
+    };
+    api(`/api/analises/${ctx.a.id}/comentarios`).then(desenhar).catch((e) => avisar(e.message, { erro: true }));
+    const partes = [vazio, lista];
+    if (pode("envio")) {
+      const sobre = campo({ rotulo: A.comentarioRegiao, opcoes: [{ valor: "", texto: A.comentarioInspecao }, ...ctx.a.regioes.map((r) => ({ valor: r.id, texto: r.nome }))], valor: ctx.sel || "" });
+      const texto = campo({ rotulo: A.comentario, area: true, marcador: A.comentarioMarcador, maxlength: "2000", rows: "3" });
+      const enviar = botao({ texto: A.comentar, icone: "comentario", compacto: true, onclick: () => ocupado(enviar, async () => {
+        const corpo = { texto: texto.querySelector("textarea").value.trim(), regiao_id: sobre.querySelector("select").value || null };
+        if (!corpo.texto) { texto.querySelector("textarea").focus(); return; }
+        try {
+          desenhar(await api(`/api/analises/${ctx.a.id}/comentarios`, json("POST", corpo)));
+          texto.querySelector("textarea").value = "";
+          avisar(A.comentado);
+        } catch (e) { avisar(e.message, { erro: true }); }
+      }) });
+      partes.push(el("div", { class: "form-comentario" }, sobre, texto, el("div", { class: "grupo-btn" }, enviar)));
+    }
+    return [el("div", { class: "bloco-comentarios" }, partes)];
   }
 
   // ---------------------------------------------------------------- montagem e redesenho
@@ -165,9 +203,10 @@ export function montarPainel(ctx, { equipamentos }) {
       { id: "condicoes", icone: "termometro", texto: A.condicoes, montar: condicoes },
       { id: "identificacao", icone: "etiqueta", texto: A.identificacao, montar: identificacao },
       { id: "pendencia", icone: "pendencias", texto: A.pendencia, montar: pendencia },
+      { id: "comentarios", icone: "comentario", texto: A.comentarios, montar: comentarios },
     ],
   });
-  const formularios = new Set(["condicoes", "identificacao", "pendencia"]);
+  const formularios = new Set(["condicoes", "identificacao", "pendencia", "comentarios"]);
   const parar = ctx.ouvir((parte) => {
     if (parte === "selecao") { if (painel.ativa() !== "resumo") painel.mostrar("resumo"); else painel.atualizar(); return; }
     if (parte === "abrir-pendencia") { painel.mostrar("pendencia"); return; }

@@ -1,7 +1,7 @@
 // Cabeçalho da Análise: equipamento e inspeção, navegação entre as inspeções do mesmo equipamento,
 // estado "Salvo" e as ações (Detectar de novo, Mais opções, Gerar laudo).
 import { TEXTOS as T } from "../../textos.js";
-import { el, api, json, dataHora, data as dataCurta } from "../base.js";
+import { el, api, json, dataHora, data as dataCurta, pode } from "../base.js";
 import { botao, selo, menu, confirmar, avisar } from "../componentes.js";
 import { abrirLaudo as laudoDialogo } from "../laudo.js";
 import { endereco } from "../rotas.js";
@@ -54,11 +54,10 @@ export function montarCabecalho(ctx) {
     { texto: A.exportarImagem, icone: "baixar", executar: () => baixar(`/api/analises/${ctx.a.id}/imagem.png?largura=1600`) },
     { texto: A.exportarCsv, icone: "baixar", executar: () => baixar(`/api/analises/${ctx.a.id}/temperaturas.csv`) },
     { texto: A.abrirOriginal, icone: "externo", executar: () => window.open(`/api/analises/${ctx.a.id}/original.jpg`, "_blank", "noopener") },
-    { separador: true },
-    { texto: A.apagarInspecao, icone: "lixo", perigo: true, executar: async () => {
+    ...(pode("revisao") ? [{ separador: true }, { texto: A.apagarInspecao, icone: "lixo", perigo: true, executar: async () => {
       if (!(await confirmar({ titulo: A.apagarTitulo, texto: A.apagarTexto(ctx.a.arquivo), confirmar: A.apagarInspecao, perigo: true }))) return;
       try { await api(`/api/analises/${ctx.a.id}`, { method: "DELETE" }); avisar(A.apagada); location.hash = endereco("inspecoes"); } catch (e) { avisar(e.message, { erro: true }); }
-    } },
+    } }] : []),
   ]);
 
   // ---------------------------------------------------------------- Gerar laudo
@@ -107,6 +106,8 @@ export function montarCabecalho(ctx) {
   desenharSalvo();
 
   anterior.hidden = seguinte.hidden = !v.total;
+  detectar.hidden = !pode("revisao"); // reprocessar é revisão (engenheiro)
+  laudo.hidden = !pode("laudo");      // laudo: engenheiro que assina
   const cabecalho = el("header", { class: "cab-analise" },
     anterior,
     el("div", { class: "titulo" }, titulo, meta),

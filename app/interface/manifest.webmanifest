@@ -1,0 +1,19 @@
+{
+  "id": "/",
+  "name": "Pyron",
+  "short_name": "Pyron",
+  "description": "Inspeção termográfica e manutenção preditiva: revisão, comentários e laudos do servidor da equipe.",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "start_url": "/#painel",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#FFFFFF",
+  "background_color": "#F7F8FA",
+  "icons": [
+    { "src": "/marca/icone-app-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/marca/icone-app-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/marca/icone-app-mascara-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

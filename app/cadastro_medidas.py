@@ -96,7 +96,8 @@ class Cadastro:
 
     @contextmanager
     def _conexao(self):
-        c = sqlite3.connect(self.banco)
+        # Sem WAL de propósito: o backup copia este arquivo como está (o banco das inspeções vai pela API de backup).
+        c = sqlite3.connect(self.banco, timeout=15)
         c.row_factory = sqlite3.Row
         try:
             c.execute("PRAGMA foreign_keys = ON")

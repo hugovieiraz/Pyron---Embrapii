@@ -45,7 +45,8 @@ export function conferir({ toque = false, raiz = document.body } = {}) {
   const contraste = [];
   let textos = 0;
   for (const n of raiz.querySelectorAll("*")) {
-    if (n.closest("[aria-hidden='true'], .esq, svg, script, style, [disabled], [aria-disabled='true'], .ignorar-conferencia")) continue;
+    // texto de controle inativo (e o rótulo dele) fica fora da regra de contraste (WCAG 1.4.3)
+    if (n.closest("[aria-hidden='true'], .esq, svg, script, style, [disabled], [aria-disabled='true'], label:has(:disabled), .ignorar-conferencia")) continue;
     if (![...n.childNodes].some((c) => c.nodeType === 3 && c.textContent.trim())) continue;
     if (!visivel(n)) continue;
     const s = getComputedStyle(n);

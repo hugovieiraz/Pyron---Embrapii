@@ -7,9 +7,11 @@ from __future__ import annotations
 
 import base64
 import csv
+import hashlib
 import importlib.util
 import io
 import json
+import mimetypes
 import os
 import re
 import threading
@@ -24,11 +26,12 @@ from pathlib import Path
 from time import perf_counter
 
 import numpy as np
-from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import Body, Depends, FastAPI, File, Form, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
 
+from app import acesso
 from app import avaliacoes as avaliacoes_mod
 from app import backup, celular
 from app import equipamentos
@@ -37,9 +40,11 @@ from app import treinos as treinos_mod
 from app import videos as videos_mod
 from app.armazenamento import Armazenamento, _destaque
 from nucleo import analise, barra, detectores, enquadrar, entrada, referencias, render, video
-from nucleo.detectores import placa
+from nucleo.detectores import placa, provedores
 
 VERSAO = "0.8.0"
+# o tipo do manifest do aplicativo instalado (PWA) não depende do registro do Windows nem do Linux
+mimetypes.add_type("application/manifest+json", ".webmanifest")
 RAIZ = Path(__file__).resolve().parents[1]
 PASTA_APP = Path(__file__).resolve().parent
 # PYRON_DADOS (ou app.iniciar --dados) aponta outra pasta: demonstrações e testes sem tocar nas inspeções reais.
@@ -70,17 +75,26 @@ NOMES_EXEMPLOS = {
 
 @asynccontextmanager
 async def _ciclo_de_vida(_app):
-    """Ao subir, retoma o monitoramento que estava ligado; ao descer, para a thread da pasta vigiada."""
+    """Ao subir, retoma o monitoramento que estava ligado; ao descer, para a thread da pasta vigiada.
+
+    No modo servidor, não sobe sem um administrador com usuário e senha (ninguém conseguiria entrar).
+    """
+    if acesso.modo_servidor() and (falta := acesso.falta_para_servidor(_config()["responsaveis"])):
+        raise RuntimeError(falta)
     if _config()["monitoramento"].get("ativo"):
         monitor.iniciar()
         _preaquecer()
+    elif acesso.modo_servidor():
+        _preaquecer()  # no servidor, o modelo já sobe na placa (o TensorRT monta o motor uma vez e guarda no cache)
     yield
     monitor.parar()
 
 
-app = FastAPI(title="Pyron", version=VERSAO, lifespan=_ciclo_de_vida)
+# Toda rota passa por acesso.verificar: no modo local não faz nada; no servidor, sessão e perfil (app/acesso.py).
+app = FastAPI(title="Pyron", version=VERSAO, lifespan=_ciclo_de_vida, dependencies=[Depends(acesso.verificar)])
 armazenamento = Armazenamento(PASTA_DADOS)
 _trava = threading.Lock()
+acesso.ligar(lambda: armazenamento, lambda: _config()["responsaveis"])
 
 
 ocr = entrada.OCRPreguicoso()
@@ -92,7 +106,8 @@ CONFIG_PADRAO = {
     "modelo_ativo": "pontos-quentes",
     "empresa": {"nome": "", "subtitulo": ""},
     "responsavel": {"nome": "", "registro": ""},  # formato antigo (um só); migra para "responsaveis"
-    # time operacional: [{"id", "nome", "perfil", "funcao", "registro", "email", "telefone", "assina", "alertas"}];
+    # time operacional: [{"id", "nome", "perfil", "funcao", "registro", "email", "telefone", "assina", "alertas",
+    #                     "usuario", "administrador", "senha_hash"}]; os três últimos são do modo servidor (app/acesso.py);
     # o laudo só aceita quem assina (com registro profissional), a pendência aceita qualquer um e o alerta
     # do monitor vai pelo WhatsApp a quem tem "alertas" (severidade a partir da qual recebe)
     "responsaveis": [],
@@ -101,7 +116,10 @@ CONFIG_PADRAO = {
     "criterios": None,  # None: critério padrão (modelo brasileiro, NBR 15866)
     "componentes": {},  # trocas do usuário na biblioteca de componentes (MTA por classe)
     "monitoramento": dict(monitoramento.PADRAO),
+    # motor do laudo em PDF: "reportlab" (padrão até o visual do Typst ser aprovado) ou "typst" (app/laudo_typst.py)
+    "laudo": {"motor": "reportlab"},
 }
+MOTORES_LAUDO = ("reportlab", "typst")
 
 
 # o monitor lê o config na thread dele e a leitura pode gravar (migração): sem a trava, uma leitura no meio
@@ -143,7 +161,8 @@ NIVEIS_ALERTA = ("atencao", "programar", "urgente", "imediato")
 
 def _membro(r: dict) -> dict:
     """Completa um membro do time gravado antes do cadastro operacional (todos assinavam laudo)."""
-    return {"perfil": "engenheiro", "email": "", "telefone": "", "assina": True, "alertas": None, **r}
+    return {"perfil": "engenheiro", "email": "", "telefone": "", "assina": True, "alertas": None,
+            "usuario": "", "administrador": False, "senha_hash": "", **r}
 
 
 def _migrar_destinatarios(cfg: dict) -> bool:
@@ -186,10 +205,14 @@ def _responsavel(id_: str | None) -> dict | None:
     return next((r for r in lista if r["id"] == escolhido), None)
 
 
-def _validar_responsaveis(lista) -> list[dict]:
-    if not isinstance(lista, list) or len(lista) > 100:
+def _validar_responsaveis(lista, anteriores: list[dict] | None = None) -> list[dict]:
+    """Confere o time vindo da tela. ``anteriores``: o time gravado, de onde vem a senha de quem não trocou."""
+    if not isinstance(lista, list):
         raise HTTPException(422, "Lista do time inválida.")
-    saida, ids = [], set()
+    if len(lista) > acesso.LIMITE_TIME:
+        raise HTTPException(422, f"O time tem no máximo {acesso.LIMITE_TIME} pessoas.")
+    guardados = {r["id"]: r for r in anteriores or []}
+    saida, ids, usuarios = [], set(), set()
     for i, r in enumerate(lista, start=1):
         nome = str(r.get("nome", "")).strip()[:120]
         registro = str(r.get("registro", "")).strip()[:60]
@@ -212,8 +235,15 @@ def _validar_responsaveis(lista) -> list[dict]:
         if not re.fullmatch(r"[a-z0-9]{1,12}", id_) or id_ in ids:
             id_ = uuid.uuid4().hex[:8]
         ids.add(id_)
+        try:
+            conta = acesso.conta(r, guardados.get(id_), nome)
+        except ValueError as erro:
+            raise HTTPException(422, str(erro)) from erro
+        if conta["usuario"] and conta["usuario"] in usuarios:
+            raise HTTPException(422, f"{nome}: o usuário {conta['usuario']} já é de outra pessoa do time.")
+        usuarios.add(conta["usuario"])
         saida.append({"id": id_, "nome": nome, "perfil": perfil, "funcao": str(r.get("funcao", "")).strip()[:80], "registro": registro,
-                      "email": email, "telefone": telefone, "assina": assina, "alertas": alertas})
+                      "email": email, "telefone": telefone, "assina": assina, "alertas": alertas, **conta})
     return saida
 
 
@@ -657,8 +687,15 @@ async def criar(arquivo: UploadFile = File(...), modelo: str | None = Form(None)
     ident = {k: v.strip()[:120] for k, v in (("instalacao", instalacao), ("equipamento", equipamento)) if v and v.strip()}
     # Se o modelo não foi explicitado, assume o modelo fundacional de segmentação e metrologia
     modelo_analise = modelo if (modelo and modelo.strip()) else _config()["modelo_ativo"]
-    with _trava:
-        return _completa(_nova_analise(dados, arquivo.filename or "imagem.jpg", modelo_analise, identificacao=ident))
+
+    def analisar() -> dict:
+        with _trava:
+            return _completa(_nova_analise(dados, arquivo.filename or "imagem.jpg", modelo_analise, identificacao=ident))
+
+    # A análise leva segundos: num fio à parte, para o servidor seguir atendendo os outros pedidos (e outros usuários).
+    from starlette.concurrency import run_in_threadpool
+
+    return await run_in_threadpool(analisar)
 
 
 def _chave_de(a: dict) -> str:
@@ -683,7 +720,19 @@ def obter(id_: str) -> dict:
 
 @app.put("/api/analises/{id_}")
 def atualizar(id_: str, corpo: dict = Body(...)) -> dict:
-    a, m = _carregar(id_)
+    """Grava a edição da tela. Com ``revisao`` no corpo, recusa (409) se outra pessoa gravou antes."""
+    with _trava:
+        a, m = _carregar(id_)
+        if "revisao" in corpo and corpo["revisao"] != a.get("revisao", 0):
+            raise HTTPException(409, "Outra pessoa alterou esta inspeção enquanto você editava. Abra de novo para ver a versão nova.")
+        _aplicar_edicao(a, m, corpo)
+        a["revisao"] = a.get("revisao", 0) + 1
+        _calcular(a, m)
+        armazenamento.salvar(a)
+    return _completa(a)
+
+
+def _aplicar_edicao(a: dict, m: np.ndarray, corpo: dict) -> None:
     if "regioes" in corpo:
         novas = []
         for r in corpo["regioes"]:
@@ -722,9 +771,6 @@ def atualizar(id_: str, corpo: dict = Body(...)) -> dict:
             if len(faixa) != 2 or faixa[1] - faixa[0] < 0.1:
                 raise HTTPException(422, "Escala inválida: o máximo precisa ser maior que o mínimo.")
         a["exibicao"] = {"paleta": e.get("paleta") if e.get("paleta") in PALETAS_EXIBICAO else "ferro", "faixa": faixa}
-    _calcular(a, m)
-    armazenamento.salvar(a)
-    return _completa(a)
 
 
 @app.post("/api/analises/identificacao")
@@ -1324,20 +1370,53 @@ def _escolher_responsavel(id_: str | None, a: dict | None = None) -> dict:
     return resp
 
 
+def _motor_laudo(pedido: str | None = None):
+    """O gerador do laudo: o da configuração (laudo.motor), ou o pedido por quem administra (?motor=, para comparar).
+
+    Typst escolhido mas indisponível (pacote ausente, DLL barrada pelo Windows): o laudo sai pelo reportlab.
+    """
+    motor = pedido if pedido in MOTORES_LAUDO else (_config().get("laudo") or {}).get("motor", "reportlab")
+    if motor == "typst":
+        from app import laudo_typst
+
+        if laudo_typst.disponivel() is None:
+            return laudo_typst
+    return laudo
+
+
+def _quem_assina(request: Request, escolhido: str | None, a: dict | None = None) -> dict:
+    """No modo local, o responsável escolhido na tela; no servidor, sempre quem entrou (nome e registro dele)."""
+    quem = acesso.usuario(request)
+    return quem if quem is not None else _escolher_responsavel(escolhido, a)
+
+
+def _registrar_laudo(request: Request, ids: list[str], resp: dict, pdf: bytes) -> None:
+    """Trilha de auditoria: quem emitiu, quem assina, quando, quais inspeções e o SHA-256 do PDF."""
+    quem = acesso.usuario(request)
+    armazenamento.registrar_laudo({
+        "id": uuid.uuid4().hex[:12], "emitido_em": datetime.now().isoformat(timespec="seconds"),
+        "emitido_por_id": quem["id"] if quem else None, "emitido_por_nome": quem["nome"] if quem else None,
+        "responsavel_nome": resp["nome"], "responsavel_registro": resp.get("registro") or None,
+        "analises": ids, "sha256": hashlib.sha256(pdf).hexdigest(), "bytes": len(pdf),
+    })
+
+
 @app.get("/api/analises/{id_}/laudo.pdf")
-def laudo_pdf(id_: str, responsavel: str | None = None, art: str | None = None) -> Response:
+def laudo_pdf(request: Request, id_: str, responsavel: str | None = None, art: str | None = None, motor: str | None = None) -> Response:
     a, m = _carregar(id_)
     _sem_temperatura([a])
-    resp = _escolher_responsavel(responsavel, a)
+    resp = _quem_assina(request, responsavel, a)
     art = (art if art is not None else (a.get("identificacao") or {}).get("art")) or ""
-    pdf = laudo.gerar(a, m, armazenamento.foto(id_), VERSAO, empresa=_config()["empresa"], responsavel=resp, art=art[:60],
-                      criterios=_criterios(), logo=_logo())
+    gerador = _motor_laudo(motor if acesso.pode(request, "administracao") else None)
+    pdf = gerador.gerar(a, m, armazenamento.foto(id_), VERSAO, empresa=_config()["empresa"], responsavel=resp, art=art[:60],
+                        criterios=_criterios(), logo=_logo())
+    _registrar_laudo(request, [a["id"]], resp, pdf)
     nome = f"relatorio_{re.sub(r'[^A-Za-z0-9_-]', '_', Path(a['arquivo']).stem)}_{a['id'][:6]}.pdf"
     return Response(pdf, media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="{nome}"'})
 
 
 @app.post("/api/laudos")
-def laudo_varias(corpo: dict = Body(...)) -> Response:
+def laudo_varias(request: Request, corpo: dict = Body(...)) -> Response:
     """Um relatório com várias inspeções, na ordem escolhida."""
     ids = corpo.get("ids")
     if not isinstance(ids, list) or not ids:
@@ -1349,11 +1428,114 @@ def laudo_varias(corpo: dict = Body(...)) -> Response:
         a, m = _carregar(id_)
         itens.append((a, m, armazenamento.foto(id_)))
     _sem_temperatura([a for a, _, _ in itens])
-    resp = _escolher_responsavel(corpo.get("responsavel"))
-    pdf = laudo.gerar_relatorio(itens, VERSAO, empresa=_config()["empresa"], responsavel=resp,
-                                art=str(corpo.get("art") or "")[:60], criterios=_criterios(), logo=_logo())
+    resp = _quem_assina(request, corpo.get("responsavel"))
+    gerador = _motor_laudo(corpo.get("motor") if acesso.pode(request, "administracao") else None)
+    pdf = gerador.gerar_relatorio(itens, VERSAO, empresa=_config()["empresa"], responsavel=resp,
+                                  art=str(corpo.get("art") or "")[:60], criterios=_criterios(), logo=_logo())
+    _registrar_laudo(request, [a["id"] for a, _, _ in itens], resp, pdf)
     nome = f"relatorio_termografico_{datetime.now():%Y%m%d_%H%M}_{len(itens)}_imagens.pdf"
     return Response(pdf, media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="{nome}"'})
+
+
+@app.get("/api/laudos/emitidos")
+def laudos_emitidos(limite: int = 200) -> list[dict]:
+    """Os laudos emitidos, do mais novo para o mais antigo: quem pediu, quem assina, inspeções e SHA-256 do PDF."""
+    return armazenamento.laudos_emitidos(max(1, min(limite, 1000)))
+
+
+# ---------------------------------------------------------------- rotas: comentários
+
+LIMITE_COMENTARIO = 2000
+
+
+def _autor(request: Request) -> tuple[str | None, str]:
+    """(id, nome) de quem escreve: quem entrou (servidor) ou o responsável padrão deste computador (local)."""
+    quem = acesso.usuario(request)
+    if quem is not None:
+        return quem["id"], quem["nome"]
+    cfg = _config()
+    padrao = next((r for r in cfg["responsaveis"] if r["id"] == cfg.get("responsavel_padrao")), None)
+    return (padrao["id"], padrao["nome"]) if padrao else (None, "Este computador")
+
+
+@app.get("/api/analises/{id_}/comentarios")
+def comentarios(id_: str) -> list[dict]:
+    if armazenamento.obter(id_) is None:
+        raise HTTPException(404, "Inspeção não encontrada.")
+    return armazenamento.comentarios(id_)
+
+
+@app.post("/api/analises/{id_}/comentarios")
+def comentar(request: Request, id_: str, corpo: dict = Body(...)) -> list[dict]:
+    """Acrescenta um comentário com autor e data (região opcional). Devolve a lista toda."""
+    a = armazenamento.obter(id_)
+    if a is None:
+        raise HTTPException(404, "Inspeção não encontrada.")
+    texto = str(corpo.get("texto") or "").strip()
+    if not texto:
+        raise HTTPException(422, "Escreva o comentário.")
+    if len(texto) > LIMITE_COMENTARIO:
+        raise HTTPException(422, f"O comentário passa de {LIMITE_COMENTARIO} caracteres.")
+    regiao = corpo.get("regiao_id") or None
+    if regiao is not None and not any(r.get("id") == regiao for r in a.get("regioes") or []):
+        raise HTTPException(422, "Essa região não existe mais nesta inspeção.")
+    autor_id, autor_nome = _autor(request)
+    armazenamento.comentar(id_, texto, autor_nome, autor_id, regiao)
+    return armazenamento.comentarios(id_)
+
+
+# ---------------------------------------------------------------- rotas: acesso (modo servidor)
+
+
+@app.get("/api/acesso/eu")
+def acesso_eu(request: Request) -> dict:
+    """Modo do servidor e quem está usando. No modo local não há login: usuário vazio e todas as permissões."""
+    if not acesso.modo_servidor():
+        return {"modo": "local", "usuario": None, "permissoes": sorted(acesso.PERMISSOES)}
+    atual = acesso.sessao_atual(request)
+    return {"modo": "servidor", "usuario": acesso.descrever(atual[0]) if atual else None,
+            "permissoes": sorted(acesso.permissoes(atual[0])) if atual else []}
+
+
+@app.post("/api/acesso/entrar")
+def acesso_entrar(request: Request, corpo: dict = Body(...)) -> JSONResponse:
+    if not acesso.modo_servidor():
+        raise HTTPException(409, "No modo local não há login.")
+    m, codigo = acesso.entrar(request, corpo.get("usuario"), corpo.get("senha"))
+    resposta = JSONResponse({"modo": "servidor", "usuario": acesso.descrever(m), "permissoes": sorted(acesso.permissoes(m))})
+    acesso.gravar_cookie(resposta, request, codigo)
+    return resposta
+
+
+@app.post("/api/acesso/sair")
+def acesso_sair(request: Request) -> JSONResponse:
+    if acesso.modo_servidor():
+        acesso.sair(request)
+    resposta = JSONResponse({"ok": True})
+    acesso.apagar_cookie(resposta, request)
+    return resposta
+
+
+@app.post("/api/acesso/senha")
+def acesso_trocar_senha(request: Request, corpo: dict = Body(...)) -> dict:
+    """A própria pessoa troca a senha (pede a atual). As outras sessões dela são encerradas."""
+    quem = acesso.usuario(request)
+    if quem is None:
+        raise HTTPException(409, "No modo local não há senha.")
+    if not acesso.conferir_senha(str(corpo.get("atual") or ""), quem.get("senha_hash")):
+        raise HTTPException(422, "A senha atual não confere.")
+    try:
+        nova = acesso.validar_senha(corpo.get("nova"))
+    except ValueError as erro:
+        raise HTTPException(422, str(erro)) from erro
+    with _trava:
+        cfg = _config()
+        for r in cfg["responsaveis"]:
+            if r["id"] == quem["id"]:
+                r["senha_hash"] = acesso.gerar_hash(nova)
+        _salvar_config(cfg)
+    armazenamento.encerrar_sessoes_de(quem["id"], menos=getattr(request.state, "sessao", None))
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------- rotas: exemplos
@@ -1440,7 +1622,16 @@ def modelos() -> dict:
         if sam2 is not None:
             disponivel = importlib.util.find_spec("sam2") is not None and sam2._caminho_pesos.exists()
             lista.insert(1, {**sam2.descrever(), "disponivel": disponivel})
-    return {"ativo": _config()["modelo_ativo"], "modelos": lista}
+    # onde o modelo ativo roda (placa, "carregando" = preparando a placa, ou processador) e o acelerador do servidor
+    return {"ativo": _config()["modelo_ativo"], "modelos": lista, "placa": _onde_modelo_ativo(), "acelerador": provedores.situacao()}
+
+
+def _onde_modelo_ativo() -> dict | None:
+    try:
+        det = _detector(None)
+    except HTTPException:
+        return None
+    return placa.situacao(_original(det.partes[0] if isinstance(det, detectores.Combinado) else det))
 
 
 @app.put("/api/modelos/ativo")
@@ -1459,12 +1650,20 @@ def criterios() -> dict:
     return {"criterio": _criterios(), "padrao": analise.CRITERIOS_PADRAO, "niveis": analise.NIVEIS}
 
 
+def _time_para_tela(request: Request | None, responsaveis: list[dict]) -> list[dict]:
+    """O time como a tela vê: nunca a senha (só se tem); telefone, e-mail e alertas só para quem administra."""
+    completo = request is None or acesso.pode(request, "administracao")
+    privados = {"senha_hash"} | (set() if completo else {"email", "telefone", "alertas"})
+    return [{**{k: v for k, v in r.items() if k not in privados}, "tem_senha": bool(r.get("senha_hash"))} for r in responsaveis]
+
+
 @app.get("/api/configuracoes")
-def configuracoes() -> dict:
+def configuracoes(request: Request = None) -> dict:
     cfg = _config()
+    pastas = request is None or acesso.pode(request, "administracao")
     return {
         "empresa": cfg["empresa"],
-        "responsaveis": cfg["responsaveis"],
+        "responsaveis": _time_para_tela(request, cfg["responsaveis"]),
         "responsavel_padrao": cfg.get("responsavel_padrao"),
         "tema": cfg["tema"],
         "criterio": cfg.get("criterios") or analise.CRITERIOS_PADRAO,
@@ -1474,10 +1673,13 @@ def configuracoes() -> dict:
         "niveis": analise.NIVEIS,
         "componentes": _componentes(),
         "componentes_padrao": referencias.COMPONENTES_PADRAO,
-        "pasta_dados": str(PASTA_DADOS),
-        "pasta_modelos": str(PASTA_MODELOS),
+        "pasta_dados": str(PASTA_DADOS) if pastas else "",
+        "pasta_modelos": str(PASTA_MODELOS) if pastas else "",
         "versao": VERSAO,
         "tem_logo": (PASTA_DADOS / "logo.png").exists(),
+        "modo": acesso.modo(),
+        "limite_time": acesso.LIMITE_TIME,
+        "laudo": cfg.get("laudo") or {"motor": "reportlab"},
     }
 
 
@@ -1509,7 +1711,8 @@ async def enviar_logo(arquivo: UploadFile = File(...)) -> dict:
 def sistema() -> dict:
     """Onde estão os dados, quanto ocupam e quantas inspeções há."""
     return {"pasta_dados": str(PASTA_DADOS), "pasta_modelos": str(PASTA_MODELOS), "versao": VERSAO,
-            "inspecoes": len(armazenamento.listar()), **backup.contar(PASTA_DADOS)}
+            "inspecoes": len(armazenamento.listar()), **backup.contar(PASTA_DADOS),
+            "acelerador": provedores.situacao(), "placa": _onde_modelo_ativo()}
 
 
 @app.get("/api/backup.zip")
@@ -1557,12 +1760,16 @@ def apagar_logo() -> dict:
 
 
 @app.put("/api/configuracoes")
-def salvar_configuracoes(corpo: dict = Body(...)) -> dict:
+def salvar_configuracoes(request: Request, corpo: dict = Body(...)) -> dict:
     cfg = _config()
     if "empresa" in corpo:
         cfg["empresa"] = {k: str(corpo["empresa"].get(k, ""))[:120] for k in ("nome", "subtitulo")}
     if "responsaveis" in corpo:
-        cfg["responsaveis"] = _validar_responsaveis(corpo["responsaveis"])
+        antes = {r["id"]: r.get("senha_hash") for r in cfg["responsaveis"]}
+        cfg["responsaveis"] = _validar_responsaveis(corpo["responsaveis"], cfg["responsaveis"])
+        if acesso.modo_servidor() and acesso.falta_para_servidor(cfg["responsaveis"]):
+            raise HTTPException(422, "O time precisa continuar com ao menos um administrador com usuário e senha.")
+        trocaram = [r["id"] for r in cfg["responsaveis"] if r["id"] in antes and r.get("senha_hash") != antes[r["id"]]]
         cfg["responsavel"] = {"nome": "", "registro": ""}  # o formato antigo não volta a migrar
         ids = [r["id"] for r in cfg["responsaveis"] if r["assina"]]
         if cfg.get("responsavel_padrao") not in ids:
@@ -1572,6 +1779,16 @@ def salvar_configuracoes(corpo: dict = Body(...)) -> dict:
         if corpo["responsavel_padrao"] not in ids:
             raise HTTPException(422, "Responsável padrão não está no cadastro de quem assina laudo.")
         cfg["responsavel_padrao"] = corpo["responsavel_padrao"]
+    if "laudo" in corpo:
+        motor = (corpo["laudo"] or {}).get("motor")
+        if motor not in MOTORES_LAUDO:
+            raise HTTPException(422, "Motor do laudo deve ser reportlab ou typst.")
+        if motor == "typst":
+            from app import laudo_typst
+
+            if (falta := laudo_typst.disponivel()) is not None:
+                raise HTTPException(422, f"O Typst não carrega neste computador: {falta}")
+        cfg["laudo"] = {"motor": motor}
     if "tema" in corpo:
         if corpo["tema"] not in ("sistema", "claro", "escuro"):
             raise HTTPException(422, "Tema deve ser sistema, claro ou escuro.")
@@ -1581,9 +1798,13 @@ def salvar_configuracoes(corpo: dict = Body(...)) -> dict:
     if "componentes" in corpo:
         cfg["componentes"] = {} if corpo["componentes"] is None else _validar_componentes(corpo["componentes"])
     _salvar_config(cfg)
+    if "responsaveis" in corpo:  # quem saiu do time, ficou sem senha ou trocou de senha sai das sessões abertas
+        armazenamento.encerrar_sessoes_fora({r["id"] for r in cfg["responsaveis"] if acesso.pode_entrar(r)})
+        for id_ in trocaram:
+            armazenamento.encerrar_sessoes_de(id_, menos=getattr(request.state, "sessao", None))
     if "criterio" in corpo or "componentes" in corpo:
         _recalcular_todas()
-    return configuracoes()
+    return configuracoes(request)
 
 
 def _recalcular_todas() -> None:
@@ -1872,17 +2093,39 @@ def listar_pendencias() -> list[dict]:
     return pendencias.listar(armazenamento.listar())
 
 
+def _mudancas_pendencia(a: dict, corpo: dict) -> list[str]:
+    """Campos que o pedido muda de fato (a tela manda todos, inclusive os que ficaram iguais)."""
+    atual = pendencias.montar({**a, "destaque": _destaque(a), "data_captura": (a.get("metadados") or {}).get("data_hora", "")})
+    mudou = []
+    if "status" in corpo and corpo["status"] != atual["status"]:
+        mudou.append("status")
+    if "prazo" in corpo and str(corpo["prazo"] or "")[:10] not in ((atual["prazo"], "") if atual["prazo_padrao"] else (atual["prazo"],)):
+        mudou.append("prazo")
+    for campo in ("ordem_servico", "responsavel"):
+        if campo in corpo and str(corpo[campo] or "").strip() != (atual[campo] or ""):
+            mudou.append(campo)
+    return mudou
+
+
 @app.put("/api/analises/{id_}/acompanhamento")
-def acompanhar(id_: str, corpo: dict = Body(...)) -> dict:
-    """Situação da anomalia: aberta, programada (com OS), corrigida, verificada ou descartada."""
+def acompanhar(request: Request, id_: str, corpo: dict = Body(...)) -> dict:
+    """Situação da anomalia: aberta, programada (com OS), corrigida, verificada ou descartada.
+
+    O técnico acompanha as pendências de atenção e de programar; nas urgentes e imediatas só deixa nota.
+    """
     with _trava:
         a = armazenamento.obter(id_)
         if a is None:
             raise HTTPException(404, "Inspeção não encontrada.")
         if a["resumo"]["severidade"] == "normal":
             raise HTTPException(422, "Esta inspeção está normal: não há anomalia para acompanhar.")
+        if (not acesso.pode(request, "revisao") and a["resumo"]["severidade"] in acesso.SEVERIDADES_SO_ENGENHEIRO
+                and _mudancas_pendencia(a, corpo)):
+            raise HTTPException(403, "Pendência urgente ou imediata: só engenheiro muda situação, prazo, OS ou responsável. "
+                                     "Você pode deixar uma nota.")
+        quem = acesso.usuario(request)
         try:
-            pendencias.atualizar(a, corpo)
+            pendencias.atualizar(a, corpo, autor=quem["nome"] if quem else None)
         except ValueError as erro:
             raise HTTPException(422, str(erro)) from erro
         armazenamento.salvar(a)
@@ -2955,6 +3198,8 @@ def celular_estado() -> dict:
 def celular_ligar(para: str = "camera") -> dict:
     """Abre o servidor do celular na rede local (HTTPS, só as rotas do celular, com código no link).
     ``para=medicao``: só para medir objetos em foto, sem exigir o detector térmico."""
+    if acesso.modo_servidor():
+        raise HTTPException(409, "O modo celular só liga no modo local (o servidor do celular abre outra porta na rede).")
     try:
         if para != "medicao":
             _detector_imagem()
@@ -3040,7 +3285,9 @@ sinais: dict = {"clientes": {}, "algum": False, "encerrar": False}
 
 @app.post("/api/sinal")
 def sinal(cliente: str = "lancador", saindo: bool = False) -> dict:
-    """Cada janela avisa que está aberta (a cada 20 s) ou que está sendo fechada."""
+    """Cada janela avisa que está aberta (a cada 20 s) ou que está sendo fechada. Não existe no modo servidor."""
+    if acesso.modo_servidor():
+        raise HTTPException(404, "No modo servidor o Pyron não se desliga sozinho.")
     clientes = sinais["clientes"]
     if saindo:
         clientes.pop(cliente[:32], None)
@@ -3068,7 +3315,12 @@ async def erro_http(_req, exc: HTTPException) -> JSONResponse:
 
 @app.middleware("http")
 async def sem_cache_da_interface(request, chamar_proximo):
-    """A interface é local: sempre servir a versão mais nova dos arquivos (atualizações entram sem limpar cache)."""
+    """A interface é local: sempre servir a versão mais nova dos arquivos (atualizações entram sem limpar cache).
+
+    No modo servidor, a interface anterior (/antiga) não existe: ela não conhece o login.
+    """
+    if acesso.modo_servidor() and request.url.path.startswith("/antiga"):
+        return RedirectResponse("/")
     resposta = await chamar_proximo(request)
     if not request.url.path.startswith("/api/"):
         resposta.headers["Cache-Control"] = "no-cache"
