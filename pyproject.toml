@@ -11,6 +11,8 @@ ocr = ["rapidocr-onnxruntime"]
 placa = ["onnxruntime-directml"]
 # arquivos das inspeções num bucket S3 ou compatível (PYRON_OBJETOS=s3://bucket/prefixo); sem isso, a pasta local
 nuvem = ["boto3"]
+# laudo em Typst (app/laudo_typst.py, laudo.motor = "typst"): compilador Typst em Rust dentro do pacote, Apache 2.0
+laudo-typst = ["typst>=0.15"]
 dev = ["pytest", "matplotlib"]
 # segmentação SAM 2 + metrologia (nucleo/segmentacao, nucleo/metrologia, nucleo/pipeline).
 # torch/torchvision com CUDA vêm do índice do PyTorch, instalados ANTES deste extra:
