@@ -3,6 +3,15 @@
 Software de manutenção preditiva por termografia (FastAPI local + interface web em `app/estatico/`,
 núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Textos em português do Brasil.
 
+## Base de Conhecimento e Segundo Cérebro (Shlomo)
+- O projeto é embasado pelo cofre Zettelkasten **Shlomo** (`D:/hd_central/Antigravity projetos/Shlomo/`) e pelo índice
+  canônico `SHLOMO_KNOWLEDGE_BASE.md`.
+- **Requisitos e física:** consultar `Pyron Embrapii - Visão Geral e Roteiro de Requisitos.md` e
+  `Pyron Embrapii - Referências e Limiares de Temperatura.md` para normas ABNT NBR 15572/15866, NETA MTS, física de
+  degradação e modelo de Arrhenius.
+- **Engenharia de Software:** respeitar estritamente Clean Code (SOLID, funções pequenas, SRP, Boy Scout Rule) conforme
+  documentado no atlas do Shlomo.
+
 ## 0. Interface principal (`app/interface`, em `/`; histórico em `docs/plano-interface.md`)
 
 - Código em `app/interface/`, servido em `/` desde a 0.8.0 (`/nova` redireciona para `/`). A interface
