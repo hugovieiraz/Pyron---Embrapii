@@ -32,3 +32,6 @@ exportacao_pyron.sql
 
 # configuração pessoal do Claude Code (permissões desta máquina)
 .claude/settings.local.json
+
+# ambiente do servidor com placa NVIDIA (0.9, F4): separado do .venv de desenvolvimento
+.venv-gpu/

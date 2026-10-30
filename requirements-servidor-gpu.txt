@@ -1,0 +1,28 @@
+# Pyron 0.9 · servidor com placa NVIDIA (TensorRT e CUDA pelo ONNX Runtime). Ambiente SEPARADO do .venv de
+# desenvolvimento: o onnxruntime-gpu ocupa o mesmo módulo "onnxruntime" que o onnxruntime-directml e tiraria o
+# DirectML do computador de desenvolvimento (CLAUDE.md, Ambiente).
+#
+#   python -m venv .venv-gpu
+#   .venv-gpu\Scripts\python -m pip install -r requirements-servidor-gpu.txt
+#   .venv-gpu\Scripts\python -m pip install --no-deps rapidocr-onnxruntime==1.4.4   (sem --no-deps ele traz o
+#       onnxruntime comum, só CPU, que sobrescreve o onnxruntime-gpu)
+#
+# Conferido em 30/10/2026 numa GTX 1650 (Windows 11, driver 621.01): docs/v09/4-tensorrt.md.
+# Licenças: ONNX Runtime MIT; CUDA, cuDNN e TensorRT pela licença da NVIDIA (aprovadas pelo usuário em 30/10/2026).
+
+# ---------------------------------------------------------------- aplicativo (as mesmas do .venv de desenvolvimento)
+fastapi==0.142.2
+starlette==1.7.0
+uvicorn==0.54.0
+python-multipart==0.0.32
+anyio==4.15.1
+numpy>=2.4
+pillow>=12
+scipy==1.18.1
+opencv-python==5.0.0.93
+reportlab==5.0.1
+typst==0.15.0                       # laudo em Typst (F3), Apache 2.0
+
+# ---------------------------------------------------------------- placa NVIDIA
+onnxruntime-gpu[cuda,cudnn]==1.24.4  # traz CUDA 12 e cuDNN 9 em pacotes nvidia-* (sem instalar o CUDA no sistema)
+tensorrt-cu12-libs==10.16.1.11       # o ONNX Runtime 1.24 usa o TensorRT 10 (nvinfer_10.dll); o 11 não serve
