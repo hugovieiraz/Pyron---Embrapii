@@ -12,7 +12,7 @@ Máquina: Acer Nitro AN515-55, Windows 11 10.0.26200, **Controle Inteligente de 
 2. Conferido neste computador: modo local e remoto abrem; o Python não sobra depois de fechar nem com fim de tarefa; queda
    do Python mostra o erro e "Reiniciar" volta; segunda abertura só traz a janela para a frente.
 3. Pendente: **assinatura** e o teste numa máquina com o Controle Inteligente ligado (aceite do plano); licenças indiretas
-   do Tauri fora de MIT/Apache para aprovar; bandeja e aviso do Windows sem conferência automatizada.
+   do Tauri aprovadas (aviso em `LICENCAS-TERCEIROS.txt`); bandeja e aviso do Windows sem conferência automatizada.
    O `Pyron.exe` em C# continua o padrão; nada foi apagado.
 
 ## Como fica
@@ -80,7 +80,11 @@ Diretas: Tauri, plugins, serde, windows-sys (MIT/Apache 2.0). Build Tools: licen
 `cargo metadata` resolve 262 crates; 28 têm licenças fora de MIT/Apache, todas permissivas e presentes em qualquer
 aplicativo Tauri: **MPL-2.0** (cssparser, cssparser-macros, selectors, dtoa-short, option-ext; uso sem modificação),
 **Unicode-3.0** (icu_*, zerovec, yoke, tinystr…, via `url`), **BSD-3-Clause** (alloc-stdlib, alloc-no-stdlib, via brotli)
-e **Zlib** (foldhash, zlib-rs). **Esperando aprovação** antes de distribuir o executável.
+e **Zlib** (foldhash, zlib-rs). **Aprovadas pelo usuário em 30/10/2026.**
+
+Obrigação ao distribuir: o `pyron-desktop.exe` vai acompanhado de `desktop/LICENCAS-TERCEIROS.txt`, gerado por
+`python desktop/licencas_terceiros.py` (lê `cargo metadata`; para com erro se aparecer licença ainda não aprovada).
+Nenhuma crate foi modificada, então a MPL-2.0 não pede publicar código.
 
 ## Pendências e decisões suas
 
@@ -88,6 +92,5 @@ e **Zlib** (foldhash, zlib-rs). **Esperando aprovação** antes de distribuir o 
   Controle Inteligente ligado") não dá para conferir aqui: ele está desligado neste computador e não há certificado. O
   executável de 4,8 MB sem assinatura tende a ser barrado como foi o `Pyron.exe` de 390 KB. Caminhos: GitHub Actions +
   Azure Trusted Signing ou certificado OV/EV. Até lá, o `Pyron.exe` em C# continua o padrão.
-- **Licenças indiretas** acima.
 - **Conferência à mão** da bandeja, do aviso do Windows, do arraste e do PDF.
 - **Espaço:** `desktop\src-tauri\target` ocupa 1,3 GB (compilação); pode ser apagado e refeito com `cargo build --release`.

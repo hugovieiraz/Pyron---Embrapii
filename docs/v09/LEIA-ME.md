@@ -26,13 +26,13 @@ Pyron desktop em Tauri v2. O modo local continua igual ao da 0.8 (`Pyron.exe` �
 | Fonte do laudo | Noto Sans (OFL); visual do Typst aprovado e padrão |
 | TensorRT | FP32 como padrão (FP16 perdeu uma detecção na borda do limiar) |
 | Licenças | as listadas no F0 aprovadas, inclusive NVIDIA (CUDA, cuDNN, TensorRT) e Visual Studio Build Tools |
-| Tauri | seguir com a implementação (Rust instalado pelo usuário) |
+| Tauri | seguir com a implementação (Rust instalado pelo usuário); licenças indiretas (MPL-2.0, Unicode-3.0, BSD-3, Zlib) aprovadas |
 
 ## Pendente
 
 - **Pyron desktop:** assinatura do executável e teste numa máquina com o Controle Inteligente de Aplicativos ligado;
-  aprovação das licenças indiretas do Tauri (MPL-2.0, Unicode-3.0, BSD-3, Zlib); conferência à mão da bandeja, do
-  aviso do Windows, do arraste e do PDF. Até lá o `Pyron.exe` em C# é o padrão.
+  conferência à mão da bandeja, do aviso do Windows, do arraste e do PDF. Até lá o `Pyron.exe` em C# é o padrão.
+  Ao distribuir, junto do executável: `desktop/LICENCAS-TERCEIROS.txt` (`python desktop/licencas_terceiros.py`).
 - **TensorRT:** paridade e tempo no servidor NVIDIA real e com o modelo treinado da equipe.
 - **Tablet:** instalação real num iPad e num Android pela rede Tailscale.
 - **Laudo:** prova do Controle Inteligente para o `typst` (`.pyd`) numa máquina com ele ligado.
