@@ -104,7 +104,17 @@ CONFIG_PADRAO = {
 }
 
 
+# o monitor lê o config na thread dele e a leitura pode gravar (migração): sem a trava, uma leitura no meio
+# da gravação pega o arquivo pela metade e cai no padrão (monitor desligado)
+_TRAVA_CONFIG = threading.RLock()
+
+
 def _config() -> dict:
+    with _TRAVA_CONFIG:
+        return _ler_config()
+
+
+def _ler_config() -> dict:
     cfg = json.loads(json.dumps(CONFIG_PADRAO))
     arq = PASTA_DADOS / "config.json"
     if arq.exists():
@@ -209,7 +219,8 @@ def _validar_responsaveis(lista) -> list[dict]:
 
 def _salvar_config(cfg: dict) -> None:
     PASTA_DADOS.mkdir(parents=True, exist_ok=True)
-    (PASTA_DADOS / "config.json").write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+    with _TRAVA_CONFIG:
+        (PASTA_DADOS / "config.json").write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def _criterios() -> dict:
