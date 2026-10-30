@@ -86,8 +86,8 @@ def listar(itens: list[dict], hoje: date | None = None) -> list[dict]:
     return sorted(saida, key=lambda p: (not p["vencida"], ordem[p["status"]], -eq.ORDEM.index(p["severidade"]), p["prazo"]))
 
 
-def atualizar(analise: dict, corpo: dict, agora: datetime | None = None) -> dict:
-    """Troca status, prazo, OS, responsável ou nota e registra a mudança no histórico."""
+def atualizar(analise: dict, corpo: dict, agora: datetime | None = None, autor: str | None = None) -> dict:
+    """Troca status, prazo, OS, responsável ou nota e registra a mudança no histórico (com quem fez, se souber)."""
     agora = agora or datetime.now()
     ac = dict(analise.get("acompanhamento") or {})
     status = corpo.get("status", ac.get("status", "aberta"))
@@ -107,7 +107,9 @@ def atualizar(analise: dict, corpo: dict, agora: datetime | None = None) -> dict
     mudou = status != ac.get("status", "aberta") or bool(str(corpo.get("nota") or "").strip())
     ac["status"] = status
     if mudou:
-        ac["historico"] = [*ac.get("historico", []), {"quando": agora.isoformat(timespec="seconds"), "status": status,
-                                                       "nota": str(corpo.get("nota") or "").strip()[:500]}][-50:]
+        entrada = {"quando": agora.isoformat(timespec="seconds"), "status": status, "nota": str(corpo.get("nota") or "").strip()[:500]}
+        if autor:
+            entrada["autor"] = autor[:120]
+        ac["historico"] = [*ac.get("historico", []), entrada][-50:]
     analise["acompanhamento"] = ac
     return analise

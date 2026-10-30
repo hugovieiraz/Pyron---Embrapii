@@ -1,6 +1,6 @@
 // Componentes da interface nova. Cada função devolve um nó pronto; o visual está em componentes.css.
 import { TEXTOS as T } from "../textos.js";
-import { el, icone, duracao, token, $ } from "./base.js";
+import { el, icone, duracao, token, $, modoServidor } from "./base.js";
 import { ilustracao } from "./ilustracoes.js";
 
 let sequencia = 0;
@@ -156,6 +156,32 @@ export function indicador({ rotulo, valor, nota, severidade, href, onclick }) {
  * Com aoEscolher (lista com painel de detalhe), a linha seleciona em vez de navegar: o alvo de teclado vira botão.
  * Com grupo, uma linha de título separa as linhas a cada valor novo (ex.: instalação).
  */
+/**
+ * Toque longo (550 ms parado) num elemento: ao levantar o dedo, chama aoSegurar com a posição e engole o clique
+ * que viria depois. Abre ao soltar, não durante: o soltar fora de um menu já aberto o fecharia (popover "auto").
+ */
+export function toqueLongo(no, aoSegurar) {
+  let relogio = null, inicio = null, segurou = false, alvo = null;
+  const cancelar = () => { clearTimeout(relogio); relogio = null; };
+  no.addEventListener("pointerdown", (ev) => {
+    if (ev.pointerType !== "touch") return;
+    segurou = false;
+    inicio = { x: ev.clientX, y: ev.clientY };
+    alvo = ev.target;
+    cancelar();
+    relogio = setTimeout(() => { relogio = null; segurou = true; no.classList.add("segurando"); }, 550);
+  });
+  no.addEventListener("pointermove", (ev) => { if (relogio && Math.hypot(ev.clientX - inicio.x, ev.clientY - inicio.y) > 10) cancelar(); });
+  no.addEventListener("pointerup", () => {
+    cancelar();
+    if (!segurou) return;
+    no.classList.remove("segurando");
+    setTimeout(() => aoSegurar({ clientX: inicio.x, clientY: inicio.y, currentTarget: no, target: alvo, preventDefault() {} }));
+  });
+  no.addEventListener("pointercancel", () => { cancelar(); segurou = false; no.classList.remove("segurando"); });
+  no.addEventListener("click", (ev) => { if (segurou) { ev.preventDefault(); ev.stopPropagation(); segurou = false; } }, true);
+}
+
 export function tabela({ rotulo, colunas, linhas, severidade, href, ordem, aoOrdenar, selecionada, marcar: sel, aoMenu, aoEscolher, grupo }) {
   const comTraco = Boolean(severidade);
   const iLink = Math.max(0, colunas.findIndex((c) => c.link));
@@ -197,7 +223,14 @@ export function tabela({ rotulo, colunas, linhas, severidade, href, ordem, aoOrd
       tr.addEventListener("click", (ev) => { if (!ev.target.closest("a, button, input, label")) aoEscolher(l); });
     }
     if (destino) tr.addEventListener("click", (ev) => { if (!ev.target.closest("a, button, input, label")) location.hash = destino.replace(/^#/, ""); });
-    if (aoMenu) tr.addEventListener("contextmenu", (ev) => { ev.preventDefault(); aoMenu(l, ev); });
+    if (aoMenu) {
+      // botão direito, e no toque o toque longo (o Safari do iPad não dispara "contextmenu"; o Chrome do
+      // Android dispara: quem chegar primeiro abre o menu, o outro é ignorado)
+      let abertoEm = 0;
+      const abrir = (ev) => { if (performance.now() - abertoEm < 1000) return; abertoEm = performance.now(); aoMenu(l, ev); };
+      tr.addEventListener("contextmenu", (ev) => { ev.preventDefault(); abrir(ev); });
+      toqueLongo(tr, (ev) => abrir(ev));
+    }
     return cabGrupo ? [cabGrupo, tr] : [tr];
   }));
   sincronizarTodas();
@@ -229,7 +262,7 @@ export function estadoVazio({ icone: ic = "inspecoes", ilustracao: ilu, procuran
 
 /** Sem conexão com o servidor, em tela inteira (a faixa do topo continua avisando). */
 export function estadoSemConexao({ tentar }) {
-  return estadoVazio({ ilustracao: "sem-conexao", titulo: T.casca.offline, texto: T.casca.offlineDica,
+  return estadoVazio({ ilustracao: "sem-conexao", titulo: T.casca.offline, texto: modoServidor() ? T.casca.offlineDicaServidor : T.casca.offlineDica,
     acoes: [botao({ texto: T.geral.tentarDeNovo, icone: "refazer", variante: "primario", onclick: tentar })] });
 }
 

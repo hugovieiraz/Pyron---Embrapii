@@ -2,7 +2,7 @@
 // máxima na última, tendência, próxima inspeção), gráfico da máxima por inspeção, peças e a lista de
 // inspeções. Primário: Relatório do equipamento. Rota: #equipamentos/<chave>.
 import { TEXTOS as T } from "../../textos.js";
-import { el, api, data, relativa, temperatura } from "../base.js";
+import { el, api, data, relativa, temperatura, pode } from "../base.js";
 import { botao, selo, segmentado, estadoVazio, avisar } from "../componentes.js";
 import { endereco } from "../rotas.js";
 import { escolherArquivos } from "../importar.js";
@@ -40,7 +40,7 @@ export async function montar(pagina, rota) {
   const cab = el("header", { class: "cabecalho" },
     el("div", { class: "titulo" }, migalhas, el("h1", {}, d.equipamento),
       el("div", { class: "meta" }, selo(d.severidade), el("span", {}, `${E.inspecoes(d.inspecoes)}, ${E.desde(data(d.primeira))}`))),
-    el("div", { class: "acoes" }, adicionar, relatorio));
+    el("div", { class: "acoes" }, adicionar, pode("laudo") ? relatorio : null));
 
   // ---------------------------------------------------------------- indicadores
   const ultimo = d.serie[d.serie.length - 1] || {};

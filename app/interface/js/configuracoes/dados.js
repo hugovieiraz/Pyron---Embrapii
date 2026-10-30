@@ -1,7 +1,7 @@
 // Configurações › Dados e backup: onde ficam os dados, quanto ocupam, o backup (.zip) e a restauração.
 // Restaurar troca tudo: pede confirmação (o estado atual fica guardado antes, numa pasta de backups).
 import { TEXTOS as T } from "../../textos.js";
-import { el, icone, api, json, fmt } from "../base.js";
+import { el, icone, api, json, fmt, nesteComputador } from "../base.js";
 import { botao, avisar, confirmar, ocupado } from "../componentes.js";
 
 const C = T.config;
@@ -35,9 +35,9 @@ export async function montar(no) {
       el("dt", {}, C.pastaDados), el("dd", { class: "mono corta", title: s.pasta_dados }, s.pasta_dados),
       el("dt", {}, C.inspecoes), el("dd", { class: "num" }, String(s.inspecoes)),
       el("dt", {}, C.ocupa), el("dd", { class: "num" }, s.bytes_videos ? C.ocupaComVideos(tamanho(s.bytes), tamanho(s.bytes_videos)) : tamanho(s.bytes))),
-    el("div", { class: "grupo-btn" }, abrir),
+    nesteComputador() ? el("div", { class: "grupo-btn" }, abrir) : null, // pelo navegador de outro aparelho, não há pasta para abrir
     el("div", { class: "titulo-bloco" }, el("h2", {}, C.backupTitulo)),
     el("p", { class: "nota" }, C.backupNota),
-    el("div", { class: "grupo-btn" }, el("a", { class: "btn primario", href: "/api/backup.zip", download: "" }, icone("baixar"), el("span", {}, C.baixarBackup)), restaurarBtn, entrada)));
+    el("div", { class: "grupo-btn" }, el("a", { class: "btn primario", href: "/api/backup.zip", download: "" }, icone("baixar"), el("span", {}, C.baixarBackup)), nesteComputador() ? [restaurarBtn, entrada] : null))); // restaurar: só no computador do servidor
   return null;
 }

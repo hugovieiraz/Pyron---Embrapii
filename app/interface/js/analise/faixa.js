@@ -13,6 +13,7 @@ export function regioesOrdenadas(regioes) {
 
 /** Apaga a região e oferece Desfazer (a região volta no mesmo lugar da lista). */
 export function apagarRegiao(ctx, id) {
+  if (!ctx.podeEditar) return;
   const lista = ctx.a.regioes;
   const i = lista.findIndex((r) => r.id === id);
   if (i < 0) return;

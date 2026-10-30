@@ -67,7 +67,7 @@ kbd { font: var(--t-1) / var(--a-1) var(--fonte-num); padding: 0 var(--e-1); bor
 .com-unidade .unidade { position: absolute; right: var(--e-3); color: var(--texto-3); font-size: var(--t-1); pointer-events: none; }
 
 .marcar { display: inline-flex; align-items: center; gap: var(--e-2); min-height: var(--alvo); cursor: pointer; font-size: var(--t-1); }
-.marcar input { width: var(--e-5); height: var(--e-5); accent-color: var(--acao); margin: 0; cursor: pointer; }
+.marcar input { width: var(--e-6); height: var(--e-6); /* 24 px: alvo mínimo da WCAG 2.5.8 */ accent-color: var(--acao); margin: 0; cursor: pointer; }
 
 /* ---------------------------------------------------------------- segmentado e abas */
 .segmentado { justify-self: start; align-self: start; display: inline-flex; padding: var(--e-1); gap: var(--e-1); border-radius: var(--r-m); background: var(--superficie-3); }
@@ -170,6 +170,8 @@ button.indicador:hover, a.indicador:hover { border-color: var(--borda-forte); ba
 .tabela tbody tr.clicavel { cursor: pointer; transition: background-color var(--dur-rapida) var(--ease-padrao); }
 .tabela tbody tr.clicavel:hover { background: var(--superficie-2); }
 .tabela tbody tr[aria-selected="true"] { background: var(--acao-suave); }
+@media (pointer: coarse) { .tabela tbody tr { -webkit-touch-callout: none; } }
+.tabela tbody tr.segurando { background: var(--superficie-3); } /* o toque longo foi reconhecido: o menu abre ao soltar */ /* o toque longo abre o menu da linha, não o do link */
 .tabela .vencida { color: var(--erro-texto); font-weight: var(--p-medio); }
 .tabela td > .vencida { display: block; } /* a data em cima, o atraso embaixo */
 .tabela .acoes-linha { display: flex; justify-content: flex-end; gap: var(--e-1); }
@@ -295,6 +297,9 @@ dialog.busca-rapida::backdrop { background: var(--veu); }
 }
 .barra-ferramentas .divisor { width: 1px; align-self: stretch; margin: var(--e-3) var(--e-2); background: var(--borda); }
 .barra-ferramentas .empurrar { margin-left: auto; }
+@media (max-width: 80em) { /* tablet: ferramentas só com o ícone (o nome fica para o leitor de tela e na dica) */
+  .barra-ferramentas .ferramenta:has(.ic) .rotulo { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
 .ferramenta {
   display: inline-flex; align-items: center; gap: var(--e-2); height: var(--alvo); padding: 0 var(--e-3); border-radius: var(--r-p);
   color: var(--texto-2); font-size: var(--t-1); font-weight: var(--p-medio); white-space: nowrap;

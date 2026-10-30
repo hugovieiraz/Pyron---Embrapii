@@ -8,6 +8,14 @@ Uso (na pasta do projeto):
 
 Com ``--auto-encerrar``, o servidor se desliga sozinho quando a interface é fechada: a página
 manda um sinal a cada 20 s e avisa ao sair (``/api/sinal``).
+
+Modo servidor (vários engenheiros pela rede, com login; ver ``docs/servidor/implantacao.md``)::
+
+    python -m app.iniciar --modo servidor --porta 8765 --proxy 127.0.0.1
+
+No modo servidor não há janela nem auto-encerrar, e ele só sobe com um administrador com senha
+(``python -m app.acesso usuario ...``). O padrão continua sendo ouvir só o próprio computador
+(127.0.0.1), com o Caddy na frente fazendo o HTTPS; ``--host 0.0.0.0`` só é aceito no modo servidor.
 """
 
 from __future__ import annotations
@@ -118,6 +126,25 @@ def vigiar(servidor, sinais: dict, inicio: float) -> None:
             servidor.should_exit = True
 
 
+LOOPBACK = ("127.0.0.1", "localhost", "::1")
+
+
+def conferir_argumentos(args) -> list[str]:
+    """Combinações que o Pyron recusa ou ajusta. Devolve avisos; erro vira SystemExit (pelo argparse)."""
+    avisos = []
+    if args.modo == "local" and args.host not in LOOPBACK:
+        raise ValueError("No modo local o Pyron só ouve o próprio computador. Para a rede, use --modo servidor (com login).")
+    if args.modo == "local" and (args.proxy or getattr(args, "porta_proxy", 0) or getattr(args, "origem", [])):
+        raise ValueError("--proxy, --porta-proxy e --origem só valem no modo servidor.")
+    if args.modo == "servidor":
+        if args.auto_encerrar:
+            avisos.append("Modo servidor: --auto-encerrar ignorado (o servidor fica no ar até ser parado).")
+            args.auto_encerrar = False
+        if args.janela or not args.sem_navegador:
+            args.janela, args.sem_navegador = False, True  # quem usa abre pelo navegador ou pelo tablet
+    return avisos
+
+
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description="Abre o Pyron.")
     ap.add_argument("--porta", type=int, default=0)
@@ -125,11 +152,32 @@ def main(argv=None) -> None:
     ap.add_argument("--sem-navegador", action="store_true", help="só o servidor (o Pyron.exe abre a janela)")
     ap.add_argument("--auto-encerrar", action="store_true", help="desligar quando a interface for fechada")
     ap.add_argument("--dados", help="outra pasta de dados (demonstração), no lugar de app/dados_app")
+    ap.add_argument("--modo", choices=("local", "servidor"), default=os.environ.get("PYRON_MODO") or "local",
+                    help="local (padrão: só este computador, sem login) ou servidor (vários usuários, com login)")
+    ap.add_argument("--host", default="127.0.0.1", help="onde ouvir (padrão 127.0.0.1; 0.0.0.0 só no modo servidor)")
+    ap.add_argument("--proxy", action="append", default=[],
+                    help="endereço do proxy HTTPS (Caddy) cujos cabeçalhos X-Forwarded-* valem; pode repetir")
+    ap.add_argument("--porta-proxy", type=int, default=int(os.environ.get("PYRON_PORTA_PROXY") or 0),
+                    help="segunda porta, só em 127.0.0.1, para o proxy HTTPS (tailscale serve): tudo que chega por ela é de fora")
+    ap.add_argument("--origem", action="append", default=[],
+                    help="endereço público aceito no cabeçalho Origin (ex.: https://pyron.tail1234.ts.net); pode repetir")
     args = ap.parse_args(argv)
+    try:
+        avisos = conferir_argumentos(args)
+    except ValueError as erro:
+        ap.error(str(erro))
     if args.dados:
         os.environ["PYRON_DADOS"] = str(Path(args.dados).resolve())
+    os.environ["PYRON_MODO"] = args.modo
 
+    from app import acesso
     from app import servidor as srv
+
+    acesso.configurar(args.modo, args.proxy or [p for p in os.environ.get("PYRON_PROXY", "").split(",") if p.strip()],
+                      porta_proxy=args.porta_proxy or None,
+                      origens=args.origem or [o for o in os.environ.get("PYRON_ORIGEM", "").split(",") if o.strip()])
+    if args.modo == "servidor" and (falta := acesso.falta_para_servidor(srv._config()["responsaveis"])):
+        ap.exit(2, falta + "\n")
 
     if args.auto_encerrar:
         # Sem console (pythonw): mensagens e erros vão para um arquivo de registro.
@@ -140,13 +188,24 @@ def main(argv=None) -> None:
 
     import uvicorn
 
-    preparar_perfil_janela(srv.PASTA_DADOS / "janela", srv._config().get("tema", "claro"))
+    if args.modo == "local":
+        preparar_perfil_janela(srv.PASTA_DADOS / "janela", srv._config().get("tema", "claro"))
     porta = args.porta or porta_livre()
     url = f"http://127.0.0.1:{porta}"
-    print("Pyron", srv.VERSAO)
-    print(f"Endereço: {url}. Para encerrar, feche a janela do aplicativo{'' if args.auto_encerrar else ' e este console'}.")
+    print("Pyron", srv.VERSAO, "· modo servidor" if args.modo == "servidor" else "")
+    for aviso in avisos:
+        print(aviso)
+    if args.modo == "servidor":
+        print(f"Ouvindo em {args.host}:{porta}. Proxy confiável: {', '.join(sorted(acesso._estado['proxies'])) or 'nenhum'}."
+              + (f" Porta do proxy: 127.0.0.1:{args.porta_proxy}." if args.porta_proxy else "")
+              + " Para encerrar, Ctrl+C ou pare o serviço.")
+    else:
+        print(f"Endereço: {url}. Para encerrar, feche a janela do aplicativo{'' if args.auto_encerrar else ' e este console'}.")
 
-    config = uvicorn.Config(srv.app, host="127.0.0.1", port=porta, log_level="warning", log_config=None if args.auto_encerrar else uvicorn.config.LOGGING_CONFIG)
+    # No modo servidor, os cabeçalhos do proxy são lidos por app.acesso (só do --proxy): o uvicorn não os aplica.
+    config = uvicorn.Config(srv.app, host=args.host, port=porta, log_level="warning",
+                            log_config=None if args.auto_encerrar else uvicorn.config.LOGGING_CONFIG,
+                            proxy_headers=args.modo == "local")
     servidor = uvicorn.Server(config)
     if args.auto_encerrar:
         threading.Thread(target=vigiar, args=(servidor, srv.sinais, time.time()), daemon=True).start()
@@ -165,7 +224,16 @@ def main(argv=None) -> None:
 
         threading.Thread(target=abrir_quando_pronto, daemon=True).start()
 
-    servidor.run()
+    if args.porta_proxy:
+        # duas portas no mesmo processo: a principal e a do proxy (só no próprio computador)
+        soquetes = []
+        for endereco in ((args.host, porta), ("127.0.0.1", args.porta_proxy)):
+            s = socket.socket(socket.AF_INET6 if ":" in endereco[0] else socket.AF_INET, socket.SOCK_STREAM)
+            s.bind(endereco)
+            soquetes.append(s)
+        servidor.run(sockets=soquetes)
+    else:
+        servidor.run()
     print(f"--- {time.strftime('%Y-%m-%d %H:%M:%S')} fim")
 
 

@@ -1,7 +1,8 @@
 // Casca da interface nova: navegação, roteamento, atalhos, busca, importação por arrastar, conexão e tema.
 import { TEXTOS as T } from "../textos.js";
-import { $, $$, el, icone, api, json, conexao, definirVersaoServidor, VERSAO_INTERFACE } from "./base.js";
-import { esqueleto, estadoVazio, estadoErro, estadoSemConexao, avisar, dialogo, podeSair } from "./componentes.js";
+import { $, $$, el, icone, api, json, conexao, definirVersaoServidor, VERSAO_INTERFACE, acesso, definirAcesso, pode, modoServidor, sessao, lerPreferencia, guardarPreferencia } from "./base.js";
+import { versaoMudou } from "./aplicativo.js";
+import { esqueleto, estadoVazio, estadoErro, estadoSemConexao, avisar, dialogo, podeSair, botao, campo, menu, ocupado } from "./componentes.js";
 import { instalarIcones } from "./icones.js";
 import { ilustracao } from "./ilustracoes.js";
 import { ROTAS, lerRota, endereco } from "./rotas.js";
@@ -15,6 +16,7 @@ let limpar = null;        // limpeza devolvida pela tela atual (intervalos, even
 let primeira = true;
 
 async function mostrarRota() {
+  if (document.documentElement.classList.contains("sem-sessao")) return; // a tela de entrada fica até entrar
   const rota = lerRota();
   const minha = ++geracao;
   const conteudo = $("#conteudo");
@@ -34,6 +36,13 @@ async function mostrarRota() {
   const def = ROTAS[rota.tela];
   const modulo = rota.partes.length && def.detalhe ? def.detalhe : def.modulo;
   document.title = T.casca.titulo(def.titulo);
+  if (def.exige && !pode(def.exige)) { // o servidor recusaria tudo da tela: diz logo por quê
+    conteudo.replaceChildren(el("div", { class: "pagina entra" }, estadoVazio({
+      icone: "config", titulo: T.conta.soAdministrador, texto: T.conta.soAdministradorTexto, nivel: 1,
+      acoes: [el("a", { class: "btn primario", href: endereco("painel") }, T.telas.painel)],
+    })));
+    return;
+  }
   conteudo.replaceChildren(el("div", { class: "pagina" }, esqueleto[(!rota.partes.length && def.esqueleto) || "pagina"]()));
   try {
     const tela = await import(`./telas/${modulo}.js`);
@@ -76,6 +85,7 @@ function abrirAtalhos() {
 async function alternarTema() {
   const novo = document.documentElement.dataset.tema === "escuro" ? "claro" : "escuro";
   aplicarTema(novo);
+  if (!pode("administracao")) return; // no servidor, o tema guardado é da equipe: quem não administra troca só nesta tela
   try { await api("/api/configuracoes", json("PUT", { tema: novo })); } catch (erro) { avisar(erro.message, { erro: true }); }
 }
 
@@ -152,6 +162,7 @@ function ligarConexao() {
     if (faixa.hidden) return;
     faixa.hidden = true;
     clearInterval(relogio);
+    if (!acessoConhecido) { location.reload(); return; } // abriu sem servidor: agora sim, entrada e perfil de verdade
     // O servidor pode ter voltado em outra versão (reaberto pelo Pyron.exe): aí recarrega tudo.
     try {
       const s = await api("/api/status");
@@ -164,6 +175,79 @@ function ligarConexao() {
     ev.currentTarget.setAttribute("aria-busy", "true");
     testar().finally(() => $("#btn-reconectar").removeAttribute("aria-busy"));
   });
+}
+
+// ---------------------------------------------------------------- acesso (modo servidor; app/acesso.py)
+let acessoConhecido = false; // /api/acesso/eu respondeu nesta abertura da tela
+let telaEntrada = null; // a promessa da entrada em andamento (não abre duas)
+
+/** Mostra a tela de entrada no lugar do conteúdo e espera entrar. ``aviso``: por que pediu de novo. */
+function pedirEntrada(aviso = null) {
+  if (telaEntrada) return telaEntrada;
+  document.documentElement.classList.add("sem-sessao");
+  limpar?.();
+  limpar = null;
+  geracao++;
+  for (const m of $$(".menu:popover-open")) m.hidePopover();
+  telaEntrada = import("./telas/entrar.js").then((tela) => new Promise((resolver) => {
+    const pagina = el("div", { class: "pagina entra" });
+    tela.montar(pagina, { aviso, aoEntrar: (eu) => {
+      document.documentElement.classList.remove("sem-sessao");
+      definirAcesso(eu);
+      aplicarPerfil();
+      telaEntrada = null;
+      resolver(eu);
+    } });
+    document.title = T.casca.titulo(T.entrar.titulo);
+    $("#conteudo").replaceChildren(pagina);
+  }));
+  return telaEntrada;
+}
+
+let menuConta = null;
+/** Topo conforme o perfil: Configurações só para quem administra; no servidor, nome, perfil e o menu da conta. */
+function aplicarPerfil() {
+  $('.topo-dir [data-rota="configuracoes"]').hidden = !pode("administracao");
+  $("#btn-conta")?.remove();
+  menuConta?.remove();
+  menuConta = null;
+  const u = acesso.usuario;
+  if (!modoServidor() || !u) return;
+  const C = T.conta;
+  const papel = [C.perfis[u.perfil] || u.perfil, u.administrador ? C.administrador : null].filter(Boolean).join(" · ");
+  const conta = el("button", { type: "button", class: "btn fantasma conta", id: "btn-conta", title: `${u.nome} · ${papel}` },
+    icone("usuario"), el("span", { class: "conta-texto" }, el("span", { class: "conta-nome" }, u.nome), el("span", { class: "conta-papel" }, papel)));
+  $(".topo-dir").append(conta);
+  menuConta = menu(conta, [
+    { texto: C.trocarSenha, icone: "chave", executar: trocarSenha },
+    { separador: true },
+    { texto: C.sair, icone: "sair", executar: sair },
+  ]);
+}
+
+async function sair() {
+  try { await api("/api/acesso/sair", json("POST", {})); } catch { /* sem servidor: a sessão vence sozinha */ }
+  location.reload();
+}
+
+function trocarSenha() {
+  const C = T.conta;
+  const atual = campo({ rotulo: C.senhaAtual, tipo: "password", autocomplete: "current-password", maxlength: "200" });
+  const nova = campo({ rotulo: C.senhaNova, tipo: "password", autocomplete: "new-password", maxlength: "200", ajuda: C.senhaAjuda });
+  const repetir = campo({ rotulo: C.senhaRepetir, tipo: "password", autocomplete: "new-password", maxlength: "200" });
+  const erro = el("p", { class: "erro-dialogo", role: "alert", hidden: true });
+  const valor = (c) => c.querySelector("input").value;
+  const salvar = botao({ texto: T.geral.salvar, variante: "primario", onclick: () => ocupado(salvar, async () => {
+    erro.hidden = true;
+    if (valor(nova) !== valor(repetir)) { erro.textContent = C.senhasDiferentes; erro.hidden = false; return; }
+    try {
+      await api("/api/acesso/senha", json("POST", { atual: valor(atual), nova: valor(nova) }));
+    } catch (e) { erro.textContent = e.message; erro.hidden = false; return; }
+    dlg.fechar();
+    avisar(C.senhaTrocada);
+  }) });
+  const dlg = dialogo({ titulo: C.trocarSenha, corpo: [atual, nova, repetir, erro], acoes: [botao({ texto: T.geral.cancelar, onclick: () => dlg.fechar() }), salvar] }).abrir();
+  atual.querySelector("input").focus();
 }
 
 /** Cada janela avisa o servidor que está aberta (o lançador encerra o servidor quando não sobra nenhuma). */
@@ -193,6 +277,7 @@ async function atualizarContadores() {
   try {
     const [status, pendencias] = await Promise.all([api("/api/status"), api("/api/pendencias")]);
     definirVersaoServidor(status.versao);
+    versaoMudou(status.versao);
     const alertas = status.alertas_pendentes || 0;
     const vencidas = pendencias.filter((p) => p.vencida).length;
     mostrarContador($("#contador-pendencias"), vencidas, T.casca.vencidas(vencidas));
@@ -249,11 +334,32 @@ escuroDoSistema.addEventListener("change", () => { if (document.documentElement.
 async function iniciar() {
   instalarIcones();
   ligarJanela();
-  for (const a of $$("#nav a")) a.dataset.nome = a.textContent.trim();
+  for (const a of $$("#nav a")) {
+    a.dataset.nome = a.textContent.trim();
+    // tablet em retrato: só o ícone da seção aparece (o nome fica para o leitor de tela e para a dica)
+    const nome = [...a.childNodes].find((n) => n.nodeType === Node.TEXT_NODE && n.textContent.trim());
+    if (nome) nome.replaceWith(el("span", { class: "nome-nav" }, nome.textContent));
+    a.prepend(icone(ROTAS[a.dataset.rota]?.icone || "painel", "ic ic-nav"));
+  }
   ligarAtalhos();
   ligarSoltar();
   ligarConexao();
-  ligarSinal();
+  // Quem está usando: no modo local não há login; no servidor, a tela de entrada vem antes de tudo.
+  let eu = null;
+  try {
+    eu = await api("/api/acesso/eu");
+    acessoConhecido = true;
+    guardarPreferencia("modo", eu.modo);
+  } catch { /* sem servidor: a faixa de conexão avisa; o tablet abre a casca guardada */ }
+  // Sem resposta, vale o último modo visto neste aparelho só para os textos (nenhuma permissão no servidor);
+  // quando a conexão voltar, a tela recarrega e pede a entrada se precisar.
+  definirAcesso(eu || (lerPreferencia("modo", "local") === "servidor" ? { modo: "servidor", usuario: null, permissoes: [] } : null));
+  if (modoServidor()) $("#faixa-conexao span").replaceChildren(el("b", {}, T.casca.offline), " ", T.casca.offlineDicaServidor);
+  if (modoServidor()) import("./aplicativo.js").then((m) => m.ligarAplicativo()); // instalável no tablet (PWA)
+  if (modoServidor() && !acesso.usuario && acessoConhecido) await pedirEntrada();
+  aplicarPerfil();
+  sessao.addEventListener("expirou", async () => { await pedirEntrada(T.entrar.expirou); mostrarRota(); atualizarContadores(); });
+  if (!modoServidor()) ligarSinal(); // o servidor da equipe não se desliga quando uma janela fecha
   // alteração sem salvar (critério, componentes): ficar devolve o endereço anterior sem remontar a tela
   addEventListener("hashchange", async (ev) => { if (await podeSair()) mostrarRota(); else history.replaceState(null, "", ev.oldURL); });
   if (PARAMS.get("tema")) aplicarTema(PARAMS.get("tema"));

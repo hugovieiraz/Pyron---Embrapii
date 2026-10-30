@@ -2,7 +2,7 @@
 // filtro, busca tolerante a acentos, ordenação pelo cabeçalho, seleção múltipla com barra de ações e o
 // progresso da importação num lugar fixo. Filtros ficam no endereço (#inspecoes?sev=criticas&q=tr-01).
 import { TEXTOS as T } from "../../textos.js";
-import { el, icone, api, json, dataHora, temperatura, normalizar, animarEntrada } from "../base.js";
+import { el, icone, api, json, dataHora, temperatura, normalizar, animarEntrada, pode } from "../base.js";
 import { botao, campo, campoBusca, segmentado, tabela, selo, estadoVazio, avisar, dialogo, confirmar, menu, ocupado } from "../componentes.js";
 import { endereco } from "../rotas.js";
 import { escolherArquivos, importarDemonstracao, importacao, estadoImportacao, mostrarProgressoNaTela } from "../importar.js";
@@ -199,9 +199,9 @@ export async function montar(pagina, rota) {
     if (semTemperatura) { laudo.setAttribute("aria-disabled", "true"); laudo.title = N.laudoSemTemperatura(semTemperatura); }
     barraSelecao.replaceChildren(
       el("span", { class: "qtd-selecao", role: "status" }, N.selecionadas(n)),
-      laudo,
-      botao({ texto: N.definirEquipamento, icone: "equipamentos", onclick: () => definirEquipamento(itens) }),
-      botao({ texto: N.apagar, icone: "lixo", variante: "fantasma", onclick: () => apagar(itens) }),
+      pode("laudo") ? laudo : null,
+      pode("revisao") ? botao({ texto: N.definirEquipamento, icone: "equipamentos", onclick: () => definirEquipamento(itens) }) : null,
+      pode("revisao") ? botao({ texto: N.apagar, icone: "lixo", variante: "fantasma", onclick: () => apagar(itens) }) : null,
       el("span", { class: "divisor", role: "separator", "aria-orientation": "vertical" }),
       botao({ texto: N.limparSelecao, icone: "x", variante: "fantasma", soIcone: true, atalho: "Esc", onclick: limparSelecao }),
     );
@@ -263,11 +263,11 @@ export async function montar(pagina, rota) {
     const sem = severidade(it) === "sem_medida";
     menu(ev.currentTarget.querySelector("a.forte") || corpo, [
       { texto: N.abrir, icone: "inspecoes", executar: () => { location.hash = endereco("inspecoes", [it.id]); } },
-      { texto: sem ? `${N.gerarLaudo}: ${T.analise.laudoSemTemperatura}` : N.gerarLaudo, icone: "laudo", desabilitado: sem, executar: () => gerarLaudo([it.id]) },
-      { texto: N.definirEquipamento, icone: "equipamentos", executar: () => definirEquipamento([it]) },
+      pode("laudo") ? { texto: sem ? `${N.gerarLaudo}: ${T.analise.laudoSemTemperatura}` : N.gerarLaudo, icone: "laudo", desabilitado: sem, executar: () => gerarLaudo([it.id]) } : null,
+      pode("revisao") ? { texto: N.definirEquipamento, icone: "equipamentos", executar: () => definirEquipamento([it]) } : null,
       it.equipamento_chave && it.equipamento_chave !== SEM_EQUIPAMENTO ? { texto: N.verEquipamento, icone: "equipamentos", executar: () => { location.hash = endereco("equipamentos", [it.equipamento_chave]); } } : null,
-      { separador: true },
-      { texto: N.apagar, icone: "lixo", perigo: true, executar: () => apagar([it]) },
+      pode("revisao") ? { separador: true } : null,
+      pode("revisao") ? { texto: N.apagar, icone: "lixo", perigo: true, executar: () => apagar([it]) } : null,
     ].filter(Boolean), { em: { x: ev.clientX, y: ev.clientY }, descartar: true });
   }
 
