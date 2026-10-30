@@ -1,0 +1,48 @@
+{
+ "quando": "2026-10-30T18:32:30",
+ "maquina": {
+  "sistema": "Windows-11-10.0.26200-SP0",
+  "processador": "Intel64 Family 6 Model 165 Stepping 2, GenuineIntel",
+  "python": "3.12.10",
+  "onnxruntime": "1.24.4",
+  "provedores": [
+   "TensorrtExecutionProvider",
+   "CUDAExecutionProvider",
+   "CPUExecutionProvider"
+  ],
+  "placa": "NVIDIA GeForce GTX 1650, 621.01, 4096 MiB"
+ },
+ "modelo": "D:\\hd_central\\pyron-f4\\teste-rfdetr-nano-coco",
+ "imagens": 37,
+ "cache_trt": "D:\\hd_central\\pyron-f4\\cache_trt",
+ "configuracoes": {
+  "cpu": {
+   "montagem_s": 0.51,
+   "p50_ms": 184.91,
+   "p95_ms": 243.7,
+   "imagens_por_s": 5.13,
+   "n": 111
+  },
+  "cuda": {
+   "montagem_s": 1.07,
+   "p50_ms": 40.26,
+   "p95_ms": 45.93,
+   "imagens_por_s": 24.14,
+   "n": 111
+  },
+  "tensorrt-fp32": {
+   "montagem_s": 22.95,
+   "p50_ms": 29.79,
+   "p95_ms": 38.31,
+   "imagens_por_s": 32.0,
+   "n": 111
+  },
+  "tensorrt-fp16": {
+   "montagem_s": 93.75,
+   "p50_ms": 28.0,
+   "p95_ms": 32.44,
+   "imagens_por_s": 34.79,
+   "n": 111
+  }
+ }
+}

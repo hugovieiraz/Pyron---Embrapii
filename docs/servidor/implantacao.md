@@ -90,6 +90,22 @@ pyron.interno {
 O Caddy já envia `X-Forwarded-For`, `X-Forwarded-Proto` e `X-Forwarded-Host`; não é preciso configurar nada
 além do `reverse_proxy`.
 
+## 3b. Placa NVIDIA (TensorRT)
+
+Num servidor com placa NVIDIA, use o ambiente separado `.venv-gpu` (`requirements-servidor-gpu.txt`): ONNX Runtime
+com CUDA e TensorRT 10, sem instalar o CUDA no sistema. Na primeira subida, o TensorRT monta o motor do modelo
+(de 20 s a alguns minutos, conforme a placa) em outro processo e guarda no cache; nas seguintes, leva 1 a 2 s.
+Enquanto monta, Modelos mostra "Preparando a placa…" e as análises seguem no processador.
+
+| Variável | Para quê |
+|---|---|
+| `PYRON_ACELERADOR` | `auto` (padrão: TensorRT > CUDA > DirectML > CPU), `tensorrt`, `cuda`, `directml` ou `cpu` |
+| `PYRON_TRT_FP16` | `1` liga o FP16 (padrão FP32; ver `docs/v09/4-tensorrt.md`) |
+| `PYRON_CACHE_TRT` | pasta do cache do motor (padrão `<dados>/cache_trt`; no Windows, caminho curto) |
+
+Medir na placa do servidor: `python -m nucleo.detectores.benchmark --modelo modelos/<id> --paridade`, depois sem
+`--paridade` para o tempo.
+
 ## 4. Deixar rodando como serviço
 
 ### Windows (Agendador de Tarefas, sem programa extra)

@@ -5,7 +5,7 @@
 #   python -m venv .venv-gpu
 #   .venv-gpu\Scripts\python -m pip install -r requirements-servidor-gpu.txt
 #   .venv-gpu\Scripts\python -m pip install --no-deps rapidocr-onnxruntime==1.4.4   (sem --no-deps ele traz o
-#       onnxruntime comum, só CPU, que sobrescreve o onnxruntime-gpu)
+#       onnxruntime comum, só CPU, que sobrescreve o onnxruntime-gpu; o pip avisa que falta "onnxruntime": é esperado)
 #
 # Conferido em 30/10/2026 numa GTX 1650 (Windows 11, driver 621.01): docs/v09/4-tensorrt.md.
 # Licenças: ONNX Runtime MIT; CUDA, cuDNN e TensorRT pela licença da NVIDIA (aprovadas pelo usuário em 30/10/2026).
@@ -22,6 +22,12 @@ scipy==1.18.1
 opencv-python==5.0.0.93
 reportlab==5.0.1
 typst==0.15.0                       # laudo em Typst (F3), Apache 2.0
+# dependências do rapidocr-onnxruntime (instalado à parte, com --no-deps)
+pyclipper==1.4.0
+PyYAML==6.0.3
+shapely==2.1.2
+six==1.17.0
+tqdm==4.70.1
 
 # ---------------------------------------------------------------- placa NVIDIA
 onnxruntime-gpu[cuda,cudnn]==1.24.4  # traz CUDA 12 e cuDNN 9 em pacotes nvidia-* (sem instalar o CUDA no sistema)

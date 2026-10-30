@@ -1,0 +1,409 @@
+{
+ "quando": "2026-10-30T18:32:02",
+ "maquina": {
+  "sistema": "Windows-11-10.0.26200-SP0",
+  "processador": "Intel64 Family 6 Model 165 Stepping 2, GenuineIntel",
+  "python": "3.12.10",
+  "onnxruntime": "1.24.4",
+  "provedores": [
+   "DmlExecutionProvider",
+   "CPUExecutionProvider"
+  ],
+  "placa": "NVIDIA GeForce GTX 1650, 621.01, 4096 MiB"
+ },
+ "modelo": "D:\\hd_central\\pyron-f4\\teste-rfdetr-nano-coco",
+ "imagens": 37,
+ "cache_trt": "D:\\hd_central\\Antigravity projetos\\brain\\Obisidian_G\\04 - Machine Learning\\Projetos\\Pyron---Embrapii\\app\\dados_app\\cache_trt",
+ "configuracoes": {
+  "cpu": {
+   "montagem_s": 0.59
+  },
+  "directml": {
+   "montagem_s": 4.21,
+   "paridade": {
+    "resumo": {
+     "imagens": 37,
+     "deteccoes_ref": 19,
+     "classes_iguais": 37,
+     "iou_min": 0.9999982083797662,
+     "dnota_max": 0.0,
+     "caixas_iguais": 19,
+     "tmax_iguais": 19,
+     "passa": true
+    },
+    "por_imagem": [
+     {
+      "imagem": "dados_app/115dfd11",
+      "n_ref": 1,
+      "n_outro": 1,
+      "mesmas_classes": true,
+      "iou_min": 0.9999998800629141,
+      "dnota_max": 0.0,
+      "caixas_iguais": 1,
+      "tmax_iguais": 1
+     },
+     {
+      "imagem": "dados_app/1a345c51",
+      "n_ref": 0,
+      "n_outro": 0,
+      "mesmas_classes": true,
+      "iou_min": 1.0,
+      "dnota_max": 0.0,
+      "caixas_iguais": 0,
+      "tmax_iguais": 0
+     },
+     {
+      "imagem": "dados_app/1cf4e953",
+      "n_ref": 1,
+      "n_outro": 1,
+      "mesmas_classes": true,
+      "iou_min": 0.9999995916518947,
+      "dnota_max": 0.0,
+      "caixas_iguais": 1,
+      "tmax_iguais": 1
+     },
+     {
+      "imagem": "dados_app/2227a28d",
+      "n_ref": 1,
+      "n_outro": 1,
+      "mesmas_classes": true,
+      "iou_min": 0.9999995916518947,
+      "dnota_max": 0.0,
+      "caixas_iguais": 1,
+      "tmax_iguais": 1
+     },
+     {
+      "imagem": "dados_app/279a7ffd",
+      "n_ref": 0,
+      "n_outro": 0,
+      "mesmas_classes": true,
+      "iou_min": 1.0,
+      "dnota_max": 0.0,
+      "caixas_iguais": 0,
+      "tmax_iguais": 0
+     },
+     {
+      "imagem": "dados_app/29eed487",
+      "n_ref": 0,
+      "n_outro": 0,
+      "mesmas_classes": true,
+      "iou_min": 1.0,
+      "dnota_max": 0.0,
+      "caixas_iguais": 0,
+      "tmax_iguais": 0
+     },
+     {
+      "imagem": "dados_app/2eaf0dca",
+      "n_ref": 0,
+      "n_outro": 0,
+      "mesmas_classes": true,
+      "iou_min": 1.0,
+      "dnota_max": 0.0,
+      "caixas_iguais": 0,
+      "tmax_iguais": 0
+     },
+     {
+      "imagem": "dados_app/399ed6b8",
+      "n_ref": 1,
+      "n_outro": 1,
+      "mesmas_classes": true,
+      "iou_min": 0.9999999396011131,
+      "dnota_max": 0.0,
+      "caixas_iguais": 1,
+      "tmax_iguais": 1
+     },
+     {
+      "imagem": "dados_app/3f1ecce9",
+      "n_ref": 0,
+      "n_outro": 0,
+      "mesmas_classes": true,
+      "iou_min": 1.0,
+      "dnota_max": 0.0,
+      "caixas_iguais": 0,
+      "tmax_iguais": 0
+     },
+     {
+      "imagem": "dados_app/45604052",
+      "n_ref": 1,
+      "n_outro": 1,
+      "mesmas_classes": true,
+      "iou_min": 0.9999995916518947,
+      "dnota_max": 0.0,
+      "caixas_iguais": 1,
+      "tmax_iguais": 1
+     },
+     {
+      "imagem": "dados_app/55d31eba",
+      "n_ref": 0,
+      "n_outro": 0,
+      "mesmas_classes": true,
+      "iou_min": 1.0,
+      "dnota_max": 0.0,
+      "caixas_iguais": 0,
+      "tmax_iguais": 0
+     },
+     {
+      "imagem": "dados_app/5678684b",
+      "n_ref": 0,
+      "n_outro": 0,
+      "mesmas_classes": true,
+      "iou_min": 1.0,
+      "dnota_max": 0.0,
+      "caixas_iguais": 0,
+      "tmax_iguais": 0
+     },
+     {
+      "imagem": "dados_app/60a339ef",
+      "n_ref": 1,
+      "n_outro": 1,
+      "mesmas_classes": true,
+      "iou_min": 0.9999995916518947,
+      "dnota_max": 0.0,
+      "caixas_iguais": 1,
+      "tmax_iguais": 1
+     },
+     {
+      "imagem": "dados_app/630f17e0",
+      "n_ref": 0,
+      "n_outro": 0,
+      "mesmas_classes": true,
+      "iou_min": 1.0,
+      "dnota_max": 0.0,
+      "caixas_iguais": 0,
+      "tmax_iguais": 0
+     },
+     {
+      "imagem": "dados_app/6454494b",
+      "n_ref": 1,
+      "n_outro": 1,
+      "mesmas_classes": true,
+      "iou_min": 0.9999995916518947,
+      "dnota_max": 0.0,
+      "caixas_iguais": 1,
+      "tmax_iguais": 1
+     },
+     {
+      "imagem": "dados_app/64e8920d",
+      "n_ref": 1,
+      "n_outro": 1,
+      "mesmas_classes": true,
+      "iou_min": 0.9999995916518947,
+      "dnota_max": 0.0,
+      "caixas_iguais": 1,
+      "tmax_iguais": 1
+     },
+     {
+      "imagem": "dados_app/7500befc",
+      "n_ref": 0,
+      "n_outro": 0,
+      "mesmas_classes": true,
+      "iou_min": 1.0,
+      "dnota_max": 0.0,
+      "caixas_iguais": 0,
+      "tmax_iguais": 0
+     },
+     {
+      "imagem": "dados_app/80eb496a",
+      "n_ref": 0,
+      "n_outro": 0,
+      "mesmas_classes": true,
+      "iou_min": 1.0,
+      "dnota_max": 0.0,
+      "caixas_iguais": 0,
+      "tmax_iguais": 0
+     },
+     {
+      "imagem": "dados_app/8294ef55",
+      "n_ref": 0,
+      "n_outro": 0,
+      "mesmas_classes": true,
+      "iou_min": 1.0,
+      "dnota_max": 0.0,
+      "caixas_iguais": 0,
+      "tmax_iguais": 0
+     },
+     {
+      "imagem": "dados_app/864815c7",
+      "n_ref": 0,
+      "n_outro": 0,
+      "mesmas_classes": true,
+      "iou_min": 1.0,
+      "dnota_max": 0.0,
+      "caixas_iguais": 0,
+      "tmax_iguais": 0
+     },
+     {
+      "imagem": "dados_app/8846972f",
+      "n_ref": 1,
+      "n_outro": 1,
+      "mesmas_classes": true,
+      "iou_min": 0.9999995916518947,
+      "dnota_max": 0.0,
+      "caixas_iguais": 1,
+      "tmax_iguais": 1
+     },
+     {
+      "imagem": "dados_app/8f89d722",
+      "n_ref": 1,
+      "n_outro": 1,
+      "mesmas_classes": true,
+      "iou_min": 0.9999985678617025,
+      "dnota_max": 0.0,
+      "caixas_iguais": 1,
+      "tmax_iguais": 1
+     },
+     {
+      "imagem": "dados_app/91f3bb17",
+      "n_ref": 1,
+      "n_outro": 1,
+      "mesmas_classes": true,
+      "iou_min": 0.9999994247845954,
+      "dnota_max": 0.0,
+      "caixas_iguais": 1,
+      "tmax_iguais": 1
+     },
+     {
+      "imagem": "dados_app/9e1cdfa2",
+      "n_ref": 0,
+      "n_outro": 0,
+      "mesmas_classes": true,
+      "iou_min": 1.0,
+      "dnota_max": 0.0,
+      "caixas_iguais": 0,
+      "tmax_iguais": 0
+     },
+     {
+      "imagem": "dados_app/a1b64d64",
+      "n_ref": 1,
+      "n_outro": 1,
+      "mesmas_classes": true,
+      "iou_min": 0.9999995916518947,
+      "dnota_max": 0.0,
+      "caixas_iguais": 1,
+      "tmax_iguais": 1
+     },
+     {
+      "imagem": "dados_app/a5b0929c",
+      "n_ref": 0,
+      "n_outro": 0,
+      "mesmas_classes": true,
+      "iou_min": 1.0,
+      "dnota_max": 0.0,
+      "caixas_iguais": 0,
+      "tmax_iguais": 0
+     },
+     {
+      "imagem": "dados_app/aae3ceba",
+      "n_ref": 1,
+      "n_outro": 1,
+      "mesmas_classes": true,
+      "iou_min": 0.9999995916518947,
+      "dnota_max": 0.0,
+      "caixas_iguais": 1,
+      "tmax_iguais": 1
+     },
+     {
+      "imagem": "dados_app/b6acfdab",
+      "n_ref": 0,
+      "n_outro": 0,
+      "mesmas_classes": true,
+      "iou_min": 1.0,
+      "dnota_max": 0.0,
+      "caixas_iguais": 0,
+      "tmax_iguais": 0
+     },
+     {
+      "imagem": "dados_app/bcf0e28e",
+      "n_ref": 1,
+      "n_outro": 1,
+      "mesmas_classes": true,
+      "iou_min": 0.9999994368839863,
+      "dnota_max": 0.0,
+      "caixas_iguais": 1,
+      "tmax_iguais": 1
+     },
+     {
+      "imagem": "dados_app/beb1e30e",
+      "n_ref": 0,
+      "n_outro": 0,
+      "mesmas_classes": true,
+      "iou_min": 1.0,
+      "dnota_max": 0.0,
+      "caixas_iguais": 0,
+      "tmax_iguais": 0
+     },
+     {
+      "imagem": "dados_app/c19e73e1",
+      "n_ref": 2,
+      "n_outro": 2,
+      "mesmas_classes": true,
+      "iou_min": 0.9999982083797662,
+      "dnota_max": 0.0,
+      "caixas_iguais": 2,
+      "tmax_iguais": 2
+     },
+     {
+      "imagem": "dados_app/db4e8816",
+      "n_ref": 1,
+      "n_outro": 1,
+      "mesmas_classes": true,
+      "iou_min": 0.9999994368839863,
+      "dnota_max": 0.0,
+      "caixas_iguais": 1,
+      "tmax_iguais": 1
+     },
+     {
+      "imagem": "dados_app/e2a6f27f",
+      "n_ref": 0,
+      "n_outro": 0,
+      "mesmas_classes": true,
+      "iou_min": 1.0,
+      "dnota_max": 0.0,
+      "caixas_iguais": 0,
+      "tmax_iguais": 0
+     },
+     {
+      "imagem": "dados_app/f0c49de8",
+      "n_ref": 1,
+      "n_outro": 1,
+      "mesmas_classes": true,
+      "iou_min": 0.9999994247845954,
+      "dnota_max": 0.0,
+      "caixas_iguais": 1,
+      "tmax_iguais": 1
+     },
+     {
+      "imagem": "dados_app/f0d36a27",
+      "n_ref": 0,
+      "n_outro": 0,
+      "mesmas_classes": true,
+      "iou_min": 1.0,
+      "dnota_max": 0.0,
+      "caixas_iguais": 0,
+      "tmax_iguais": 0
+     },
+     {
+      "imagem": "dados_app/f5710af3",
+      "n_ref": 1,
+      "n_outro": 1,
+      "mesmas_classes": true,
+      "iou_min": 0.9999995916518947,
+      "dnota_max": 0.0,
+      "caixas_iguais": 1,
+      "tmax_iguais": 1
+     },
+     {
+      "imagem": "dados_app/f57b0fea",
+      "n_ref": 0,
+      "n_outro": 0,
+      "mesmas_classes": true,
+      "iou_min": 1.0,
+      "dnota_max": 0.0,
+      "caixas_iguais": 0,
+      "tmax_iguais": 0
+     }
+    ]
+   }
+  }
+ }
+}

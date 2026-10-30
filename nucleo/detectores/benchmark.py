@@ -44,16 +44,24 @@ CONFIGURACOES = {
 }
 
 
+PULADAS: list[str] = []  # imagens gravadas que não abrem (arquivos de teste vazios, cortados): ficam de fora e são contadas
+
+
 def conjunto(pastas: list[Path], limite: int | None = None) -> list[tuple[str, np.ndarray, np.ndarray]]:
     """(nome, temperatura, imagem RGB) de cada inspeção gravada nas pastas de dados (só leitura)."""
     saida = []
+    PULADAS.clear()
     for pasta in pastas:
         for npy in sorted((pasta / "matrizes").glob("*.npy")):
             jpg = pasta / "imagens" / f"{npy.stem}.jpg"
             if not jpg.exists():
                 continue
-            with Image.open(jpg) as im:
-                rgb = np.asarray(im.convert("RGB"))
+            try:
+                with Image.open(jpg) as im:
+                    rgb = np.asarray(im.convert("RGB"))
+            except OSError:
+                PULADAS.append(f"{pasta.name}/{jpg.name}")
+                continue
             saida.append((f"{pasta.name}/{npy.stem[:8]}", np.load(npy, allow_pickle=False).astype(np.float32), rgb))
     return saida[:limite] if limite else saida
 
@@ -103,7 +111,20 @@ def _pixels(caixa) -> tuple[int, int, int, int]:
 def tmax(t: np.ndarray, caixa) -> float | None:
     x0, y0, x1, y1 = _pixels(caixa)
     recorte = t[max(0, y0):max(0, y1), max(0, x0):max(0, x1)]
-    return float(np.nanmax(recorte)) if recorte.size else None
+    if not recorte.size:
+        return None
+    with np.errstate(all="ignore"):
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)  # região toda sem temperatura: NaN, sem aviso
+            return float(np.nanmax(recorte))
+
+
+def _mesmo_valor(a, b) -> bool:
+    """Igualdade que conta "sem temperatura" (None ou NaN, imagem sem matriz) dos dois lados como igual."""
+    sem = lambda v: v is None or (isinstance(v, float) and np.isnan(v))  # noqa: E731
+    return (sem(a) and sem(b)) or a == b
 
 
 def comparar(ref: list, outro: list, t: np.ndarray) -> dict:
@@ -120,7 +141,7 @@ def comparar(ref: list, outro: list, t: np.ndarray) -> dict:
         notas.append(abs(d.confianca - melhor.confianca))
         if _pixels(d.caixa) == _pixels(melhor.caixa):
             caixas_iguais += 1
-            tmax_iguais += int(tmax(t, d.caixa) == tmax(t, melhor.caixa))
+            tmax_iguais += int(_mesmo_valor(tmax(t, d.caixa), tmax(t, melhor.caixa)))
     mesmas = sorted(d.classe for d in ref) == sorted(o.classe for o in outro)
     return {"n_ref": len(ref), "n_outro": len(outro), "mesmas_classes": mesmas,
             "iou_min": min(ious) if ious else 1.0, "dnota_max": max(notas) if notas else 0.0,
@@ -143,6 +164,42 @@ def paridade(ref_det, det, imagens) -> dict:
     resumo["passa"] = (resumo["classes_iguais"] == resumo["imagens"] and resumo["iou_min"] >= IOU_MINIMO
                        and resumo["dnota_max"] <= NOTA_MAXIMA and resumo["tmax_iguais"] == resumo["caixas_iguais"])
     return {"resumo": resumo, "por_imagem": por_imagem}
+
+
+def sobrecarga(pasta_modelo: Path, configuracao: str, n: int = 50) -> dict:
+    """Quanto de cada execução é do ONNX Runtime e não da rede, pelo perfil do próprio ONNX Runtime: tempo de cada
+    ``model_run`` contra a soma dos kernels dentro dele (no TensorRT, o motor inteiro é um kernel só). É o número
+    que decide se vale escrever C++ à mão com o TensorRT direto (só acima de 15%)."""
+    import tempfile
+
+    import onnxruntime as ort
+
+    acelerador, meia = CONFIGURACOES[configuracao]
+    base = DetectorONNX(pasta_modelo)
+    if acelerador in ("tensorrt", "cuda"):
+        provedores.preparar_bibliotecas()
+    leitura = ort.InferenceSession(str(base.arquivo), providers=["CPUExecutionProvider"])
+    entrada = leitura.get_inputs()[0]
+    del leitura
+    with tempfile.TemporaryDirectory(prefix="perfil-") as tmp:
+        opcoes = provedores.opcoes_sessao(acelerador)
+        opcoes.enable_profiling = True
+        opcoes.profile_file_prefix = str(Path(tmp) / "perfil")
+        sessao = ort.InferenceSession(str(base.arquivo), opcoes, providers=provedores.lista_provedores(
+            acelerador, base.cartao, entrada.name, list(entrada.shape), meia))
+        e = base.entrada
+        x = np.zeros((1, 3, int(e["altura"]), int(e["largura"])), np.float32)
+        for _ in range(5 + n):
+            sessao.run(None, {entrada.name: x})
+        eventos = json.loads(Path(sessao.end_profiling()).read_text(encoding="utf-8"))
+    corridas = sorted((ev for ev in eventos if ev.get("name") == "model_run"), key=lambda ev: ev["ts"])[5:]
+    nos = [ev for ev in eventos if ev.get("cat") == "Node" and str(ev.get("name", "")).endswith("_kernel_time")]
+    totais, kernels = [], []
+    for c in corridas:
+        totais.append(c["dur"])
+        kernels.append(sum(nd["dur"] for nd in nos if c["ts"] <= nd["ts"] <= c["ts"] + c["dur"]))
+    total, rede = statistics.median(totais), statistics.median(kernels)
+    return {"execucao_us": total, "kernels_us": rede, "sobrecarga_pct": 100 * (1 - rede / total) if total else None, "n": len(totais)}
 
 
 def maquina() -> dict:
@@ -173,6 +230,7 @@ def main(argv=None) -> int:
     ap.add_argument("--limite", type=int, help="usar só as N primeiras imagens")
     ap.add_argument("--repeticoes", type=int, default=3, help="passadas pelo conjunto no tempo (padrão 3)")
     ap.add_argument("--paridade", action="store_true", help="comparar cada provedor com a CPU (sem medir tempo)")
+    ap.add_argument("--sobrecarga", action="store_true", help="medir a parte do ONNX Runtime em cada execução (perfil)")
     ap.add_argument("--saida", type=Path, help="gravar o resultado em JSON")
     args = ap.parse_args(argv)
 
@@ -186,8 +244,8 @@ def main(argv=None) -> int:
     else:
         lista = ["cpu"] + [c for c in ("directml", "cuda", "tensorrt-fp32", "tensorrt-fp16") if CONFIGURACOES[c][0] in oferecidos]
     resultado = {"quando": datetime.now().isoformat(timespec="seconds"), "maquina": maquina(), "modelo": str(args.modelo),
-                 "imagens": len(imagens), "cache_trt": str(provedores.pasta_cache_trt()), "configuracoes": {}}
-    print(f"{len(imagens)} imagens · {resultado['maquina'].get('placa') or 'sem placa NVIDIA'} · onnxruntime {resultado['maquina'].get('onnxruntime')}")
+                 "imagens": len(imagens), "puladas": list(PULADAS), "cache_trt": str(provedores.pasta_cache_trt()), "configuracoes": {}}
+    print(f"{len(imagens)} imagens ({len(PULADAS)} puladas por não abrir) · {resultado['maquina'].get('placa') or 'sem placa NVIDIA'} · onnxruntime {resultado['maquina'].get('onnxruntime')}")
     referencia = montar(args.modelo, "cpu")[0] if args.paridade else None
     for nome in lista:
         try:
@@ -197,7 +255,13 @@ def main(argv=None) -> int:
             print(f"{nome:14} não montou: {resultado['configuracoes'][nome]['erro']}")
             continue
         item = {"montagem_s": round(montagem, 2)}
-        if args.paridade:
+        if args.sobrecarga:
+            del det
+            item["sobrecarga"] = sobrecarga(args.modelo, nome)
+            s = item["sobrecarga"]
+            print(f"{nome:14} execução {s['execucao_us'] / 1000:7.2f} ms · kernels {s['kernels_us'] / 1000:7.2f} ms · "
+                  f"ONNX Runtime {s['sobrecarga_pct']:5.1f} % (n={s['n']})")
+        elif args.paridade:
             if nome != "cpu":
                 item["paridade"] = paridade(referencia, det, imagens)
                 r = item["paridade"]["resumo"]

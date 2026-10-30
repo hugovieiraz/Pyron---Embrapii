@@ -15,7 +15,7 @@ de comparação (paridade) e roda sem exigências; cada provedor de placa tem as
 e em sequência; TensorRT com cache de motor e perfil de formas) e entra só pela ``placa.py``, que espera ficar
 pronto em outro fio. Com a lista explícita, o ONNX Runtime também nunca escolhe sozinho a placa integrada.
 
-TensorRT: FP16 por padrão (``PYRON_TRT_FP16=0`` desliga), cache do motor em ``<dados>/cache_trt`` (o primeiro motor
+TensorRT: FP32 por padrão (``PYRON_TRT_FP16=1`` liga o FP16, ver ``fp16()``), cache do motor em ``<dados>/cache_trt`` (o primeiro motor
 leva minutos para montar; os seguintes, segundos) e perfil de formas (min/opt/max) a partir do ``cartao.json``.
 """
 
@@ -41,7 +41,10 @@ def pedido() -> str:
 
 
 def fp16() -> bool:
-    return (os.environ.get("PYRON_TRT_FP16") or "1").strip() not in ("0", "false", "nao", "não")
+    """FP16 no TensorRT só com ``PYRON_TRT_FP16=1``. Padrão FP32: na paridade de 30/10/2026 (GTX 1650), o FP32 deu
+    o mesmo resultado da CPU em todas as imagens e o FP16 perdeu uma detecção na borda do limiar
+    (docs/v09/4-tensorrt.md). Trocar o padrão é decisão do usuário."""
+    return (os.environ.get("PYRON_TRT_FP16") or "0").strip().lower() in ("1", "true", "sim")
 
 
 def disponiveis(ort=None) -> list[str]:
@@ -72,8 +75,19 @@ def pasta_dados() -> Path:
     return Path(os.environ.get("PYRON_DADOS") or Path(__file__).resolve().parents[2] / "app" / "dados_app")
 
 
+# Nome do arquivo do motor que o ONNX Runtime grava (ex.: TensorrtExecutionProvider_TRTKernel_graph_<id>_0_0_fp16_sm75.engine):
+# ~90 caracteres. No Windows, caminho acima de 260 caracteres faz a gravação falhar SEM erro (medido em 30/10/2026):
+# o motor seria montado de novo, por minutos, a cada subida.
+FOLGA_NOME_MOTOR = 110
+LIMITE_CAMINHO_WINDOWS = 259
+
+
 def pasta_cache_trt() -> Path:
-    pasta = pasta_dados() / "cache_trt"
+    """``PYRON_CACHE_TRT``, ou ``<dados>/cache_trt``; no Windows, se esse caminho for longo demais para o nome do
+    motor, ``%LOCALAPPDATA%/Pyron/cache_trt``."""
+    pasta = Path(os.environ.get("PYRON_CACHE_TRT") or pasta_dados() / "cache_trt")
+    if sys.platform == "win32" and len(str(pasta.resolve())) + FOLGA_NOME_MOTOR > LIMITE_CAMINHO_WINDOWS and not os.environ.get("PYRON_CACHE_TRT"):
+        pasta = Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "Pyron" / "cache_trt"
     pasta.mkdir(parents=True, exist_ok=True)
     return pasta
 
@@ -194,6 +208,34 @@ def criar_sessao(arquivo: Path, acelerador: str = "cpu", cartao: dict | None = N
     return sessao
 
 
+MONTAGEM_MAXIMA_S = 30 * 60
+
+
+def montar_em_outro_processo(arquivo: Path, cartao: dict | None = None, meia_precisao: bool | None = None) -> None:
+    """Monta o motor do TensorRT (e grava no cache) num processo Python à parte.
+
+    Criar a sessão do ONNX Runtime segura o interpretador (GIL) o tempo todo; com o TensorRT montando o motor,
+    são minutos com o servidor inteiro parado, mesmo em outro fio (medido em 30/10/2026: 117 s sem responder nem
+    /api/saude). Esperar outro processo solta o interpretador; depois, a sessão daqui lê o motor do cache em ~1,5 s.
+    """
+    import json
+    import subprocess
+    import tempfile
+
+    meia = fp16() if meia_precisao is None else meia_precisao
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as f:
+        json.dump(cartao or {}, f)
+        arq_cartao = f.name
+    try:
+        r = subprocess.run([sys.executable, "-m", "nucleo.detectores.provedores", "montar", str(arquivo), arq_cartao, "1" if meia else "0"],
+                           cwd=str(Path(__file__).resolve().parents[2]), capture_output=True, text=True, timeout=MONTAGEM_MAXIMA_S,
+                           creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), env={**os.environ, "PYRON_CACHE_TRT": str(pasta_cache_trt())})
+    finally:
+        os.unlink(arq_cartao)
+    if r.returncode != 0:
+        raise RuntimeError(f"o TensorRT não montou o motor: {(r.stderr or r.stdout).strip()[-400:]}")
+
+
 def situacao() -> dict:
     """Para /api/sistema: o que foi pedido, o que este ONNX Runtime oferece e o que vale."""
     escolhido, motivo = escolher()
@@ -204,4 +246,14 @@ def situacao() -> dict:
     except (ImportError, OSError):
         versao = None
     return {"pedido": pedido(), "disponiveis": disponiveis(), "escolhido": escolhido, "nome": NOMES[escolhido],
-            "motivo": motivo, "fp16": fp16() if escolhido == "tensorrt" else None, "onnxruntime": versao}
+            "motivo": motivo, "fp16": fp16() if escolhido == "tensorrt" else None, "onnxruntime": versao,
+            "cache_trt": str(pasta_cache_trt()) if escolhido == "tensorrt" else None}
+
+
+if __name__ == "__main__":  # python -m nucleo.detectores.provedores montar <modelo.onnx> <cartao.json> <fp16 0|1>
+    import json
+
+    if len(sys.argv) != 5 or sys.argv[1] != "montar":
+        sys.exit("uso: python -m nucleo.detectores.provedores montar <modelo.onnx> <cartao.json> <0|1>")
+    sessao = criar_sessao(Path(sys.argv[2]), "tensorrt", json.loads(Path(sys.argv[3]).read_text(encoding="utf-8")), sys.argv[4] == "1")
+    print("motor pronto em", pasta_cache_trt())

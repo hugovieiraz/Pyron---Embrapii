@@ -213,6 +213,15 @@ telefone válido); a Pasta monitorada só mostra a lista (`_destinatarios()` em 
   reportlab). Modelo em `app/laudo/modelo.typ` + `partes/`, fontes só de `app/laudo/fontes/` (Noto Sans + Noto Sans
   Math para ≥, OFL). **Texto do usuário só entra por `dados.json`**: nunca montar código Typst com texto, nunca `eval`.
   Mudou o conteúdo do laudo em `laudo.py`? Mudar `montar_dados()` e o modelo junto (os dois têm de dizer o mesmo).
+- **Provedor do ONNX** (F4, `docs/v09/4-tensorrt.md`): escolha num lugar só, `nucleo/detectores/provedores.py`
+  (`PYRON_ACELERADOR=auto|tensorrt|cuda|directml|cpu`; auto = TensorRT > CUDA > DirectML > CPU). A sessão da CPU é a
+  referência (`onnx_modelo.py`); a placa entra por `placa.DetectorAcelerado`. Sessão de placa com `disable_fallback`
+  e conferida depois da primeira conta (o ONNX Runtime volta para a CPU em silêncio se a placa falhar). Servidor NVIDIA:
+  ambiente `.venv-gpu` separado (`requirements-servidor-gpu.txt`; ONNX Runtime 1.24 usa TensorRT **10**, não 11).
+  Cache do motor TensorRT: no Windows, caminho acima de 260 caracteres não grava (sem erro); `PYRON_CACHE_TRT` ou
+  `%LOCALAPPDATA%/Pyron/cache_trt`. O motor monta em **outro processo** (criar a sessão segura o GIL: o servidor
+  parava minutos). TensorRT em **FP32 por padrão** (`PYRON_TRT_FP16=1` liga o FP16; perdeu uma detecção na paridade).
+  Medir: `python -m nucleo.detectores.benchmark --modelo <pasta> [--paridade | --sobrecarga]`.
 - Tela de 1536 × 816 úteis: janelas `--start-maximized`; conferir telas nesse tamanho.
 - Janela do aplicativo: o `Pyron.exe` abre a interface numa janela própria sem a barra de título do Windows
   (`lancador/Janela.cs`, WebView2; DLLs da Microsoft em `lancador/webview2`, carregadas de lá). O topo da

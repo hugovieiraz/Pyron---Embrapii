@@ -43,9 +43,9 @@ def test_variavel_de_ambiente(monkeypatch) -> None:
     assert provedores.pedido() == "tensorrt"
     monkeypatch.setenv("PYRON_ACELERADOR", "placa-magica")
     assert provedores.pedido() == "auto"
-    monkeypatch.setenv("PYRON_TRT_FP16", "0")
-    assert provedores.fp16() is False
-    monkeypatch.delenv("PYRON_TRT_FP16")
+    monkeypatch.delenv("PYRON_TRT_FP16", raising=False)
+    assert provedores.fp16() is False  # padrão FP32 até o usuário aprovar o FP16 (paridade)
+    monkeypatch.setenv("PYRON_TRT_FP16", "1")
     assert provedores.fp16() is True
 
 
@@ -152,3 +152,43 @@ def test_placa_nao_volta_para_a_cpu_em_silencio(monkeypatch, tmp_path) -> None:
     s.provedores = ["CPUExecutionProvider"]  # a placa largou o modelo na primeira conta
     with pytest.raises(RuntimeError, match="largou o modelo"):
         provedores.conferir(s, "cuda")
+
+
+def test_cache_do_tensorrt_nunca_em_caminho_longo_demais(tmp_path, monkeypatch) -> None:
+    """No Windows, o motor não é gravado (sem erro) se o caminho passar de 260 caracteres."""
+    import sys
+
+    longa = tmp_path / ("p" * 120) / ("q" * 60)
+    monkeypatch.setenv("PYRON_DADOS", str(longa))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "local"))
+    monkeypatch.delenv("PYRON_CACHE_TRT", raising=False)
+    pasta = provedores.pasta_cache_trt()
+    if sys.platform == "win32":
+        assert pasta == tmp_path / "local" / "Pyron" / "cache_trt"
+    assert len(str(pasta)) + provedores.FOLGA_NOME_MOTOR <= provedores.LIMITE_CAMINHO_WINDOWS or sys.platform != "win32"
+    monkeypatch.setenv("PYRON_CACHE_TRT", str(tmp_path / "meu_cache"))
+    assert provedores.pasta_cache_trt() == tmp_path / "meu_cache"
+
+
+def test_tensorrt_monta_o_motor_em_outro_processo(monkeypatch, tmp_path) -> None:
+    """A montagem (minutos) não pode segurar o interpretador do servidor: vai para outro processo."""
+    import subprocess
+
+    from nucleo.detectores import placa
+
+    chamadas = []
+
+    def falso_run(cmd, **kw):
+        chamadas.append(cmd)
+        return SimpleNamespace(returncode=1, stderr="sem placa", stdout="")
+
+    monkeypatch.setattr(subprocess, "run", falso_run)
+    monkeypatch.setenv("PYRON_CACHE_TRT", str(tmp_path / "cache"))
+    with pytest.raises(RuntimeError, match="não montou o motor: sem placa"):
+        provedores.montar_em_outro_processo(tmp_path / "m.onnx", {"entrada": {}}, True)
+    assert chamadas[0][1:4] == ["-m", "nucleo.detectores.provedores", "montar"] and chamadas[0][-1] == "1"
+
+    det = placa.DetectorAcelerado.__new__(placa.DetectorAcelerado)
+    det.acelerador, det.arquivo, det.cartao, det.meia_precisao = "tensorrt", tmp_path / "m.onnx", {}, False
+    with pytest.raises(RuntimeError, match="não montou"):
+        det.carregar()  # falhou no outro processo: nem tenta montar aqui

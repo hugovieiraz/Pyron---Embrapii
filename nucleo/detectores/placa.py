@@ -117,6 +117,8 @@ class DetectorAcelerado(DetectorONNX):
         self._trava_placa = threading.Lock()  # uma conta por vez na placa
 
     def carregar(self) -> None:
+        if self.acelerador == "tensorrt":  # o motor monta (minutos, na 1ª vez) em outro processo: o servidor segue respondendo
+            provedores.montar_em_outro_processo(self.arquivo, self.cartao, self.meia_precisao)
         self._sessao = provedores.criar_sessao(self.arquivo, self.acelerador, self.cartao, self.meia_precisao)
         e = self.entrada
         self._rodar(np.zeros((1, 3, int(e["altura"]), int(e["largura"])), np.float32))  # primeira conta é lenta
