@@ -3,14 +3,20 @@
 Software de manutenção preditiva por termografia (FastAPI local + interface web em `app/estatico/`,
 núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Textos em português do Brasil.
 
-## Base de Conhecimento e Segundo Cérebro (Shlomo)
-- O projeto é embasado pelo cofre Zettelkasten **Shlomo** (`D:/hd_central/Antigravity projetos/Shlomo/`) e pelo índice
-  canônico `SHLOMO_KNOWLEDGE_BASE.md`.
-- **Requisitos e física:** consultar `Pyron Embrapii - Visão Geral e Roteiro de Requisitos.md` e
-  `Pyron Embrapii - Referências e Limiares de Temperatura.md` para normas ABNT NBR 15572/15866, NETA MTS, física de
-  degradação e modelo de Arrhenius.
-- **Engenharia de Software:** respeitar estritamente Clean Code (SOLID, funções pequenas, SRP, Boy Scout Rule) conforme
-  documentado no atlas do Shlomo.
+## Notas pessoais fora do repositório (Shlomo)
+
+Nota para o Claude do GS87 (Gabriel), escrita a pedido do Hugo em 30/10/2026: a seção "Base de Conhecimento e Segundo
+Cérebro (Shlomo)", que entrou no `feb3b8c`, foi tirada daqui. Ela apontava para `D:/hd_central/Antigravity projetos/Shlomo/`,
+que só existe na máquina do Gabriel; nas outras máquinas a regra não tinha como ser cumprida. Este arquivo vale para
+todo mundo que trabalha no repositório, então só entra nele o que está no repositório.
+
+- Na máquina do Gabriel o cofre continua podendo ser consultado como apoio (normas NBR 15572/15866, NETA MTS,
+  degradação e Arrhenius). A instrução de usá-lo vai no `~/.claude/CLAUDE.md` dele, não aqui.
+- Conhecimento do cofre que o código passe a usar (limiares, critérios, referências) entra no repositório, em `docs/`,
+  com a fonte, para os dois lados enxergarem a mesma coisa.
+- Estilo de código: valem as regras deste arquivo (seção 4: a solução mais simples, componente repetido vira função,
+  nomes em português) e o jeito do código em volta. Uma regra de estilo nova entra aqui por escrito, sem depender
+  de documento externo.
 
 ## 0. Interface principal (`app/interface`, em `/`; histórico em `docs/plano-interface.md`)
 
