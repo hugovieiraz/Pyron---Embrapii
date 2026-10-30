@@ -37,6 +37,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 from PIL import Image, ImageFilter
@@ -150,7 +151,7 @@ def _edge() -> Path:
 
 def rasterizar(svg: Path, largura: int, altura: int) -> Image.Image:
     """Desenha o SVG em largura × altura px, com fundo transparente."""
-    with tempfile.TemporaryDirectory() as pasta:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as pasta:
         pasta = Path(pasta)
         pagina = pasta / "marca.html"
         pagina.write_text(
@@ -166,6 +167,11 @@ def rasterizar(svg: Path, largura: int, altura: int) -> Image.Image:
              f"--window-size={largura},{altura}", f"--screenshot={png}", pagina.as_uri()],
             check=True, capture_output=True, timeout=120,
         )
+        # desde a atualização do Edge de 10/2026 o processo chamado volta antes de gravar a imagem
+        limite = time.monotonic() + 60
+        while not (png.exists() and png.stat().st_size) and time.monotonic() < limite:
+            time.sleep(0.2)
+        time.sleep(0.3)  # deixa terminar a gravação
         with Image.open(png) as im:
             return im.convert("RGBA").copy()
 
