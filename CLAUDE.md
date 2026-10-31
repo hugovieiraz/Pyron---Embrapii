@@ -5,14 +5,18 @@ núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Te
 
 ## Trabalho em dupla: diário da equipe
 
-Hugo e Gabriel (GS87) mexem no mesmo `main`, cada um com o seu assistente. Para ninguém refazer o trabalho do outro:
+Hugo e Gabriel (GS87) mexem no mesmo `main`, cada um com o seu assistente. Regra obrigatória, pedida pelo Hugo em
+31/10/2026, para ninguém refazer o trabalho do outro:
 
-- **Ao começar:** o gancho SessionStart (`.claude/settings.json` → `ferramentas/novidades_equipe.py`) busca o GitHub e
-  mostra os commits da outra pessoa e as entradas novas de `docs/equipe/diario.md` desde a última sessão. Leia antes de
-  começar e conte ao usuário, em poucas linhas, o que o outro fez. Sem o gancho (outra ferramenta), rode o script à mão.
-- **Ao publicar no `main`:** acrescente no topo de `docs/equipe/diario.md` uma entrada curta, no modelo do arquivo
-  (Feito, Para o outro, Pendente), no mesmo commit ou logo depois. Escreva pensando no assistente do outro: o que ele
-  não precisa refazer, que regra mudou, que cuidado tomar. Detalhe técnico fica no commit; o diário aponta o hash.
+- **Antes de planejar ou mexer em qualquer coisa** (código, documento, plano, pesquisa), e não só ao abrir a sessão:
+  rode `python ferramentas/novidades_equipe.py` (ele busca o GitHub; o gancho SessionStart de `.claude/settings.json`
+  faz isso sozinho na abertura) e leia em `docs/equipe/diario.md` as entradas que tocam o mesmo assunto. Se o outro já
+  fez, está fazendo ou deixou pedido sobre aquilo, diga ao usuário antes de começar e parta do que existe. Conte ao
+  usuário, em poucas linhas, o que o outro fez desde a última vez.
+- **Ao terminar cada tarefa** (não só ao publicar no `main`): acrescente no topo de `docs/equipe/diario.md` uma entrada
+  curta, no modelo do arquivo (Feito, Para o outro, Pendente), e publique junto com a mudança. Plano ou pesquisa sem
+  código também entra. Escreva pensando no assistente do outro: o que ele não precisa refazer, que regra mudou, que
+  cuidado tomar. Detalhe técnico fica no commit; o diário aponta o hash.
 - Recado resolvido não se apaga; o diário é o histórico. Pedido ao outro vai em "Pendente", com o nome de quem decide.
 
 ## Notas pessoais fora do repositório (Shlomo)

@@ -32,4 +32,11 @@ Modelo de entrada (curta; o detalhe fica no commit):
 - Para o outro: este diário e o gancho em `.claude/settings.json` são novos. Ao abrir uma sessão do Claude Code no
   projeto, ele busca o GitHub e mostra os seus commits e recados novos. Se usar outra ferramenta (Antigravity), leia
   este arquivo à mão ou rode `python ferramentas/novidades_equipe.py`.
-- Pendente: aprovar o visual do laudo em Typst antes de ligá-lo; decidir se o branch `v09-f1-servidor` pode ser apagado.
+- Feito: integrei os commits do Gabriel de 30/10 à noite (0.9.0 com Typst como padrão, Pyron desktop em Tauri F5 e
+  licenças do Tauri); 450 testes passando, 9 pulados; a interface abre sem erro no console.
+- Para o outro: regra nova no topo do `CLAUDE.md`. Antes de planejar ou mexer em qualquer coisa, consultar as novidades
+  (script + este diário); ao terminar cada tarefa, registrar aqui.
+- Pendente (Hugo): confirmar que o visual do laudo em Typst está aprovado. O commit `0688af3` diz "visual aprovado",
+  mas o Hugo não tinha visto. Neste computador o pacote `typst` não está instalado, então o laudo continua saindo pelo
+  reportlab.
+- Pendente (Gabriel): dizer se o branch `v09-f1-servidor` pode ser apagado.
