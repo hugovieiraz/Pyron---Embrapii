@@ -13,6 +13,33 @@ Modelo de entrada (curta; o detalhe fica no commit):
 - Pendente: o que ficou para depois ou espera decisão.
 ```
 
+## 31/10/2026 · Hugo (3): modelos, Análise e Medição
+
+- Feito (`fc28080`, `7f67f51`, `477394d`): pedido do Hugo para simplificar a inspeção e separar a medição da térmica.
+  - Modelo térmico único: para-raios + pontos quentes. `_modelo_termico()` em `app/servidor.py` resolve o ativo
+    (combinado do config, combinado do treinado do config ou o primeiro combinado normal; sem treinado, a regra).
+    `/api/modelos` marca `principal` no que a tela mostra. Modelos › Em uso e Captura › Vídeo não oferecem mais troca.
+  - Análise: lista de regiões voltou para a lateral (Resumo), com "anterior / 2 de 14 / próxima" no detalhe; a faixa
+    horizontal saiu. "Detectar de novo" saiu; no lugar, chaves liga/desliga Para-raios, Pontos quentes e Medição
+    (pontos e linhas de temperatura), componente `chaves()` em `js/componentes.js`. A seção Dimensões (SAM 2) saiu da Análise.
+  - Ponto quente sem anomalia não vira caixa: sai se a severidade é normal e o ΔT do entorno fica abaixo do 1º limite
+    de `similares` (5 °C na NBR). O ponto mais quente da cena vem da matriz inteira (`nucleo/analise.py`).
+  - Medição virou tela do topo (Painel · Inspeções · Equipamentos · Pendências · Captura · Medição · Modelos), abas
+    Medir e Modelos em `js/medicao/`. `#captura/medir` e `#modelos/medicao` redirecionam. Medir só por duas pontas que
+    o usuário marca (o modelo de profundidade dá a distância entre elas) ou pelo retângulo de referência; saíram
+    "Clicar no objeto", "Caixa em volta", as cotas automáticas e a biblioteca de pesos. Uma medida por vez, nada gravado.
+- Para o outro: `/api/medicao/comparar` e `/api/medicao/video/comparar` só gravam no registro com `registrar=true`
+  e aceitam `modelo` (`da3` ou `moge`) para rodar um só. O backend do SAM 2 + DINOv2, do auto_identificar, da
+  redetecção e do registro continua; só a tela deixou de usar. Testes que esperavam o treinado sozinho como ativo
+  mudaram (`test_avaliacoes.py`, `test_componentes_pontos.py`).
+- Para o outro: feito com o orquestrador alethe. Claude Sonnet escreveu a tela Medição e a medida por duas pontas;
+  Codex (ChatGPT) escreveu a resolução do modelo no servidor e revisou o código (achou 2 defeitos, corrigidos em
+  `7f67f51`); Antigravity revisou a UX (aplicados `role="switch"` nas chaves e texto mais curto). Integração e
+  testes pelo Claude Opus do Hugo: suíte completa com 455 passando, 9 pulados.
+- Pendente (Hugo): testar a medida por duas pontas com fotos reais e o vídeo (as pontas dos quadros 2 a 4 vêm do
+  fluxo óptico). `testes/test_video.py::test_video_de_ponta_a_ponta` falhou uma vez na suíte rápida por tempo e
+  passou 3 de 3 sozinho.
+
 ## 31/10/2026 · Hugo (2)
 
 - Feito: a regra do diário também vale no Antigravity. Bloco novo "Diário da equipe" no começo de
