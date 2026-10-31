@@ -3,6 +3,18 @@
 Software de manutenção preditiva por termografia (FastAPI local + interface web em `app/estatico/`,
 núcleo em `nucleo/`, treino em `ml/`, lançador `Pyron.exe` em `lancador/`). Textos em português do Brasil.
 
+## Trabalho em dupla: diário da equipe
+
+Hugo e Gabriel (GS87) mexem no mesmo `main`, cada um com o seu assistente. Para ninguém refazer o trabalho do outro:
+
+- **Ao começar:** o gancho SessionStart (`.claude/settings.json` → `ferramentas/novidades_equipe.py`) busca o GitHub e
+  mostra os commits da outra pessoa e as entradas novas de `docs/equipe/diario.md` desde a última sessão. Leia antes de
+  começar e conte ao usuário, em poucas linhas, o que o outro fez. Sem o gancho (outra ferramenta), rode o script à mão.
+- **Ao publicar no `main`:** acrescente no topo de `docs/equipe/diario.md` uma entrada curta, no modelo do arquivo
+  (Feito, Para o outro, Pendente), no mesmo commit ou logo depois. Escreva pensando no assistente do outro: o que ele
+  não precisa refazer, que regra mudou, que cuidado tomar. Detalhe técnico fica no commit; o diário aponta o hash.
+- Recado resolvido não se apaga; o diário é o histórico. Pedido ao outro vai em "Pendente", com o nome de quem decide.
+
 ## Notas pessoais fora do repositório (Shlomo)
 
 Nota para o Claude do GS87 (Gabriel), escrita a pedido do Hugo em 30/10/2026: a seção "Base de Conhecimento e Segundo
