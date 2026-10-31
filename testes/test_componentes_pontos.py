@@ -104,7 +104,9 @@ def test_resolve_modelo_termico_e_marca_principais(monkeypatch) -> None:
     assert servidor._modelo_termico() == "para-raios-int8+pontos-quentes"
     instalados = [pontos, detectores.obter("pontos-quentes-sam2"), sam2, rapido, combinados[1]]
     resposta = servidor.modelos()
-    assert {m["id"] for m in resposta["modelos"] if m.get("principal")} == {"pontos-quentes"}
+    # só o INT8 instalado: ele é o ativo e é o que a tela mostra (antes a tela mostrava a regra sozinha)
+    assert resposta["ativo"] == "para-raios-int8+pontos-quentes"
+    assert {m["id"] for m in resposta["modelos"] if m.get("principal")} == {"para-raios-int8+pontos-quentes"}
     instalados = [pontos, detectores.obter("pontos-quentes-sam2"), sam2, modelo, rapido, *combinados]
     config["modelo_ativo"] = "para-raios"
     monkeypatch.setattr(servidor, "_salvar_config", lambda _: None)

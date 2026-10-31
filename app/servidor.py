@@ -303,7 +303,12 @@ def _validar_componentes(c: dict) -> dict:
 
 
 def _modelo_termico() -> str:
-    """Resolve o detector térmico ativo sem alterar o modelo explícito pedido pela API."""
+    """O modelo térmico das análises sem modelo pedido: sempre para-raios + pontos quentes quando há um treinado.
+
+    Vale o combinado do config (inclusive a versão rápida INT8 escolhida), o combinado do treinado do config ou o
+    primeiro combinado instalado (o normal antes do INT8). Sem modelo treinado, só os pontos quentes. Desde
+    31/10/2026 a tela não oferece mais a regra sozinha, o SAM 2 nem o treinado sem os pontos quentes.
+    """
     cfg = _config()["modelo_ativo"]
     lista = detectores.listar(PASTA_MODELOS)
     por_id = {det.id: det for det in lista}
@@ -316,7 +321,7 @@ def _modelo_termico() -> str:
     if combinados:
         recomendados = [det for det in combinados if not (det.partes[0].cartao.get("otimizacao"))]
         return (recomendados or combinados)[0].id
-    return cfg if cfg in por_id or cfg == "sam2-dinov2" else "pontos-quentes"
+    return cfg if cfg in por_id else "pontos-quentes"  # o SAM 2 + DINOv2 não fica como padrão: leva minutos por imagem
 
 
 def _detector(id_: str | None) -> detectores.Detector:
@@ -1665,7 +1670,8 @@ def modelos() -> dict:
             disponivel = importlib.util.find_spec("sam2") is not None and sam2._caminho_pesos.exists()
             lista.insert(1, {**sam2.descrever(), "disponivel": disponivel})
     combinados = [d for d in detectores.listar(PASTA_MODELOS) if isinstance(d, detectores.Combinado)]
-    principais = [d.id for d in combinados if not d.partes[0].cartao.get("otimizacao")]
+    # o que a tela mostra: os combinados normais; só com o INT8 instalado, ele; sem treinado, os pontos quentes
+    principais = [d.id for d in combinados if not d.partes[0].cartao.get("otimizacao")] or [d.id for d in combinados]
     if principais:
         principais_set = set(principais)
     else:

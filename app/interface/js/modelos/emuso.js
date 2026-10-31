@@ -51,7 +51,8 @@ export async function montar(no) {
 
   function desenhar() {
     const rapidas = mapaRapidas(dados.modelos);
-    const ehRapida = (m) => [...rapidas.values()].some((r) => r.id === m.id);
+    // a rápida some da lista quando o original dela está na lista (vira opção no detalhe dele)
+    const ehRapida = (m) => [...rapidas.entries()].some(([origem, r]) => r.id === m.id && dados.modelos.some((x) => x.id === origem && x.principal));
     const lista = dados.modelos.filter((m) => m.principal && !ehRapida(m));
     const recomendado = recomendadoDe(lista);
     // o em uso conta para o original quando a versão rápida está ativa
