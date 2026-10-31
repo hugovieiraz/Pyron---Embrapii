@@ -13,6 +13,12 @@ Modelo de entrada (curta; o detalhe fica no commit):
 - Pendente: o que ficou para depois ou espera decisão.
 ```
 
+## 31/10/2026 · Codex
+
+- Feito: análise de leitura do Pyron, sem mudanças no código. Os commits `fc28080`, `7f67f51` e `477394d` separaram Medição da Análise, simplificaram a medição para duas pontas ou retângulo de referência e fazem a tela pedir um único modelo de profundidade. A arquitetura liga `app/interface/` → FastAPI em `app/servidor.py` → regras/modelos em `nucleo/`; o servidor tem 3.433 linhas e reúne rotas de vários domínios.
+- Para o outro: ao abrir Medição, `medir.js` consulta `/api/medicao/estado`; se PyTorch estiver instalado, `modelos.estado()` importa Torch e verifica CUDA. Os pesos do modelo de profundidade só carregam ao medir e ficam no medidor global em cache até o processo terminar. É um possível custo de memória após abrir Medição, não prova de CPU alta em repouso.
+- Pendente: comparar uso de CPU e memória em repouso, ao abrir Medição e durante uma medição antes de decidir otimizações.
+
 ## 31/10/2026 · Hugo (3): modelos, Análise e Medição
 
 - Feito (`fc28080`, `7f67f51`, `477394d`): pedido do Hugo para simplificar a inspeção e separar a medição da térmica.
