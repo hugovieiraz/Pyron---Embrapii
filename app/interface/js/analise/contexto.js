@@ -16,19 +16,18 @@ function lerMatriz(m) {
   return { W: m.largura, H: m.altura, valores, lo, hi, validos };
 }
 
-export function criarContexto({ analise, paletas, modelos, config, vizinhas }) {
+export function criarContexto({ analise, paletas, config, vizinhas }) {
   const ouvintes = new Set();
   const ctx = {
-    a: null, m: null, paletas, modelos, config, vizinhas,
+    a: null, m: null, paletas, config, vizinhas,
     sel: null,                       // região selecionada
     ferramenta: "selecionar",
     paleta: "ferro",
     faixa: { modo: "equipamento", manual: null },
-    camadas: lerPreferencia("camadas", { regioes: true, rotulos: true, pontos: true, contornos: true }),
+    camadas: { regioes: true, rotulos: true, pontos: true, contornos: true, medicoes: true, ...lerPreferencia("camadas", {}) },
     isoterma: { ligada: false, valor: null },
     foto: false,
     salvo: { estado: "salvo", em: null },
-    ocupado: null,                   // "detectar" | "medir" | null: o painel mostra a ilustração procurando
     podeEditar: pode("revisao"),     // técnico (modo servidor) vê, comenta e acompanha; quem edita é o engenheiro
 
     ouvir(fn) { ouvintes.add(fn); return () => ouvintes.delete(fn); },

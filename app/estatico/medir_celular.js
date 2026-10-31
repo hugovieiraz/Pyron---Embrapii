@@ -2,7 +2,7 @@
 
 // Fotos para medir: o celular só tira (ou escolhe da galeria) e envia. O arquivo vai inteiro para o Pyron do
 // computador, byte por byte (sem recomprimir: qualidade, lente e EXIF intactos); a medida, com ou sem o post-it,
-// é feita lá, em Captura › Medir foto, onde a foto nova abre sozinha.
+// é feita lá, em Medição › Medir, onde a foto nova abre sozinha.
 
 const T = TEXTOS.medirCelular;
 const BASE = location.pathname.replace(/\/medir\/?$/, "");

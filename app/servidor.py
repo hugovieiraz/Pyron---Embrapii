@@ -302,9 +302,26 @@ def _validar_componentes(c: dict) -> dict:
     return saida
 
 
+def _modelo_termico() -> str:
+    """Resolve o detector térmico ativo sem alterar o modelo explícito pedido pela API."""
+    cfg = _config()["modelo_ativo"]
+    lista = detectores.listar(PASTA_MODELOS)
+    por_id = {det.id: det for det in lista}
+    combinados = [det for det in lista if isinstance(det, detectores.Combinado)]
+    if cfg in por_id and isinstance(por_id[cfg], detectores.Combinado):
+        return cfg
+    combinado_cfg = f"{cfg}+pontos-quentes"
+    if combinado_cfg in por_id:
+        return combinado_cfg
+    if combinados:
+        recomendados = [det for det in combinados if not (det.partes[0].cartao.get("otimizacao"))]
+        return (recomendados or combinados)[0].id
+    return cfg if cfg in por_id or cfg == "sam2-dinov2" else "pontos-quentes"
+
+
 def _detector(id_: str | None) -> detectores.Detector:
     try:
-        return detectores.obter(id_ or _config()["modelo_ativo"], PASTA_MODELOS)
+        return detectores.obter(id_ or _modelo_termico(), PASTA_MODELOS)
     except KeyError:
         return detectores.obter("pontos-quentes", PASTA_MODELOS)
 
@@ -360,6 +377,29 @@ def _calcular(a: dict, matriz: np.ndarray) -> dict:
     campos_med = ("id", "tipo", "x", "y", "x0", "y0", "x1", "y1")
     a["medicoes"] = analise.medir_medicoes(matriz, [{k: v for k, v in m.items() if k in campos_med} for m in a.get("medicoes", [])])
     return a
+
+
+def _remover_pontos_quentes_sem_anomalia(a: dict, matriz: np.ndarray) -> None:
+    """Tira as caixas de ponto quente que não mostram anomalia; a imagem normal fica só com o ponto mais quente.
+
+    Fica a caixa com severidade acima de normal ou com ΔT do entorno que já seria nível contra o semelhante
+    (5 °C no critério da NBR). Abaixo disso é a variação comum da peça. Pedido do Hugo em 31/10/2026.
+    """
+    regioes = a["regioes"]
+    limites = _criterios()["similares"]
+
+    def sem_anomalia(r: dict) -> bool:
+        if r.get("classe") != "ponto_quente" or not str(r.get("origem", "")).startswith("modelo:"):
+            return False
+        if r.get("severidade") not in ("normal", "sem_medida"):
+            return False
+        dt = r.get("dt_entorno")
+        return dt is None or analise.nivel_por_limites(dt, limites) == "normal"
+
+    filtradas = [r for r in regioes if not sem_anomalia(r)]
+    if len(filtradas) != len(regioes):
+        a["regioes"] = filtradas
+        _calcular(a, matriz)
 
 
 PALETAS_EXIBICAO = ("ferro", "arco-iris", "cinza")
@@ -630,6 +670,7 @@ def _nova_analise(dados: bytes, nome: str, modelo: str | None, fonte: str = "man
     if notas:
         a["avisos_analise"] = notas
     _calcular(a, img.temperatura_c)
+    _remover_pontos_quentes_sem_anomalia(a, img.temperatura_c)
     t3 = perf_counter()
     etapas = [
         {"nome": "Leitura da temperatura", "ms": round((t1 - t0) * 1000), **({} if img.tem_temperatura else {"sem_dado": True})},
@@ -685,8 +726,8 @@ async def criar(arquivo: UploadFile = File(...), modelo: str | None = Form(None)
     if not dados:
         raise HTTPException(422, "O arquivo está vazio.")
     ident = {k: v.strip()[:120] for k, v in (("instalacao", instalacao), ("equipamento", equipamento)) if v and v.strip()}
-    # Se o modelo não foi explicitado, assume o modelo fundacional de segmentação e metrologia
-    modelo_analise = modelo if (modelo and modelo.strip()) else _config()["modelo_ativo"]
+    # Sem modelo explícito, _detector resolve o modelo térmico ativo.
+    modelo_analise = modelo if (modelo and modelo.strip()) else None
 
     def analisar() -> dict:
         with _trava:
@@ -810,6 +851,7 @@ def detectar_de_novo(id_: str, corpo: dict = Body(default={})) -> dict:
         raise HTTPException(422, f"O modelo {det.nome} falhou: {erro}") from erro
     a["modelo"] = _info_modelo(det)
     _calcular(a, m)
+    _remover_pontos_quentes_sem_anomalia(a, m)
     armazenamento.salvar(a)
     return _completa(a)
 
@@ -1622,8 +1664,17 @@ def modelos() -> dict:
         if sam2 is not None:
             disponivel = importlib.util.find_spec("sam2") is not None and sam2._caminho_pesos.exists()
             lista.insert(1, {**sam2.descrever(), "disponivel": disponivel})
+    combinados = [d for d in detectores.listar(PASTA_MODELOS) if isinstance(d, detectores.Combinado)]
+    principais = [d.id for d in combinados if not d.partes[0].cartao.get("otimizacao")]
+    if principais:
+        principais_set = set(principais)
+    else:
+        principais_set = {"pontos-quentes"}
+    for item in lista:
+        if item["id"] in principais_set:
+            item["principal"] = True
     # onde o modelo ativo roda (placa, "carregando" = preparando a placa, ou processador) e o acelerador do servidor
-    return {"ativo": _config()["modelo_ativo"], "modelos": lista, "placa": _onde_modelo_ativo(), "acelerador": provedores.situacao()}
+    return {"ativo": _modelo_termico(), "modelos": lista, "placa": _onde_modelo_ativo(), "acelerador": provedores.situacao()}
 
 
 def _onde_modelo_ativo() -> dict | None:
@@ -1640,7 +1691,12 @@ def definir_ativo(corpo: dict = Body(...)) -> dict:
     if det.id != corpo.get("id"):
         raise HTTPException(404, "Modelo não encontrado.")
     cfg = _config()
-    cfg["modelo_ativo"] = det.id
+    if det.tipo == "aprendizado":
+        combinado = f"{det.id}+pontos-quentes"
+        instalados = {d.id for d in detectores.listar(PASTA_MODELOS)}
+        cfg["modelo_ativo"] = combinado if combinado in instalados else det.id
+    else:
+        cfg["modelo_ativo"] = det.id
     _salvar_config(cfg)
     return modelos()
 
@@ -2062,7 +2118,7 @@ def obter_avaliacao(id_: str) -> dict:
         raise HTTPException(404, "Avaliação não encontrada.") from erro
     instalados = {m.id for m in detectores.listar(PASTA_MODELOS)}
     d["modelo_disponivel"] = d["meta"].get("modelo_instalado") in instalados
-    d["modelo_ativo"] = _config()["modelo_ativo"]
+    d["modelo_ativo"] = _modelo_termico()
     return d
 
 
@@ -2538,22 +2594,37 @@ def _registro_medicao():
 _registro_med = None
 
 
-def comparar_e_registrar(dados: bytes, pista: dict, referencia: dict | None, origem: str = "tela", como: str = "ambos") -> dict:
-    """Guarda a foto como chegou, mede com os dois modelos (sem e com referência) e registra."""
+def _modelo_medicao(modelo: str | None) -> list[str] | None:
+    """O modelo de profundidade pedido na medida (``da3`` ou ``moge``), como lista para ``comparar``; sem pedido, todos."""
+    if not modelo:
+        return None
+    from nucleo.medicao.modelos import MODELOS_PROFUNDIDADE
+
+    if modelo not in MODELOS_PROFUNDIDADE:
+        raise HTTPException(422, f"Modelo de profundidade desconhecido: {modelo}.")
+    return [modelo]
+
+
+def comparar_e_registrar(dados: bytes, pista: dict, referencia: dict | None, origem: str = "tela", como: str = "ambos",
+                         registrar: bool = True, modelos: list[str] | None = None) -> dict:
+    """Mede com os modelos de profundidade (sem e com referência). Só com ``registrar`` guarda a foto como chegou e a medida."""
     from nucleo import medicao as medicao_mod
 
+    with _trava_medicao:
+        r = medicao_mod.comparar(dados, pista, referencia, modelos=modelos)
+    if not registrar:
+        return r
     reg = _registro_medicao()
     foto = reg.guardar_foto(dados)
-    with _trava_medicao:
-        r = medicao_mod.comparar(dados, pista, referencia)
     entrada = reg.adicionar(foto, pista, referencia, r["resultados"], origem=origem, como=como)
     return {**r, "id": entrada["id"], "foto": foto, "erros": entrada["erros"]}
 
 
 @app.post("/api/medicao/comparar")
 async def medicao_comparar(arquivo: UploadFile = File(...), pista: str = Form(...), referencia: str | None = Form(None),
-                           como: str = Form("ambos")) -> dict:
-    """A mesma pista nos dois modelos (DA3 e MoGe-2), sem e com referência, lado a lado; fica no registro."""
+                           como: str = Form("ambos"), modelo: str | None = Form(None), registrar: bool = Form(False)) -> dict:
+    """A mesma pista nos modelos de profundidade (DA3 e MoGe-2; ``modelo`` limita a um), sem e com referência.
+    Não guarda nada: só com ``registrar=true`` a foto e a medida entram no registro (avaliação dos modelos)."""
     dados = await arquivo.read()
     if not dados:
         raise HTTPException(422, "O arquivo está vazio.")
@@ -2568,10 +2639,12 @@ async def medicao_comparar(arquivo: UploadFile = File(...), pista: str = Form(..
         abrir(dados)
     except Exception:
         raise HTTPException(422, "Não consegui abrir a foto.")
+    modelos = _modelo_medicao(modelo)
     from starlette.concurrency import run_in_threadpool
 
     try:
-        return await run_in_threadpool(comparar_e_registrar, dados, p, ref, "tela", como if como in ("ambos", "com", "sem") else "ambos")
+        return await run_in_threadpool(comparar_e_registrar, dados, p, ref, "tela", como if como in ("ambos", "com", "sem") else "ambos",
+                                       registrar, modelos)
     except (ImportError, OSError) as e:
         raise HTTPException(503, f"Os modelos da medição não estão instalados ({type(e).__name__}: {e}).")
     except ValueError as e:
@@ -2773,9 +2846,12 @@ async def medicao_video_comparar(
     referencia: str | None = Form(None),
     como: str = Form("ambos"),
     max_keyframes: int = Form(4),
+    modelo: str | None = Form(None),
+    registrar: bool = Form(False),
 ) -> dict:
-    """O vídeo nos dois modelos, sem e com referência: a pista vale no 1º quadro nítido e segue o objeto nos outros;
-    o resultado de cada modelo e modo é a mediana dos quadros. Guarda o vídeo e registra a medida (foto: o 1º quadro)."""
+    """O vídeo nos modelos de profundidade (``modelo`` limita a um), sem e com referência: a pista vale no 1º quadro nítido
+    e segue o objeto nos outros; o resultado de cada modelo e modo é a mediana dos quadros. Não guarda nada: só com
+    ``registrar=true`` guarda o vídeo e registra a medida (foto: o 1º quadro)."""
     dados = await arquivo.read()
     if not dados:
         raise HTTPException(422, "O arquivo de vídeo está vazio.")
@@ -2786,13 +2862,18 @@ async def medicao_video_comparar(
     ref = _validar_pista_medicao(ref_bruta, "a referência", exige_tamanho=True) if ref_bruta else None
     como = como if como in ("ambos", "com", "sem") else "ambos"
     extensao = Path(arquivo.filename or "").suffix.lower() or ".mp4"
+    modelos = _modelo_medicao(modelo)
 
     def rodar():
         from nucleo import medicao as medicao_mod
         from nucleo.medicao import video_keyframes as vk
 
+        comparar = medicao_mod.comparar if modelos is None else (lambda jpeg, pista, referencia: medicao_mod.comparar(jpeg, pista, referencia, modelos=modelos))
         with _trava_medicao:
-            r = vk.comparar_video(dados, p, ref, max_keyframes=max(1, min(max_keyframes, 8)), comparar=medicao_mod.comparar)
+            r = vk.comparar_video(dados, p, ref, max_keyframes=max(1, min(max_keyframes, 8)), comparar=comparar)
+        if not registrar:
+            r.pop("jpeg_primeiro")
+            return r
         reg = _registro_medicao()
         codigo_video = reg.guardar_video(dados, extensao)
         foto = reg.guardar_foto(r.pop("jpeg_primeiro"))

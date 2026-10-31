@@ -829,7 +829,7 @@ const TEXTOS = {
   },
   medirCelular: {
     // página do celular para as fotos de medir (app/estatico/medir_celular.*): o celular só tira e envia;
-    // a medida, com ou sem o post-it, é no computador (Captura › Medir foto)
+    // a medida, com ou sem o post-it, é no computador (Medição › Medir)
     subtitulo: "Fotos para medir",
     titulo: "Tire a foto do objeto",
     dica: "Para medir com mais precisão, cole o post-it rosa ao lado do objeto, no mesmo plano. A foto vai inteira para o Pyron, sem perder qualidade.",
@@ -849,7 +849,7 @@ const TEXTOS = {
     tentar: "Tentar de novo",
     ligado: "Ligado ao Pyron",
     desligado: "Sem o Pyron",
-    noComputador: "Meça no computador, em Captura › Medir foto: a última foto abre sozinha lá.",
+    noComputador: "Meça no computador, em Medição › Medir: a última foto abre sozinha lá.",
     erroServidor: (s) => `O Pyron respondeu com erro ${s}.`,
     semConexao: "Sem conexão com o Pyron. Confira se o celular está no mesmo Wi-Fi do computador.",
   },

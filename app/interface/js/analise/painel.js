@@ -1,18 +1,18 @@
-// Painel de detalhe da Análise: Resumo ou Região selecionada, Condições, Identificação, Pendência e Comentários.
+// Painel de detalhe da Análise: Resumo (com a lista de regiões) ou Região selecionada, Condições, Identificação,
+// Pendência e Comentários.
 // Edições salvam sozinhas (indicador "Salvo" no cabeçalho); ações que recalculam têm botão próprio.
 // Quem não revisa (técnico, no modo servidor) vê os campos travados e pode comentar.
 import { TEXTOS as T } from "../../textos.js";
 import { el, api, json, fmt, temperatura, lerNumero, dataHora, pode, modoServidor } from "../base.js";
 import { botao, campo, secao, selo, painelDetalhe, estadoVazio, avisar, ocupado } from "../componentes.js";
-import { apagarRegiao } from "./faixa.js";
+import { apagarRegiao, listaRegioes, regioesOrdenadas } from "./faixa.js";
 import { formularioPendencia } from "../pendencia.js";
 
 const A = T.analise;
 const pct = (v) => fmt(v, 0, " %");
 const dl = (pares) => el("dl", { class: "pares" }, pares.filter(Boolean).flatMap(([t, d]) => [el("dt", {}, t), el("dd", {}, d)]));
 
-export function montarPainel(ctx, { equipamentos }) {
-  const sam2 = ctx.modelos.find((m) => m.id === "sam2-dinov2")?.disponivel === true;
+export function montarPainel(ctx, { equipamentos, realcar }) {
   /** Sem permissão de revisar: campos e botões de edição ficam desabilitados (continuam legíveis). */
   const travar = (nos) => {
     if (!ctx.podeEditar) for (const n of [nos].flat()) n?.querySelectorAll?.("input, select, textarea, button").forEach((c) => { c.disabled = true; });
@@ -24,13 +24,14 @@ export function montarPainel(ctx, { equipamentos }) {
     const a = ctx.a;
     const r = a.resumo || {};
     const partes = [];
-    if (ctx.ocupado === "detectar") partes.push(estadoVazio({ ilustracao: "analise", procurando: true, titulo: A.detectando, compacto: true }));
-    else if (!a.regioes.length) partes.push(estadoVazio({ ilustracao: "analise", titulo: A.regioes, texto: A.semRegioes, compacto: true }));
     partes.push(secao({ titulo: A.situacao, conteudo: [
       el("div", { class: "linha-selo" }, selo(r.severidade || "sem_medida")),
       r.mensagem ? el("p", {}, r.mensagem) : null,
-      dl([[A.tmaxCena, temperatura(r.t_max_cena)], r.maior_pct_mta != null && [A.maiorMta, pct(r.maior_pct_mta)], [A.regioesN, String(a.regioes.length)]]),
+      dl([[A.tmaxCena, temperatura(r.t_max_cena)], r.maior_pct_mta != null && [A.maiorMta, pct(r.maior_pct_mta)]]),
     ] }));
+    // sem peça identificada nem ponto quente fora do normal, a leitura é só o ponto mais quente (marcado na imagem)
+    partes.push(secao({ titulo: A.regioes, qtd: a.regioes.length, conteudo: [a.regioes.length ? listaRegioes(ctx, realcar)
+      : el("p", { class: "nota" }, a.sem_temperatura ? A.semRegioesSemTemperatura : A.semRegioes)] }));
     const avisos = r.avisos || [];
     if (avisos.length) partes.push(secao({ titulo: A.avisos, qtd: avisos.length, aberta: false, conteudo: [el("ul", { class: "lista-avisos" }, avisos.map((t) => el("li", {}, t)))] }));
     const grupos = (r.comparacao_componentes || []).filter((g) => g.itens.length > 1);
@@ -51,6 +52,9 @@ export function montarPainel(ctx, { equipamentos }) {
 
   // ---------------------------------------------------------------- região selecionada
   function regiao(r) {
+    const ordem = regioesOrdenadas(ctx.a.regioes);
+    const pos = ordem.findIndex((x) => x.id === r.id);
+    const irPara = (passo) => () => ctx.selecionar(ordem[(pos + passo + ordem.length) % ordem.length].id);
     const nomes = { ...(ctx.a.modelo?.nomes || {}) };
     const classes = [...new Set([...(ctx.a.modelo?.classes || []), r.classe, "componente"])];
     const salvarCampo = (mudanca) => ctx.salvarRegioes(ctx.a.regioes.map((x) => (x.id === r.id ? { ...x, ...mudanca } : x))).catch((e) => avisar(e.message, { erro: true }));
@@ -68,21 +72,13 @@ export function montarPainel(ctx, { equipamentos }) {
         el("div", {}, el("span", { class: "rotulo" }, rotuloDt), el("b", { class: "num" }, fmt(dt, 1, " °C"))),
         el("div", {}, el("span", { class: "rotulo" }, A.pctMta), el("b", { class: "num" }, r.pct_mta != null ? pct(r.pct_mta) : T.geral.semValor))));
 
-    const geo = r.segmentacao?.geometria;
-    const dimensoes = geo?.height_meters != null
-      ? dl([[A.dimensoes, A.dimAlturaLargura(fmt(geo.height_meters, 2), fmt(geo.mean_width_meters, 2))], [A.metodo, A.dimMetodo[geo.metodo_metrologia] || geo.metodo_metrologia],
-          r.segmentacao.termica_isolada?.t_max != null && [A.tmaxPeca, temperatura(r.segmentacao.termica_isolada.t_max)]])
-      : null;
-    const medir = sam2 && ctx.podeEditar ? botao({ texto: A.medir, icone: "regua", compacto: true, title: A.medirDica, onclick: (ev) => ocupado(ev.currentTarget, async () => {
-      try {
-        const resp = await api(`/api/analises/${ctx.a.id}/segmentar`, json("POST", { regiao_id: r.id }));
-        ctx.aplicar(resp.analise);
-      } catch (e) { avisar(e.message, { erro: true }); }
-    }) }) : null;
-
     return [
       el("div", { class: "cab-regiao" }, botao({ texto: A.voltarResumo, icone: "anterior", soIcone: true, compacto: true, variante: "fantasma", onclick: () => ctx.selecionar(null) }),
-        selo(r.severidade, { indicativa: r.indicativa }), r.confianca != null && r.origem !== "manual" ? el("span", { class: "nota" }, A.confianca(Math.round(r.confianca * 100))) : el("span", { class: "nota" }, A.origemManual)),
+        selo(r.severidade, { indicativa: r.indicativa }), r.confianca != null && r.origem !== "manual" ? el("span", { class: "nota" }, A.confianca(Math.round(r.confianca * 100))) : el("span", { class: "nota" }, A.origemManual),
+        ordem.length > 1 ? el("div", { class: "nav-regiao" },
+          botao({ texto: A.regiaoAnterior, icone: "anterior", soIcone: true, compacto: true, variante: "fantasma", onclick: irPara(-1) }),
+          el("span", { class: "nota num" }, A.posicao(pos + 1, ordem.length)),
+          botao({ texto: A.regiaoSeguinte, icone: "proxima", soIcone: true, compacto: true, variante: "fantasma", onclick: irPara(1) })) : null),
       travar(el("div", { class: "campos-regiao" }, nome, classe)),
       secao({ titulo: A.leituras, conteudo: [leituras] }),
       secao({ titulo: A.diagnostico, conteudo: [
@@ -92,7 +88,6 @@ export function montarPainel(ctx, { equipamentos }) {
         r.indicativa ? el("p", { class: "nota" }, T.indicativa) : null,
       ] }),
       r.referencia ? secao({ titulo: A.referencia, aberta: false, conteudo: [dl([[r.referencia.nome, r.referencia.mta_c != null ? `${A.mta} ${temperatura(r.referencia.mta_c, 0)}` : T.geral.semValor]]), r.referencia.fonte ? el("p", { class: "nota" }, r.referencia.fonte) : null] }) : null,
-      dimensoes || medir ? secao({ titulo: A.dimensoes, conteudo: [dimensoes, medir ? el("div", { class: "grupo-btn" }, medir) : null] }) : null,
       ctx.podeEditar ? el("div", { class: "rodape-painel" }, botao({ texto: A.apagarRegiao, icone: "lixo", variante: "perigo", compacto: true, onclick: () => apagarRegiao(ctx, r.id) })) : null,
     ];
   }
@@ -210,7 +205,7 @@ export function montarPainel(ctx, { equipamentos }) {
   const parar = ctx.ouvir((parte) => {
     if (parte === "selecao") { if (painel.ativa() !== "resumo") painel.mostrar("resumo"); else painel.atualizar(); return; }
     if (parte === "abrir-pendencia") { painel.mostrar("pendencia"); return; }
-    if (parte === "tudo" || parte === "ocupado") painel.atualizar();
+    if (parte === "tudo") painel.atualizar();
     if (parte === "dados" && !formularios.has(painel.ativa())) painel.atualizar();
   });
   return { painel, encerrar: parar };

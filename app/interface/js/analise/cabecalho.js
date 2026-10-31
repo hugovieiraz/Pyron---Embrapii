@@ -1,8 +1,10 @@
 // Cabeçalho da Análise: equipamento e inspeção, navegação entre as inspeções do mesmo equipamento,
-// estado "Salvo" e as ações (Detectar de novo, Mais opções, Gerar laudo).
+// estado "Salvo", as chaves do que aparece na imagem (Para-raios, Pontos quentes, Medição) e as ações (Mais opções,
+// Gerar laudo). As chaves entraram no lugar de "Detectar de novo" em 31/10/2026: o modelo é sempre o mesmo
+// (para-raios + pontos quentes), então reprocessar daria o mesmo resultado; o que muda é o que se quer ver.
 import { TEXTOS as T } from "../../textos.js";
-import { el, api, json, dataHora, data as dataCurta, pode } from "../base.js";
-import { botao, selo, menu, confirmar, avisar } from "../componentes.js";
+import { el, api, dataHora, data as dataCurta, pode } from "../base.js";
+import { botao, chaves, selo, menu, confirmar, avisar } from "../componentes.js";
 import { abrirLaudo as laudoDialogo } from "../laudo.js";
 import { endereco } from "../rotas.js";
 
@@ -24,29 +26,13 @@ export function montarCabecalho(ctx) {
   const anterior = botao({ texto: A.anterior, icone: "anterior", soIcone: true, variante: "fantasma", desabilitado: !v.anterior, onclick: irPara(v.anterior) });
   const seguinte = botao({ texto: A.seguinte, icone: "proxima", soIcone: true, variante: "fantasma", desabilitado: !v.seguinte, onclick: irPara(v.seguinte) });
 
-  // ---------------------------------------------------------------- Detectar de novo
-  const detectar = botao({ texto: A.detectar, icone: "detectar" });
-  const sam2 = ctx.modelos.find((m) => m.id === "sam2-dinov2");
-  const rodar = (acao) => async () => {
-    ctx.ocupado = "detectar";
-    ctx.mudou("ocupado");
-    detectar.setAttribute("aria-busy", "true");
-    try { ctx.aplicar(await acao()); } catch (e) { avisar(e.message, { erro: true }); } finally {
-      ctx.ocupado = null;
-      detectar.removeAttribute("aria-busy");
-      ctx.mudou("ocupado");
-    }
-  };
-  const menuDetectar = menu(detectar, [
-    { grupo: A.modeloAtual },
-    ...ctx.modelos.map((m) => ({
-      texto: m.nome, marcado: m.id === ctx.a.modelo?.id, desabilitado: m.disponivel === false,
-      executar: rodar(() => api(`/api/analises/${ctx.a.id}/detectar`, json("POST", { modelo: m.id }))),
-    })),
-    { separador: true },
-    { texto: sam2?.disponivel ? A.identificar : `${A.identificar}: ${A.indisponivel}`, icone: "detectar", desabilitado: !sam2?.disponivel,
-      executar: rodar(() => api(`/api/analises/${ctx.a.id}/auto_identificar`, json("POST", {}))) },
-  ]);
+  // ---------------------------------------------------------------- o que aparece na imagem (preferência guardada)
+  const mostrar = chaves({
+    rotulo: A.mostrarNaImagem,
+    opcoes: [["regioes", A.mostrarParaRaios, A.mostrarParaRaiosDica], ["pontos", A.mostrarPontos, A.mostrarPontosDica], ["medicoes", A.mostrarMedicao, A.mostrarMedicaoDica]]
+      .map(([chave, texto, dica]) => ({ chave, texto, dica, ligado: ctx.camadas[chave] })),
+    aoMudar: (chave, ligado) => { ctx.camadas[chave] = ligado; ctx.guardarCamadas(); ctx.mudou("exibicao"); },
+  });
 
   // ---------------------------------------------------------------- Mais opções
   const mais = botao({ texto: A.mais, icone: "mais-opcoes", soIcone: true });
@@ -86,7 +72,6 @@ export function montarCabecalho(ctx) {
       pendenciaNaMeta(a.pendencia),
     ].filter(Boolean));
     if (a.sem_temperatura) { laudo.setAttribute("aria-disabled", "true"); laudo.title = `${A.laudo}: ${A.laudoSemTemperatura}`; } else { laudo.removeAttribute("aria-disabled"); laudo.title = ""; }
-    [...menuDetectar.querySelectorAll('[role="menuitemradio"]')].forEach((b, i) => b.setAttribute("aria-checked", String(ctx.modelos[i]?.id === a.modelo?.id)));
     document.title = T.casca.titulo(id.equipamento ? `${id.equipamento} · ${a.arquivo}` : a.arquivo);
   }
   // pendência em aberto fica à vista no cabeçalho (o que falta fazer); clicar abre a aba Pendência
@@ -101,17 +86,21 @@ export function montarCabecalho(ctx) {
     salvo.textContent = s.estado === "salvando" ? A.salvando : s.estado === "erro" ? A.erroSalvar : s.em ? A.salvoEm(s.em.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })) : "";
   }
 
-  const parar = ctx.ouvir((parte) => { if (["tudo", "dados"].includes(parte)) desenhar(); if (parte === "salvo") desenharSalvo(); });
+  const marcarChaves = () => mostrar.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(Boolean(ctx.camadas[b.dataset.chave]))));
+  const parar = ctx.ouvir((parte) => {
+    if (["tudo", "dados"].includes(parte)) desenhar();
+    if (parte === "salvo") desenharSalvo();
+    if (parte === "exibicao") marcarChaves();
+  });
   desenhar();
   desenharSalvo();
 
   anterior.hidden = seguinte.hidden = !v.total;
-  detectar.hidden = !pode("revisao"); // reprocessar é revisão (engenheiro)
   laudo.hidden = !pode("laudo");      // laudo: engenheiro que assina
   const cabecalho = el("header", { class: "cab-analise" },
     anterior,
     el("div", { class: "titulo" }, titulo, meta),
     seguinte,
-    el("div", { class: "acoes" }, salvo, detectar, mais, laudo));
-  return { cabecalho, encerrar() { parar(); menuDetectar.remove(); menuMais.remove(); } };
+    el("div", { class: "acoes" }, salvo, mostrar, mais, laudo));
+  return { cabecalho, encerrar() { parar(); menuMais.remove(); } };
 }

@@ -238,11 +238,32 @@ def comparacao(cliente, monkeypatch):
     return cliente
 
 
+def test_comparar_nao_grava_por_padrao_e_aceita_um_so_modelo(comparacao):
+    """A tela mede uma vez e não guarda: sem `registrar`, nem a foto nem a medida entram no registro; `modelo` limita a um."""
+    cli, foto = comparacao
+    ref = {"ponto": _px(0.5, 0.3, 2.9), "tamanho_cm": 30, "nome": "régua"}
+    dados = {"pista": json.dumps({"ponto": _px(-0.6, 0.0, 3.0)}), "referencia": json.dumps(ref)}
+    for _ in range(3):  # medir a mesma foto várias vezes não acumula nada
+        r = cli.post("/api/medicao/comparar", files={"arquivo": ("f.png", foto, "image/png")}, data={**dados, "modelo": "da3"})
+        assert r.status_code == 200, r.text
+        d = r.json()
+        assert list(d["resultados"]) == ["da3"]
+        assert d["resultados"]["da3"]["com_referencia"]["comprimento_cm"] == pytest.approx(210, rel=0.01)
+        assert "id" not in d and "foto" not in d and "erros" not in d
+    assert cli.get("/api/medicao/registro").json()["entradas"] == []
+    assert cli.get("/api/medicao/fotos").json()["fotos"] == []
+    r = cli.post("/api/medicao/comparar", files={"arquivo": ("f.png", foto, "image/png")}, data={**dados, "modelo": "nao-existe"})
+    assert r.status_code == 422
+    # sem `modelo`, os dois modelos instalados continuam saindo (a avaliação em ml/ e a API antiga)
+    r = cli.post("/api/medicao/comparar", files={"arquivo": ("f.png", foto, "image/png")}, data=dados)
+    assert set(r.json()["resultados"]) == {"da3", "moge"}
+
+
 def test_comparar_os_dois_modelos_e_registrar(comparacao):
     cli, foto = comparacao
     ref = {"ponto": _px(0.5, 0.3, 2.9), "tamanho_cm": 30, "nome": "régua"}
     r = cli.post("/api/medicao/comparar", files={"arquivo": ("f.png", foto, "image/png")},
-                 data={"pista": json.dumps({"ponto": _px(-0.6, 0.0, 3.0)}), "referencia": json.dumps(ref)})
+                 data={"pista": json.dumps({"ponto": _px(-0.6, 0.0, 3.0)}), "referencia": json.dumps(ref), "registrar": "true"})
     assert r.status_code == 200, r.text
     d = r.json()
     assert d["resultados"]["da3"]["sem_referencia"]["comprimento_cm"] == pytest.approx(210 * 1.05, rel=0.005)
@@ -284,7 +305,7 @@ def test_foto_do_celular_fica_guardada_e_e_medida_na_tela(comparacao, monkeypatc
     codigo = servidor._celular_guardar_foto(foto)
     assert cli.get(f"/api/medicao/fotos/{codigo}").content == foto
     r = cli.post("/api/medicao/comparar", files={"arquivo": ("f.png", cli.get(f"/api/medicao/fotos/{codigo}").content, "image/png")},
-                 data={"pista": json.dumps({"ponto": _px(-0.6, 0.0, 3.0)}), "como": "sem"})
+                 data={"pista": json.dumps({"ponto": _px(-0.6, 0.0, 3.0)}), "como": "sem", "registrar": "true"})
     assert r.json()["resultados"]["da3"]["sem_referencia"]["comprimento_cm"] == pytest.approx(210 * 1.05, rel=0.005)
     entrada = cli.get("/api/medicao/registro").json()["entradas"][0]
     assert entrada["foto"] == codigo and entrada["como"] == "sem"
@@ -336,14 +357,10 @@ def test_api_video_keyframes_e_medir(cliente, tmp_path):
     assert dados_med["n_keyframes"] >= 1
 
 
-def test_video_comparar_guarda_video_e_registra(comparacao, monkeypatch, tmp_path):
-    """O vídeo passa pelos dois modelos em cada quadro; a medida entra no registro com o 1º quadro como foto."""
+def _video_de_teste(tmp_path):
     cv2 = pytest.importorskip("cv2")
     import numpy as np
 
-    import nucleo.medicao as medicao
-
-    cli, _ = comparacao
     caminho = tmp_path / "v.mp4"
     escrita = cv2.VideoWriter(str(caminho), cv2.VideoWriter_fourcc(*"mp4v"), 10.0, (160, 120))
     for i in range(20):
@@ -352,10 +369,44 @@ def test_video_comparar_guarda_video_e_registra(comparacao, monkeypatch, tmp_pat
         q[:, (i % 10)::10] = 20
         escrita.write(q)
     escrita.release()
+    return caminho
+
+
+def test_video_comparar_nao_grava_por_padrao(comparacao, monkeypatch, tmp_path):
+    """Sem `registrar`, o vídeo é medido (só no modelo pedido) e nada é guardado: nem vídeo, nem foto, nem medida."""
+    import nucleo.medicao as medicao
+
+    cli, _ = comparacao
+    caminho = _video_de_teste(tmp_path)
+    pedidos = []
+
+    def falso(jpeg, pista, ref, modelos=None):
+        pedidos.append(modelos)
+        return {"resultados": {"da3": {"sem_referencia": {"comprimento_cm": 33.0}, "com_referencia": None}}, "contorno": []}
+
+    monkeypatch.setattr(medicao, "comparar", falso)
+    r = cli.post("/api/medicao/video/comparar", files={"arquivo": ("v.mp4", caminho.read_bytes(), "video/mp4")},
+                 data={"pista": json.dumps({"ponto": [80, 60]}), "modelo": "da3"})
+    assert r.status_code == 200, r.text
+    corpo = r.json()
+    assert corpo["consenso"]["da3"]["sem_referencia"]["comprimento_cm"]["valor"] == 33.0
+    assert pedidos and all(p == ["da3"] for p in pedidos)
+    assert "jpeg_primeiro" not in corpo and "id" not in corpo and "video" not in corpo
+    assert cli.get("/api/medicao/registro").json()["entradas"] == []
+    assert cli.get("/api/medicao/fotos").json()["fotos"] == []
+    assert not list((tmp_path / "dados_app" / "medicao").glob("videos/*"))
+
+
+def test_video_comparar_guarda_video_e_registra(comparacao, monkeypatch, tmp_path):
+    """Com `registrar=true`, o vídeo passa pelos dois modelos em cada quadro; a medida entra no registro com o 1º quadro como foto."""
+    import nucleo.medicao as medicao
+
+    cli, _ = comparacao
+    caminho = _video_de_teste(tmp_path)
     monkeypatch.setattr(medicao, "comparar", lambda jpeg, pista, ref: {"resultados": {
         "da3": {"sem_referencia": {"comprimento_cm": 33.0}, "com_referencia": None}}, "contorno": []})
     r = cli.post("/api/medicao/video/comparar", files={"arquivo": ("v.mp4", caminho.read_bytes(), "video/mp4")},
-                 data={"pista": json.dumps({"ponto": [80, 60]}), "como": "sem"})
+                 data={"pista": json.dumps({"ponto": [80, 60]}), "como": "sem", "registrar": "true"})
     assert r.status_code == 200, r.text
     corpo = r.json()
     assert corpo["consenso"]["da3"]["sem_referencia"]["comprimento_cm"]["valor"] == 33.0

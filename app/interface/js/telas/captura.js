@@ -1,12 +1,12 @@
 // Captura (Etapa 5c): as fontes de imagem que chegam sozinhas e o resultado delas. Abas Pasta monitorada,
-// Vídeo, Celular, Medir foto (docs/07_roteiro_medicao_geral.md) e Alertas; cada aba é um módulo em js/captura/
-// (js/telaAbas.js).
+// Vídeo, Celular e Alertas; cada aba é um módulo em js/captura/ (js/telaAbas.js). Medir foto saiu daqui: é a
+// tela Medição (js/telas/medicao.js).
 import { TEXTOS as T } from "../../textos.js";
 import { el, api } from "../base.js";
 import { telaComAbas } from "../telaAbas.js";
 
 const K = T.captura;
-const ABAS = ["pasta", "video", "celular", "medir", "alertas"];
+const ABAS = ["pasta", "video", "celular", "alertas"];
 
 export async function montar(pagina, rota) {
   const status = await api("/api/status");

@@ -1,20 +1,21 @@
-// Captura › Medir foto (docs/07_roteiro_medicao_geral.md, fase 5): medir um objeto qualquer numa foto comum.
-// Abrir a foto, clicar no objeto (ou arrastar uma caixa, ou marcar duas pontas) e ver altura, largura e
-// comprimento com a margem de erro; uma referência de tamanho conhecido na foto corrige a escala.
-// O servidor faz tudo (POST /api/medicao/comparar): cada medida sai nos dois modelos de profundidade (Depth Anything 3
-// e MoGe-2), sem e com a referência, lado a lado; com o valor real informado, o registro guarda o erro de cada um
-// (GET /api/medicao/registro). Contorno do SAM 2.1 e geometria em 3D.
+// Medição › Medir: medir um objeto qualquer numa foto comum (docs/07_roteiro_medicao_geral.md, fase 5).
+// Abrir a foto, clicar no objeto (ou arrastar uma caixa, ou marcar duas pontas) e ver altura, largura, comprimento e
+// espessura com a margem de erro; uma referência de tamanho conhecido (o post-it rosa, achado sozinho pela cor) corrige a escala.
+// Cada marca mede UMA vez e mostra UM resultado, que a marca seguinte substitui: nada de medida guardada. O servidor mede
+// com o modelo padrão (POST /api/medicao/comparar com `modelo`, sem `registrar`, então nada vai para o registro): com a
+// referência quando ela vale, senão pela escala do próprio modelo. Contorno do SAM 2.1 e geometria em 3D.
+// A foto aberta só fica na faixa de fotos (POST /api/medicao/fotos) para passar de uma para outra; as do celular chegam por ali.
 // Sem modelo nenhum (ou sem os pesos instalados), o modo "Retângulo de referência" mede no plano de uma folha
 // A4 ou de um cartão: 4 cantos e 2 pontas, por homografia (POST /api/medicao/plano).
 import { TEXTOS as T } from "../../textos.js";
 import { el, api, fmt, json, lerNumero } from "../base.js";
-import { botao, avisar, barraFerramentas, campo, esqueleto, estadoVazio, ocupado, secao, segmentado } from "../componentes.js";
+import { botao, avisar, barraFerramentas, campo, esqueleto, estadoVazio, ocupado, secao } from "../componentes.js";
 import { endereco } from "../rotas.js";
 
 const M = T.medir;
 const SVG = "http://www.w3.org/2000/svg";
 const ORDEM = ["altura", "comprimento", "largura", "espessura", "distancia"];
-const QUADROS_VIDEO = 4;  // quadros nítidos medidos por vídeo (cada um passa pelos dois modelos)
+const QUADROS_VIDEO = 4;  // quadros nítidos medidos por vídeo
 const PASSO_TECLADO = 0.01; // mira do teclado: 1 % da foto por seta (Shift: 5 %)
 const CAIXA_MINIMA = 0.01;  // arrasto menor que 1 % da foto vale como clique
 
@@ -26,20 +27,20 @@ function svg(tag, attrs = {}) {
 
 export async function montar(no, ctx = {}) {
   const estado = await api("/api/medicao/estado");
+  const modeloPadrao = estado.modelo_padrao;
+  const nomeModelo = M.colunas[modeloPadrao] || modeloPadrao;
 
-  let foto = null;           // { arquivo, url, largura, altura }
+  let foto = null;           // { arquivo, url, largura, altura, codigo }
   let modo = estado.pronto ? "ponto" : "plano"; // ponto | caixa | pontos (com os modelos) | plano (sem modelo)
   let cantos = [];           // modo plano: cantos do retângulo de referência
   let pontoPlano = null;     // modo plano: a primeira ponta da medida
-  let medidasPlano = [];     // modo plano: [{ pontos, r }]
+  let medidaPlano = null;    // modo plano: a medida mostrada, { pontos, r }
   let alvo = "objeto";       // objeto | referencia: o que a próxima marca na foto define
-  let medicoes = [];         // cada medida da foto: { n, pista, r (comparação), real, id }; a mais nova por último
+  let medida = null;         // a medida mostrada: { pista, r (resposta do servidor; null enquanto mede), video (nº de quadros), comReferencia, seq }
   let pistaRef = null;       // pista da referência
   let primeiroPonto = null;  // modo "pontos": a primeira ponta
   let medindo = false;
-  let contador = 0;
-  const NOMES = Object.fromEntries((estado.modelos || []).map((m) => [m.id, M.colunas[m.id] || m.id]));
-  NOMES.contexto = M.contextoTitulo;
+  let sequencia = 0;         // cada pedido de medida leva um número; só o mais novo mostra o resultado
   let biblioteca = [];
   let ultimaPista = null;
   let geracao = 0;
@@ -110,9 +111,6 @@ export async function montar(no, ctx = {}) {
   const teclaEspaco = (ev) => { if (ev.code === "Space" && !ev.target.closest?.("input, textarea, button")) espaco = ev.type === "keydown"; };
   addEventListener("keydown", teclaEspaco);
   addEventListener("keyup", teclaEspaco);
-  const listaMedicoes = el("div", { class: "lista-medicoes", "aria-live": "polite" });
-  const blocoComparacao = el("section", { class: "bloco-comparacao", "aria-label": M.comparacaoTitulo },
-    el("div", { class: "titulo-bloco" }, el("h2", {}, M.comparacaoTitulo)), listaMedicoes);
   const area = el("div", { class: "coluna-medir" }, palco);
   // faixa das fotos guardadas (as abertas aqui e as do celular), com setas para passar de uma para outra
   let galeria = [];
@@ -133,13 +131,7 @@ export async function montar(no, ctx = {}) {
   const marcarRef = botao({ texto: M.marcarReferencia, icone: "regua", onclick: () => comecarReferencia() });
   const tirarRef = botao({ texto: M.tirarReferencia, variante: "fantasma", compacto: true, onclick: () => { pistaRef = null; desenharReferencia(); remedir(); } });
   const notaRef = el("p", { class: "nota", role: "status" });
-  // medir com a referência, sem ou os dois: vale para os próximos cliques (cada medida guarda a sua escolha)
-  let comoMedir = "ambos";
-  try { comoMedir = localStorage.getItem("pyron.medir.como") || "ambos"; } catch { /* sem armazenamento */ }
-  const notaComo = el("p", { class: "nota" }, M.comoNota[comoMedir]);
-  const seletorComo = segmentado({ rotulo: M.medirComo, valor: comoMedir, opcoes: Object.entries(M.como).map(([valor, texto]) => ({ valor, texto })),
-    aoMudar: (v) => { comoMedir = v; notaComo.textContent = M.comoNota[v]; try { localStorage.setItem("pyron.medir.como", v); } catch { /* sem armazenamento */ } } });
-  const corpoRef = el("div", { class: "grupo-campos" }, el("p", { class: "nota" }, M.referenciaTexto), objetoRef, ladoRef, tamanhoRef, seletorComo, notaComo, el("div", { class: "grupo-btn" }, marcarRef, tirarRef), notaRef);
+  const corpoRef = el("div", { class: "grupo-campos" }, el("p", { class: "nota" }, M.referenciaTexto), objetoRef, ladoRef, tamanhoRef, el("div", { class: "grupo-btn" }, marcarRef, tirarRef), notaRef);
   const retangulos = refs.filter(([, r]) => r.largura != null);
   const retRef = campo({ rotulo: M.retangulo, valor: autos.length ? `auto:${autos[0][0]}` : retangulos[0]?.[0] || "outro", opcoes: [
     ...autos.map(([id, r]) => ({ valor: `auto:${id}`, texto: r.nome })),
@@ -147,12 +139,12 @@ export async function montar(no, ctx = {}) {
   const ladoMaior = campo({ rotulo: M.ladoMaior, tipo: "number", unidade: "cm" });
   const ladoMenor = campo({ rotulo: M.ladoMenor, tipo: "number", unidade: "cm" });
   const acharPostit = botao({ texto: M.acharPostit, icone: "detectar", onclick: () => ocupado(acharPostit, achar) });
-  const refazerCantos = botao({ texto: M.refazerCantos, variante: "fantasma", compacto: true, onclick: () => { cantos = []; pontoPlano = null; medidasPlano = []; atualizarTudo(); palco.focus({ preventScroll: true }); } });
+  const refazerCantos = botao({ texto: M.refazerCantos, variante: "fantasma", compacto: true, onclick: () => { cantos = []; pontoPlano = null; medidaPlano = null; atualizarTudo(); palco.focus({ preventScroll: true }); } });
   const corpoPlano = el("div", { class: "grupo-campos" }, el("p", { class: "nota" }, M.planoTexto), retRef, ladoMaior, ladoMenor, el("div", { class: "grupo-btn" }, acharPostit, refazerCantos));
   const secaoRef = secao({ titulo: M.referenciaTitulo, conteudo: [corpoRef] });
   const secaoPlano = secao({ titulo: M.planoTitulo, conteudo: [corpoPlano] });
   const avisoModelos = estado.pronto ? null : el("div", { class: "aviso-modelos" }, el("p", { class: "nota" }, M.semModelosNota), el("code", { class: "mono comando-medir" }, M.comandoInstalar),
-    el("a", { class: "btn compacto", href: endereco("modelos", ["medicao"]) }, M.abrirModelos));
+    el("a", { class: "btn compacto", href: endereco("medicao", ["modelos"]) }, M.abrirModelos));
   const secaoResultado = el("section", {}, el("div", { class: "titulo-bloco" }, el("h2", {}, M.resultado)), caixaResultado);
 
   // biblioteca de pesos (contexto do vídeo)
@@ -168,12 +160,10 @@ export async function montar(no, ctx = {}) {
     listaItensContexto);
   const secaoContexto = secao({ titulo: M.contextoTitulo, conteudo: [corpoContexto] });
 
-  const caixaRegistro = el("div", { class: "registro-medir" });
   const caixaCelular = el("div", { class: "celular-medir" });
   const secaoCelular = secao({ titulo: M.celularTitulo, conteudo: [el("p", { class: "nota" }, M.celularTexto), caixaCelular] });
-  const secaoRegistro = secao({ titulo: M.registroTitulo, conteudo: [el("p", { class: "nota" }, M.registroTexto), caixaRegistro] });
   const painel = el("aside", { class: "painel-medir", "aria-label": M.resultado },
-    secaoResultado, secaoContexto, secaoPlano, secaoRef, secaoCelular, secaoRegistro,
+    secaoResultado, secaoContexto, secaoPlano, secaoRef, secaoCelular,
     secao({ titulo: M.detalhes, aberta: false, conteudo: [caixaDetalhes] }),
     avisoModelos);
 
@@ -234,6 +224,13 @@ export async function montar(no, ctx = {}) {
   let inicioMedida = 0;
   const relogioMedida = setInterval(() => { if (medindo) atualizarHud(); }, 1000);
 
+  /** O que vale numa medida: com a referência quando ela foi usada, senão a escala do próprio modelo. */
+  function valorDe(r) {
+    const res = r.resultados?.[modeloPadrao] || r.resultados?.contexto || Object.values(r.resultados || {})[0] || {};
+    const usada = Boolean(res.com_referencia) && !res.com_referencia.referencia_ignorada;
+    return { res, v: (usada ? res.com_referencia : res.sem_referencia) || {}, usada };
+  }
+
   function desenharCamada(rascunho = null) {
     if (!foto) return;
     const { largura: W, altura: H } = foto;
@@ -274,15 +271,14 @@ export async function montar(no, ctx = {}) {
       }
     }
 
-    const ultima = [...medicoes].reverse().find((m) => m.r);
-    const doQuadro = (m) => (video && m.r?.quadrosVideo ? m.r.quadrosVideo[video.atual] || {} : null);  // v?deo: o que vale no quadro mostrado
+    const ultima = medida?.r ? medida : null;
+    const doQuadro = (m) => (video && m.r?.quadrosVideo ? m.r.quadrosVideo[video.atual] || {} : null);  // vídeo: o que vale no quadro mostrado
     if (ultima && (modo !== "plano" || ultima.r?.resultados?.contexto)) {
       poligonos(doQuadro(ultima) ? [] : ultima.r.contorno_referencia || [], "contorno-ref");
       poligonos(doQuadro(ultima)?.contorno || ultima.r.contorno || [], "contorno-obj");
 
       const cotas = doQuadro(ultima) ? (video.atual === 0 ? ultima.r.cotas || {} : {}) : ultima.r.cotas || {};
-      const res0 = Object.values(ultima.r.resultados || {}).find((x) => x.com_referencia || x.sem_referencia);
-      const v0 = res0?.com_referencia || res0?.sem_referencia || {};
+      const { v: v0 } = valorDe(ultima.r);
 
       if (cotas.apoio && (!cotaDestacada || cotaDestacada === "altura")) {
         const [[ax1, ay1], [ax2, ay2]] = cotas.apoio;
@@ -341,11 +337,11 @@ export async function montar(no, ctx = {}) {
         filhos.push(svg(tag, { points: pts, class: "marca-ref sombra" }), svg(tag, { points: pts, class: "marca-ref" }));
       }
       cantos.forEach(([cx, cy]) => filhos.push(svg("circle", { cx, cy, r: Math.max(W, H) * 0.006, class: "marca-ref" })));
-      medidasPlano.forEach((m) => marca({ pontos: m.pontos }, "marca-obj"));
+      if (medidaPlano) marca({ pontos: medidaPlano.pontos }, "marca-obj");
       if (pontoPlano) marca({ ponto: pontoPlano }, "marca-obj");
     } else {
       marca(pistaRef, "marca-ref");
-      medicoes.forEach((m) => marca(doQuadro(m)?.pista || (!video || video.atual === 0 ? m.pista : null), "marca-obj"));
+      if (medida) marca(doQuadro(medida)?.pista || (!video || video.atual === 0 ? medida.pista : null), "marca-obj");
       if (primeiroPonto) marca({ ponto: primeiroPonto }, "marca-obj");
     }
     if (rascunho) marca({ caixa: rascunho }, "marca-rascunho");
@@ -353,116 +349,46 @@ export async function montar(no, ctx = {}) {
     camada.replaceChildren(...filhos);
   }
 
+  /** Uma leitura do resultado: nome da grandeza, valor e a margem. */
+  function leitura(rotulo, valor, margem, principal = false, aoPassar = null) {
+    return el("div", { class: principal ? "leitura-medir principal" : "leitura-medir", onmouseenter: aoPassar && (() => aoPassar(true)), onmouseleave: aoPassar && (() => aoPassar(false)) },
+      el("span", { class: "rotulo" }, rotulo), el("b", { class: "num" }, M.valor(fmt(valor, 1))), el("span", { class: "num mais" }, M.mais(fmt(margem, 1))));
+  }
+
+  /** A medida da foto, uma só: altura, comprimento… com a margem, o aviso da referência e como foi medido. */
   function desenharResultado() {
-    const temContexto = medicoes.some((m) => m.r?.resultados?.contexto);
-    secaoResultado.hidden = modo !== "plano" && !medidasPlano.some((m) => m.r);
-    blocoComparacao.hidden = modo === "plano" && !temContexto;
-    if (modo === "plano") desenharResultadoPlano();
-    if (!medicoes.length) { listaMedicoes.replaceChildren(el("p", { class: "nota" }, M.comparacaoVazia)); caixaDetalhes.replaceChildren(); return; }
-    listaMedicoes.replaceChildren(...[...medicoes].reverse().map(cartao));
-    const ultima = [...medicoes].reverse().find((m) => m.r);
-    const r0 = ultima && Object.values(ultima.r.resultados).find((x) => x.sem_referencia)?.sem_referencia;
-    caixaDetalhes.replaceChildren(...(r0 ? [el("p", {}, M.lente[r0.lente] || "")] : []));
-  }
-
-  /** Um cartão por medida: linhas = altura, comprimento…; colunas = cada modelo sem e com referência e o valor real. */
-  function cartao(m) {
-    const fechar = botao({ texto: M.removerMedida, icone: "x", soIcone: true, compacto: true, variante: "fantasma",
-      onclick: () => { medicoes = medicoes.filter((x) => x !== m); atualizarTudo(); } });
-    const cab = el("div", { class: "cab-cartao" }, el("h3", {}, M.medidaDe(m.n, m.video ? M.tipoVideo : M.tipoPista[Object.keys(m.pista)[0]])), fechar);
-    if (!m.r) return el("article", { class: "cartao-medida" }, cab, el("p", { class: "nota" }, M.medindoModelos), esqueleto.linhas(2));
-    const res = m.r.resultados;
-    const modelos = Object.keys(res);
-    const comRef = modelos.some((k) => res[k].com_referencia);
-    // "Com referência" mostra só essas colunas; se a referência não foi achada, cai nas sem referência
-    const sem = m.como !== "com" || !comRef;
-    const colunas = modelos.flatMap((k) => [...(sem ? [[k, "sem_referencia", NOMES[k] || k]] : []), ...(comRef ? [[k, "com_referencia", M.comRef(NOMES[k] || k)]] : [])]);
-    const medidas = ORDEM.filter((q) => colunas.some(([k, modo]) => res[k][modo]?.[`${q}_cm`] != null));
-    const celula = (k, modo, q) => {
-      const v = res[k][modo];
-      if (!v || v[`${q}_cm`] == null) return el("td", {}, T.geral.semValor);
-      const erro = m.erros?.[k]?.[modo]?.[q];
-      return el("td", {}, el("span", { class: "num valor" }, fmt(v[`${q}_cm`], 1)),
-        el("span", { class: "num mais" }, M.mais(fmt(v.incerteza_cm?.[q], 1))),
-        erro != null ? el("span", { class: `num erro-medida ${Math.abs(erro) < 0.1 ? "bom" : Math.abs(erro) < 0.25 ? "medio" : "ruim"}` }, M.erroPct(Math.round(erro * 100))) : null);
-    };
-    const linhas = medidas.map((q) => {
-      const real = campoReal(m, q);
-      return el("tr", {
-        class: "linha-medida",
-        onmouseenter: () => { cotaDestacada = q; desenharCamada(); },
-        onmouseleave: () => { cotaDestacada = null; desenharCamada(); },
-      }, el("th", { scope: "row" }, M.nomes[q]), ...colunas.map(([k, modo]) => celula(k, modo, q)), el("td", {}, real));
-    });
+    caixaDetalhes.replaceChildren();
+    if (modo === "plano") { desenharResultadoPlano(); return; }
+    const r = medida?.r;
+    if (medida && !r) { caixaResultado.replaceChildren(esqueleto.linhas(2)); return; }
+    if (!r || r.resultados?.contexto) { caixaResultado.replaceChildren(el("p", { class: "nota" }, M.semResultado)); return; }  // a do contexto tem o cartão dela
+    const { res, v, usada } = valorDe(r);
+    const medidas = ORDEM.filter((q) => v[`${q}_cm`] != null);
+    const destacar = (q) => (ligado) => { cotaDestacada = ligado ? q : null; desenharCamada(); };
     const notas = [];
-    for (const k of modelos) {
-      if (res[k].erro) notas.push(M.modeloErro(NOMES[k] || k, res[k].erro));
-      const ign = res[k].com_referencia?.referencia_ignorada;
-      if (ign) notas.push(M.refIgnorada(NOMES[k] || k, ign));
-    }
-    const tempos = modelos.map((k) => res[k].sem_referencia?.tempos_ms?.total != null
-      ? M.temposModelo(NOMES[k] || k, M.segundos(fmt(res[k].sem_referencia.tempos_ms.total / 1000, 1))) : null).filter(Boolean);
-    return el("article", { class: "cartao-medida" }, cab, campoNome(m),
-      el("div", { class: "rola-tabela" }, el("table", { class: "tabela-comparacao" },
-        el("thead", {}, el("tr", {}, el("th", { scope: "col" }, M.colunaMedida), ...colunas.map(([, , nome]) => el("th", { scope: "col" }, nome)), el("th", { scope: "col" }, M.colunaReal))),
-        el("tbody", {}, linhas))),
-      m.video ? el("p", { class: "nota" }, M.notaVideo(m.video)) : null,
-      ...notas.map((t) => el("p", { class: "nota aviso-escala" }, t)),
-      tempos.length ? el("p", { class: "nota" }, M.tempos(tempos.join(", "))) : null);
-  }
-
-  /** O nome do objeto ("Kindle"): agrupa as medidas em Modelos › Medição. */
-  function campoNome(m) {
-    const c = campo({ rotulo: M.nomeObjeto, valor: m.nome, marcador: M.nomeMarcador, classe: "campo-nome", autocomplete: "off" });
-    const entrada = c.querySelector("input");
-    entrada.addEventListener("change", async () => {
-      m.nome = entrada.value.trim();
-      try { await api(`/api/medicao/registro/${m.id}`, json("PUT", { nome: m.nome })); avisar(M.nomeSalvo); }
-      catch (erro) { avisar(erro.message, { erro: true }); }
-    });
-    return c;
-  }
-
-  function campoReal(m, q) {
-    const entrada = el("input", { type: "text", inputmode: "decimal", class: "num campo-real", value: m.real[q] != null ? fmt(m.real[q], 1) : "",
-      "aria-label": M.realRotulo(M.nomes[q].toLowerCase(), m.n), autocomplete: "off" });
-    entrada.addEventListener("change", async () => {
-      const v = lerNumero(entrada.value);
-      if (v != null && !(v > 0)) return;
-      m.real = { ...m.real, [q]: v };
-      try {
-        const e = await api(`/api/medicao/registro/${m.id}`, json("PUT", { real: m.real }));
-        m.erros = e.erros;
-        desenharResultado();
-        atualizarRegistro();
-        avisar(M.realSalvo);
-      } catch (erro) { avisar(erro.message, { erro: true }); }
-    });
-    return entrada;
-  }
-
-  async function atualizarRegistro() {
-    try {
-      const r = await api("/api/medicao/registro?limite=1");
-      const linhas = [];
-      for (const [modelo, modos] of Object.entries(r.resumo || {})) {
-        for (const [modoR, v] of Object.entries(modos)) linhas.push(el("li", {}, M.registroLinha(NOMES[modelo] || modelo, M.modos[modoR], fmt(v.erro_mediano_pct, 1), v.n)));
-      }
-      caixaRegistro.replaceChildren(linhas.length ? el("ul", { class: "lista-registro" }, linhas) : el("p", { class: "nota" }, M.registroVazio));
-    } catch { /* a faixa de conexão já avisa */ }
+    if (usada) notas.push(el("p", { class: "nota" }, M.comReferencia));
+    else if (medida.comReferencia) {
+      const motivo = res.erro || res.com_referencia?.referencia_ignorada;
+      notas.push(el("p", { class: "nota aviso-escala" }, M.refNaoUsada(motivo)), el("p", { class: "nota" }, M.semReferencia));
+    } else notas.push(el("p", { class: "nota" }, M.semReferencia));
+    if (medida.video) notas.push(el("p", { class: "nota" }, M.notaVideo(medida.video)));
+    caixaResultado.replaceChildren(
+      el("div", { class: "leituras-medir" }, medidas.map((q) => leitura(M.nomes[q], v[`${q}_cm`], v.incerteza_cm?.[q], medidas.length === 1, destacar(q)))),
+      ...notas);
+    const detalhes = [];
+    if (v.lente) detalhes.push(el("p", {}, M.lente[v.lente] || ""));
+    const total = v.tempos_ms?.total;
+    detalhes.push(el("p", { class: "nota" }, M.modeloUsado(nomeModelo, total != null ? M.segundos(fmt(total / 1000, 1)) : "")));
+    caixaDetalhes.replaceChildren(...detalhes);
   }
 
   function desenharResultadoPlano() {
-    const prontas = medidasPlano.filter((m) => m.r);
-    if (!prontas.length) { caixaResultado.replaceChildren(el("p", { class: "nota" }, M.semResultado)); caixaDetalhes.replaceChildren(); return; }
-    const linhas = medidasPlano.map((m, i) => !m.r ? null : el("div", { class: i === medidasPlano.length - 1 ? "leitura-medir principal" : "leitura-medir" },
-      el("span", { class: "rotulo" }, m.r.extrapolacao > 3 ? `${M.medidaN(i + 1)}, ${M.longe}` : M.medidaN(i + 1)),
-      el("b", { class: "num" }, M.valor(fmt(m.r.distancia_cm, 1))),
-      el("span", { class: "num mais" }, M.mais(fmt(m.r.incerteza_cm, 1)))));
-    const ultima = medidasPlano.length - 1;
-    caixaResultado.replaceChildren(el("div", { class: "leituras-medir" }, linhas.filter(Boolean).reverse()), el("p", { class: "nota" }, M.planoMetodo));
-    if (!medidasPlano[ultima]?.r) caixaResultado.prepend(esqueleto.linhas(1));
-    caixaDetalhes.replaceChildren();
+    const r = medidaPlano?.r;
+    if (medidaPlano && !r) { caixaResultado.replaceChildren(esqueleto.linhas(1)); return; }
+    if (!r) { caixaResultado.replaceChildren(el("p", { class: "nota" }, M.semResultado)); return; }
+    caixaResultado.replaceChildren(
+      el("div", { class: "leituras-medir" }, leitura(r.extrapolacao > 3 ? `${M.nomes.distancia}, ${M.longe}` : M.nomes.distancia, r.distancia_cm, r.incerteza_cm, true)),
+      el("p", { class: "nota" }, M.planoMetodo));
   }
 
   function atualizarTudo() {
@@ -582,11 +508,10 @@ export async function montar(no, ctx = {}) {
     const largInc = extrairIncerteza(res.largura) ?? (largVal ? largVal * 0.05 : null);
     const compInc = extrairIncerteza(res.comprimento) ?? (compVal ? compVal * 0.05 : null);
 
-    const nomeContexto = res.contexto?.nome || res.contexto?.classe || (biblioteca.find((b) => String(b.id) === String(res.contexto?.id))?.nome) || "";
-
-    const m = {
-      n: ++contador,
+    sequencia++;  // a medida em andamento, se houver, não aparece mais
+    medida = {
       pista,
+      video: 0,
       r: {
         resultados: {
           contexto: {
@@ -606,19 +531,8 @@ export async function montar(no, ctx = {}) {
         contorno: res.contorno || [],
         contorno_referencia: [],
         cotas: res.cotas || {},
-        contexto: res.contexto,
-        escala_cm_px: res.escala_cm_px,
-        angulo_inclinacao_graus: res.angulo_inclinacao_graus,
-        area_cm2: res.area_cm2,
       },
-      real: {},
-      id: res.id || `contexto-${Date.now()}`,
-      erros: null,
-      como: "sem",
-      nome: nomeContexto,
     };
-
-    medicoes.push(m);
     desenharResultadoContextoDestaque(res, altVal, largVal, compVal, altInc, largInc, compInc);
   }
 
@@ -704,7 +618,7 @@ export async function montar(no, ctx = {}) {
   }
 
   async function remedirPlano() {
-    for (const m of medidasPlano.filter((x) => x.r)) await medirPlano(m);
+    if (medidaPlano?.r) await medirPlano(medidaPlano);
     desenharResultado();
   }
 
@@ -713,9 +627,11 @@ export async function montar(no, ctx = {}) {
     if (!pontoPlano) { pontoPlano = p; atualizarHud(); desenharCamada(); return; }
     const m = { pontos: [pontoPlano, p], r: null };
     pontoPlano = null;
-    medidasPlano.push(m); // entra na ordem do clique, mesmo que a resposta de outra medida chegue antes
-    atualizarHud(); desenharCamada();
-    if (!(await medirPlano(m))) medidasPlano = medidasPlano.filter((x) => x !== m);
+    medidaPlano = m;  // a medida nova substitui a anterior
+    atualizarTudo();
+    const ok = await medirPlano(m);
+    if (medidaPlano !== m) return;  // outra marca veio no meio
+    if (!ok) medidaPlano = null;
     atualizarTudo();
   }
 
@@ -728,7 +644,6 @@ export async function montar(no, ctx = {}) {
     if (auto && !lerNumero(campoTamanho.value)) campoTamanho.value = fmt(auto.lado_cm, 1);
     if (pronta) campoTamanho.value = fmt(pronta[seletorLado.value === "largura" && pronta.largura != null ? "largura" : "comprimento"], 2);
     marcarRef.hidden = Boolean(auto);
-    seletorComo.hidden = notaComo.hidden = !escolha;  // sem referência não há o que escolher
     marcarRef.disabled = !escolha || !foto;
     tirarRef.hidden = !pistaRef;
     notaRef.textContent = pistaRef ? M.referenciaMarcada : "";
@@ -750,8 +665,8 @@ export async function montar(no, ctx = {}) {
   }
 
   // ---------------------------------------------------------------- ações
-  /** Abre a foto. O navegador não mostra HEIC: aí o servidor devolve um JPEG do mesmo tamanho só para a tela
-   * (as medidas usam sempre o arquivo original, com os metadados). */
+  /** Abre a foto, sem nenhuma marca de medida. O navegador não mostra HEIC: aí o servidor devolve um JPEG do mesmo
+   * tamanho só para a tela (as medidas usam sempre o arquivo original, com os metadados). */
   function abrir(arquivo, previa = null, { comoVideo = false } = {}) {
     if (foto) URL.revokeObjectURL(foto.url);
     const url = URL.createObjectURL(previa || arquivo);
@@ -760,7 +675,7 @@ export async function montar(no, ctx = {}) {
       if (!comoVideo) video = null;
       foto = { arquivo, url, largura: img.naturalWidth, altura: img.naturalHeight, codigo: arquivo.codigo || null };
       pistaRef = primeiroPonto = pontoPlano = null;
-      cantos = []; medidasPlano = []; medicoes = [];
+      cantos = []; medidaPlano = null; medida = null;
       alvo = "objeto";
       ultimaPista = null;
       caixaResultadoContexto.replaceChildren();
@@ -768,11 +683,10 @@ export async function montar(no, ctx = {}) {
       imagem.src = url;
       zoom = 1; quadro.style.width = ""; janela.style.height = ""; janela.classList.remove("ampliada"); rotuloZoom.textContent = M.zoomPct(100);
       quadro.style.setProperty("--proporcao", String(foto.largura / foto.altura));
-      area.replaceChildren(palco, faixa, blocoComparacao);
+      area.replaceChildren(palco, faixa);
       desenharReferencia(); atualizarTudo();
       palco.focus({ preventScroll: true });
-      if (comoVideo) desenharFaixa();
-      else if (foto.codigo) { trazerMedidasDoCelular(); desenharFaixa(); } else guardarNaFaixa(arquivo);
+      if (comoVideo || foto.codigo) desenharFaixa(); else guardarNaFaixa(arquivo);
     };
     img.onerror = async () => {
       URL.revokeObjectURL(url);
@@ -797,7 +711,7 @@ export async function montar(no, ctx = {}) {
 
   function limpar() {
     pistaRef = primeiroPonto = pontoPlano = null;
-    cantos = []; medidasPlano = []; medicoes = [];
+    cantos = []; medidaPlano = null; medida = null;
     alvo = "objeto";
     ultimaPista = null;
     caixaResultadoContexto.replaceChildren();
@@ -826,47 +740,43 @@ export async function montar(no, ctx = {}) {
       return;
     }
     if (video && video.atual !== 0) { avisar(M.videoSoPrimeiro); mostrarQuadro(0); return; }
-    const m = { n: ++contador, pista: p, r: null, real: {}, id: null, erros: null, como: comoMedir, nome: "", video: video ? video.quadros.length : 0 };
-    medicoes.push(m);
-    medir(m);
+    caixaResultadoContexto.replaceChildren();
+    medida = { pista: p, r: null, video: video ? video.quadros.length : 0, comReferencia: false, seq: 0 };
+    medir(medida);
   }
 
-  /** Referência mudou: as medidas da foto saem de novo (cada uma vira uma entrada nova no registro). */
-  function remedir() { medicoes.forEach((m) => { m.r = null; m.erros = null; medir(m); }); }
+  /** A referência mudou: a medida da foto sai de novo (e continua uma só). */
+  function remedir() { if (medida?.seq) { medida.r = null; medir(medida); } }  // a do contexto não tem `seq`: não depende da referência
 
-  // uma comparação por vez no servidor (dois modelos); as medidas esperam na ordem do clique
+  // um pedido por vez no servidor; se outra marca chega antes, o pedido velho nem sai
   let fila = Promise.resolve();
   function medir(m) {
     const minha = geracao;
+    const seq = m.seq = ++sequencia;
+    const vale = () => minha === geracao && m.seq === seq;
     if (!medindo) inicioMedida = Date.now();
     medindo = true;
     desenharResultado(); atualizarHud(); desenharCamada();
     fila = fila.then(async () => {
-      if (minha !== geracao || !medicoes.includes(m)) return;
+      if (!vale()) return;
       const dados = new FormData();
       dados.append("arquivo", m.video ? video.arquivo : foto.arquivo);
       dados.append("pista", JSON.stringify(m.pista));
-      const ref = m.como === "sem" ? null : referencia();
+      const ref = referencia();
+      m.comReferencia = Boolean(ref);
       if (ref) dados.append("referencia", JSON.stringify(ref));
-      dados.append("como", m.como);
+      dados.append("modelo", modeloPadrao);  // só o modelo padrão; o servidor não guarda nada sem o pedido explícito
       if (m.video) dados.append("max_keyframes", String(QUADROS_VIDEO));
       try {
-        const r = m.video ? deVideo(await api("/api/medicao/video/comparar", { method: "POST", body: dados }))
-          : await api("/api/medicao/comparar", { method: "POST", body: dados });
-        if (minha !== geracao) return;
-        m.r = r; m.id = r.id; m.erros = r.erros;
-        if (foto && !m.video) foto.codigo = r.foto;
-        if (Object.keys(m.real).length) {  // o valor real já informado vale também para a medida refeita
-          const e = await api(`/api/medicao/registro/${m.id}`, json("PUT", { real: m.real }));
-          m.erros = e.erros;
-          atualizarRegistro();
-        }
+        const r = await api(m.video ? "/api/medicao/video/comparar" : "/api/medicao/comparar", { method: "POST", body: dados });
+        if (!vale()) return;
+        m.r = m.video ? deVideo(r) : r;
       } catch (e) {
-        if (minha !== geracao) return;
-        medicoes = medicoes.filter((x) => x !== m);
+        if (!vale()) return;
+        if (medida === m) medida = null;
         avisar(`${M.erroMedir} ${e.message}`, { erro: true });
       } finally {
-        if (minha === geracao) { medindo = medicoes.some((x) => !x.r); desenharResultado(); atualizarHud(); desenharCamada(); }
+        if (vale()) { medindo = false; desenharResultado(); atualizarHud(); desenharCamada(); }
       }
     });
   }
@@ -955,23 +865,14 @@ export async function montar(no, ctx = {}) {
       el("p", { class: "nota" }, M.fotosCelular));
   }
 
+  /** Abre uma foto guardada (da faixa ou do celular): só a foto, sem medida nenhuma. */
   async function abrirDoCelular(codigo) {
     const r = await fetch(`/api/medicao/fotos/${codigo}`);
     if (!r.ok) { avisar(M.erroMedir, { erro: true }); return; }
     const blob = await r.blob();
     const arquivo = new File([blob], codigo, { type: blob.type });
     arquivo.codigo = codigo;
-    abrir(arquivo);  // ao carregar, traz as medidas que o celular já fez nesta foto
-  }
-
-  /** As medidas já guardadas da foto aberta voltam como cartões (sem o contorno, que não fica no registro). */
-  async function trazerMedidasDoCelular() {
-    if (!foto?.codigo) return;
-    const reg = await api("/api/medicao/registro?limite=100");
-    const ids = new Set(medicoes.map((m) => m.id));
-    const novas = reg.entradas.filter((e) => e.foto === foto.codigo && !ids.has(e.id)).reverse();  // as medidas já guardadas desta foto
-    for (const e of novas) medicoes.push({ n: ++contador, pista: e.pista, r: { resultados: e.resultados, contorno: [], contorno_referencia: [] }, real: e.real || {}, id: e.id, erros: e.erros, como: e.como || (e.referencia ? "ambos" : "sem"), nome: e.nome || "" });
-    if (novas.length) { desenharResultado(); desenharCamada(); atualizarRegistro(); }
+    abrir(arquivo);
   }
 
   async function vigiarCelular() {
@@ -993,7 +894,6 @@ export async function montar(no, ctx = {}) {
         vistas.add(nova.id);
         if (foto?.codigo !== nova.id) { await abrirDoCelular(nova.id); avisar(M.fotoNovaCelular); }
       }
-      await trazerMedidasDoCelular();
     } catch { /* a faixa de conexão já avisa */ }
   }
   const relogioCelular = setInterval(vigiarCelular, 2000);
@@ -1002,7 +902,6 @@ export async function montar(no, ctx = {}) {
   carregarBiblioteca();
   atualizarTudo();
   desenharVazio();
-  atualizarRegistro();
   vigiarCelular();
   // outra foto: arrastar para a aba ou colar (Ctrl+V), além do botão
   const fotoDe = (lista) => [...(lista || [])].find((f) => f.type.startsWith("image/") || /\.(heic|heif)$/i.test(f.name));
@@ -1068,7 +967,7 @@ export async function montar(no, ctx = {}) {
   /** O servidor escolhe os quadros nítidos e espaçados; o 1º abre no palco e os outros vão para a faixa. */
   async function abrirVideo(arquivo) {
     limpar();
-    area.replaceChildren(palco, faixa, blocoComparacao);
+    area.replaceChildren(palco, faixa);
     hud.replaceChildren(el("b", {}, M.escolhendoQuadros));
     quadro.classList.add("medindo");
     const dados = new FormData();
@@ -1093,7 +992,7 @@ export async function montar(no, ctx = {}) {
     abrirVideo(new File([blob], `${codigo}.mp4`, { type: blob.type || "video/mp4" }));
   }
 
-  /** Mostra outro quadro do vídeo sem perder as medidas: a pista e o contorno daquele quadro aparecem nele. */
+  /** Mostra outro quadro do vídeo sem perder a medida: a pista e o contorno daquele quadro aparecem nele. */
   function mostrarQuadro(j) {
     if (!video?.quadros[j]) return;
     video.atual = j;
@@ -1114,27 +1013,28 @@ export async function montar(no, ctx = {}) {
       el("span", { class: "nota num" }, M.posicaoFaixa(atual + 1, quadros.length)));
   }
 
-  /** A resposta do vídeo no formato do cartão: a mediana de cada modelo e modo, o ± é o desvio entre os quadros. */
+  /** A resposta do vídeo no formato da foto: a mediana de cada modelo e modo, o ± é o desvio entre os quadros. */
   function deVideo(r) {
+    const q0 = r.quadros.find((q) => q.resultados) || {};
     const resultados = {};
     for (const [modelo, modos] of Object.entries(r.consenso)) {
-      resultados[modelo] = { sem_referencia: null, com_referencia: null };
+      resultados[modelo] = { sem_referencia: null, com_referencia: null, erro: q0.resultados?.[modelo]?.erro };
       for (const [modoR, c] of Object.entries(modos)) {
         const v = { incerteza_cm: {} };
         for (const [campo, x] of Object.entries(c)) {
           if (x && typeof x === "object") { v[campo] = x.valor; v.incerteza_cm[campo.replace(/_cm$/, "")] = x.desvio_padrao; }
         }
+        if (modoR === "com_referencia") v.referencia_ignorada = q0.resultados?.[modelo]?.com_referencia?.referencia_ignorada || "";
         resultados[modelo][modoR] = v;
       }
     }
-    const q0 = r.quadros.find((q) => q.resultados) || {};
     const cotas = Object.values(q0.resultados || {}).find((x) => x?.sem_referencia)?.sem_referencia?.cotas || {};
     return { ...r, resultados, cotas, contorno: q0.contorno || [], contorno_referencia: [],
       quadrosVideo: r.quadros.map((q) => ({ pista: q.pista, contorno: q.contorno || [] })) };
   }
 
   carregarFaixa();
-  // Modelos › Medição abre uma foto guardada por aqui (#captura/medir/<código>)
+  // um endereço #medicao/medir/<código> abre essa foto guardada
   const pedida = ctx.partes?.[0];
   if (pedida && /^[0-9a-f]+$/i.test(pedida)) abrirDoCelular(pedida);
 
@@ -1146,4 +1046,3 @@ export async function montar(no, ctx = {}) {
     video?.quadros.forEach((q) => URL.revokeObjectURL(q.url));
   };
 }
-

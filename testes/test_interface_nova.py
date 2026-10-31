@@ -140,13 +140,14 @@ def test_equipamentos_e_pendencias_tem_tela_propria_e_formulario_compartilhado()
 
 
 def test_captura_tem_as_quatro_abas_e_so_fontes_que_funcionam():
-    """Etapa 5c: Captura com as abas Pasta monitorada, Vídeo, Celular, Medir foto (roteiro de medição, fase 5) e
-    Alertas (um módulo cada); as fontes e o envio que ainda não existem (RTSP, SDK da FLIR, WhatsApp automático)
+    """Etapa 5c: Captura com as abas Pasta monitorada, Vídeo, Celular e Alertas (um módulo cada; Medir foto
+    saiu para a tela Medição); as fontes e o envio que ainda não existem (RTSP, SDK da FLIR, WhatsApp automático)
     não aparecem na tela."""
     casca = (PASTA / "js" / "telas" / "captura.js").read_text(encoding="utf-8")
-    assert 'const ABAS = ["pasta", "video", "celular", "medir", "alertas"]' in casca
-    for aba in ("pasta", "video", "celular", "medir", "alertas"):
+    assert 'const ABAS = ["pasta", "video", "celular", "alertas"]' in casca
+    for aba in ("pasta", "video", "celular", "alertas"):
         assert (PASTA / "js" / "captura" / f"{aba}.js").exists(), aba
+    assert not (PASTA / "js" / "captura" / "medir.js").exists()
     codigo = [l for l in (PASTA / "js" / "captura" / "pasta.js").read_text(encoding="utf-8").splitlines() if not l.strip().startswith("//")]
     assert not any(p in l.lower() for l in codigo for p in ("rtsp", "flir_sdk", "automatico"))
     assert 'from "../grafico.js"' in (PASTA / "js" / "captura" / "video.js").read_text(encoding="utf-8")
@@ -157,12 +158,34 @@ def test_modelos_e_configuracoes_usam_a_tela_com_abas():
     a mesma casca de abas da Captura (js/telaAbas.js); toda rota tem tela própria."""
     rotas = (PASTA / "js" / "rotas.js").read_text(encoding="utf-8")
     assert "provisoria" not in rotas
-    for tela, pasta, abas in (("modelos", "modelos", ("emuso", "treino", "avaliacao", "medicao")),
+    for tela, pasta, abas in (("modelos", "modelos", ("emuso", "treino", "avaliacao")),
                               ("configuracoes", "configuracoes", ("empresa", "criterio", "componentes", "aparencia", "dados", "sobre")),
-                              ("captura", "captura", ("pasta", "video", "celular", "medir", "alertas"))):
+                              ("captura", "captura", ("pasta", "video", "celular", "alertas")),
+                              ("medicao", "medicao", ("medir", "modelos"))):
         assert 'from "../telaAbas.js"' in (PASTA / "js" / "telas" / f"{tela}.js").read_text(encoding="utf-8"), tela
         for aba in abas:
             assert (PASTA / "js" / pasta / f"{aba}.js").exists(), f"{pasta}/{aba}"
+    assert not (PASTA / "js" / "modelos" / "medicao.js").exists()
+
+
+def test_medicao_e_tela_de_topo_e_nao_guarda_medidas():
+    """A Medição é uma tela de topo (depois da Captura, antes de Modelos), com as abas Medir e Modelos; os endereços
+    antigos (#captura/medir, #modelos/medicao) caem nela; a aba Medir mede uma vez por marca e não chama nada que
+    grave no registro (nome do objeto, valor real, histórico, abrir a foto com medidas antigas)."""
+    rotas = (PASTA / "js" / "rotas.js").read_text(encoding="utf-8")
+    assert re.search(r'captura: \{[^}]*atalho: "5"', rotas)
+    assert re.search(r'medicao: \{[^}]*modulo: "medicao"[^}]*atalho: "6"[^}]*icone: "regua"', rotas)
+    assert re.search(r'modelos: \{[^}]*atalho: "7"', rotas)
+    assert 'captura: { medir: ["medicao", "medir"] }' in rotas and 'modelos: { medicao: ["medicao", "modelos"] }' in rotas
+    assert 'data-rota="medicao"' in (PASTA / "index.html").read_text(encoding="utf-8")
+    assert 'const ABAS = ["medir", "modelos"]' in (PASTA / "js" / "telas" / "medicao.js").read_text(encoding="utf-8")
+    codigo = [l for l in (PASTA / "js" / "medicao" / "medir.js").read_text(encoding="utf-8").splitlines() if not l.strip().startswith("//")]
+    medir = "\n".join(codigo)
+    for proibido in ("/api/medicao/registro", "trazerMedidasDoCelular", "registrar", "campoReal", "campoNome"):
+        assert proibido not in medir, proibido
+    assert 'dados.append("modelo", modeloPadrao)' in medir
+    modelos = (PASTA / "js" / "medicao" / "modelos.js").read_text(encoding="utf-8")
+    assert "/api/medicao/registro" not in modelos and "registro.csv" not in modelos
 
 
 def test_salvar_explicito_pergunta_antes_de_sair_e_versoes_iguais():

@@ -459,6 +459,22 @@ def analisar_regioes(
         )
     pcts = [i["pct_mta"] for i in saida if i.get("pct_mta") is not None]
     ponto_mais_quente, comparacao = relacionar_componentes(saida)
+    # o ponto mais quente vem da matriz inteira: imagem sem região nenhuma também tem o seu marcador
+    finita = np.isfinite(temperatura)
+    if finita.any():
+        y_max, x_max = np.unravel_index(np.argmax(np.where(finita, temperatura, -np.inf)), temperatura.shape)
+        componentes_medidos = [i for i in saida if i.get("medida") and i.get("classe") != PONTO_QUENTE]
+        dono = componente_em(componentes_medidos, x_max, y_max)
+        mancha = next((i for i in saida if i.get("medida") and i.get("classe") == PONTO_QUENTE
+                       and _contem(i["caixa"], x_max, y_max)), None)
+        ponto_mais_quente = ponto_mais_quente or {}
+        ponto_mais_quente.update(
+            t_max=float(temperatura[y_max, x_max]), x=float(x_max), y=float(y_max),
+            componente=_identidade(dono) if dono else None,
+            dentro_de=[_identidade(c) for c in componentes_medidos if c is not dono and _contem(c["caixa"], x_max, y_max)],
+            regiao=_identidade(mancha or dono) if (mancha or dono) else None,
+            severidade=(dono or mancha or {}).get("severidade", "normal"),
+        )
     if ponto_mais_quente and ponto_mais_quente["t_max"] > LIMITE_CONFERIR_C:
         avisos.append(
             f"O ponto mais quente passa de {LIMITE_CONFERIR_C:.0f} °C ({ponto_mais_quente['t_max']:.0f} °C). "

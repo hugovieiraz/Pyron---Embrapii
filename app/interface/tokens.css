@@ -172,7 +172,6 @@
   --logo-topo: 32px;      /* altura da logo horizontal na barra do topo */
   --linha: 44px;           /* linha de tabela */
   --detalhe: 400px;        /* painel de detalhe à direita */
-  --faixa-regioes: 88px;   /* faixa de regiões abaixo do termograma */
   --conteudo-max: 1600px;
   --medida: 68ch;          /* texto corrido */
   --col-num: 128px;        /* campo numérico com unidade; coluna de número */
@@ -192,7 +191,7 @@
   --r-p: 4px;
   --r-m: 8px;
   --r-g: 12px;
-  --r-pilula: 999px;       /* só selo e contador */
+  --r-pilula: 999px;       /* só selo, contador e o trilho da chave liga/desliga */
 
   /* ---------------------------------------------------------------- sombras (3 níveis, ardósia) */
   --sombra-1: 0 1px 2px rgba(22, 27, 34, .06);

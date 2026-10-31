@@ -73,6 +73,72 @@ def test_lista_oferece_um_outro_ou_os_dois(tmp_path) -> None:
     assert "ponto_quente" in combinado.classes and "aletas_isoladoras" in combinado.classes
 
 
+def test_resolve_modelo_termico_e_marca_principais(monkeypatch) -> None:
+    from app import servidor
+
+    def treinado(id_: str, otimizacao: dict | None = None) -> detectores.Detector:
+        cartao = {"id": id_, "classes": ["para_raio"]}
+        if otimizacao:
+            cartao["otimizacao"] = otimizacao
+        return detectores.Detector(id_, id_, "aprendizado", "teste", "", ["para_raio"], cartao=cartao)
+
+    pontos = detectores.obter("pontos-quentes")
+    sam2 = detectores.Detector("sam2-dinov2", "SAM 2", "aprendizado", "teste", "", [], cartao={})
+    modelo = treinado("para-raios")
+    rapido = treinado("para-raios-int8", {"origem": "para-raios"})
+    combinados = [detectores.Combinado(d, pontos) for d in (modelo, rapido)]
+    instalados = [pontos, detectores.obter("pontos-quentes-sam2"), sam2, modelo, rapido, *combinados]
+    config = {"modelo_ativo": "pontos-quentes"}
+    monkeypatch.setattr(servidor, "_config", lambda: config)
+    monkeypatch.setattr(servidor.detectores, "listar", lambda _: instalados)
+    monkeypatch.setattr(servidor, "_onde_modelo_ativo", lambda: None)
+    monkeypatch.setattr(servidor.provedores, "situacao", lambda: {})
+
+    assert servidor._modelo_termico() == "para-raios+pontos-quentes"
+    resposta = servidor.modelos()
+    assert resposta["ativo"] == "para-raios+pontos-quentes"
+    principais = {m["id"] for m in resposta["modelos"] if m.get("principal")}
+    assert principais == {"para-raios+pontos-quentes"}
+
+    config["modelo_ativo"] = "para-raios-int8+pontos-quentes"
+    assert servidor._modelo_termico() == "para-raios-int8+pontos-quentes"
+    instalados = [pontos, detectores.obter("pontos-quentes-sam2"), sam2, rapido, combinados[1]]
+    resposta = servidor.modelos()
+    assert {m["id"] for m in resposta["modelos"] if m.get("principal")} == {"pontos-quentes"}
+    instalados = [pontos, detectores.obter("pontos-quentes-sam2"), sam2, modelo, rapido, *combinados]
+    config["modelo_ativo"] = "para-raios"
+    monkeypatch.setattr(servidor, "_salvar_config", lambda _: None)
+    servidor.definir_ativo({"id": "para-raios"})
+    assert config["modelo_ativo"] == "para-raios+pontos-quentes"
+
+    instalados = [pontos, detectores.obter("pontos-quentes-sam2"), sam2]
+    config["modelo_ativo"] = "pontos-quentes"
+    resposta = servidor.modelos()
+    assert servidor._modelo_termico() == "pontos-quentes"
+    assert {m["id"] for m in resposta["modelos"] if m.get("principal")} == {"pontos-quentes"}
+
+
+def test_ponto_quente_normal_some_e_anormal_permanece(monkeypatch) -> None:
+    from app import servidor
+
+    for temperatura, esperado in ((25.0, False), (100.0, True)):
+        matriz = np.full((20, 20), 25.0)
+        matriz[8:12, 8:12] = temperatura
+        analise_regiao = {
+            "id": "pq", "nome": "Ponto quente 1", "classe": "ponto_quente",
+            "caixa": [8, 8, 12, 12], "origem": "modelo:pontos-quentes",
+        }
+        a = {"condicoes": {}, "regioes": [analise_regiao]}
+        servidor._calcular(a, matriz)
+        if esperado:
+            assert a["regioes"][0]["severidade"] not in ("normal", "sem_medida")
+        servidor._remover_pontos_quentes_sem_anomalia(a, matriz)
+        assert bool(a["regioes"]) is esperado
+        # O marcador e a temperatura máxima continuam vindo da matriz toda.
+        assert a["resumo"]["t_max_cena"] == pytest.approx(temperatura)
+        assert a["resumo"]["ponto_mais_quente"]["t_max"] == pytest.approx(temperatura)
+
+
 @pytest.fixture()
 def cliente(tmp_path, monkeypatch):
     from fastapi.testclient import TestClient

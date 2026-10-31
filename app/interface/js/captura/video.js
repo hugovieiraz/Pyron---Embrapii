@@ -25,11 +25,10 @@ export async function montar(no, { partes }) {
 
 // ================================================================ lista e envio
 async function montarLista(no) {
-  const [videos, modelos] = await Promise.all([api("/api/videos"), api("/api/modelos").catch(() => ({ modelos: [], ativo: null }))]);
+  const videos = await api("/api/videos");
   let lista = videos;
   let relogio = null;
   const opcoes = { modo: "ao_vivo" };
-  const disponiveis = (modelos.modelos || []).filter((m) => m.disponivel !== false);
 
   // ---------------------------------------------------------------- opções do envio
   const velocidade = campo({ rotulo: V.velocidade, opcoes: ["0.5", "1", "2", "4"].map((v) => ({ valor: v, texto: `${fmt(Number(v), v.includes(".") ? 1 : 0)}×` })), valor: "1" });
@@ -38,7 +37,6 @@ async function montarLista(no) {
   const notaModo = el("p", { class: "nota" }, V.modoAoVivo);
   const modo = segmentado({ rotulo: V.modo, valor: "ao_vivo", opcoes: [{ valor: "ao_vivo", texto: V.aoVivoOpcao }, { valor: "intervalo", texto: V.intervaloOpcao }],
     aoMudar: (v) => { opcoes.modo = v; velocidade.hidden = v !== "ao_vivo"; intervalo.hidden = v !== "intervalo"; notaModo.textContent = v === "ao_vivo" ? V.modoAoVivo : V.modoIntervalo; } });
-  const modelo = campo({ rotulo: V.modelo, opcoes: disponiveis.map((m) => ({ valor: m.id, texto: m.nome })), valor: modelos.ativo });
   const tmin = campo({ rotulo: V.escalaMin, tipo: "number", unidade: "°C", marcador: V.lerDaImagem });
   const tmax = campo({ rotulo: V.escalaMax, tipo: "number", unidade: "°C", marcador: V.lerDaImagem });
   const entrada = el("input", { type: "file", accept: "video/*,.mkv,.wmv", hidden: true, onchange: () => { enviar(entrada.files[0]); entrada.value = ""; } });
@@ -49,7 +47,7 @@ async function montarLista(no) {
 
   no.append(el("section", { class: "envio-video", "aria-label": V.enviarTitulo },
     el("div", { class: "titulo-bloco" }, el("h2", {}, V.enviarTitulo), enviarBtn, entrada),
-    el("div", { class: "linha-opcoes" }, el("div", { class: "campo" }, el("span", { class: "rotulo" }, V.modo), modo), velocidade, intervalo, modelo),
+    el("div", { class: "linha-opcoes" }, el("div", { class: "campo" }, el("span", { class: "rotulo" }, V.modo), modo), velocidade, intervalo),
     notaModo,
     secao({ titulo: V.escalaFixa, aberta: false, conteudo: [el("p", {}, V.escalaFixaTexto), el("div", { class: "grade-campos-2" }, tmin, tmax)] })),
   progresso, corpo);
@@ -109,7 +107,6 @@ async function montarLista(no) {
     dados.append("modo", opcoes.modo);
     dados.append("velocidade", velocidade.querySelector("select").value);
     dados.append("intervalo_s", String(lerNumero(intervalo.querySelector("input").value) ?? 0.5));
-    dados.append("modelo", modelo.querySelector("select").value || "");
     dados.append("t_min", String(lerNumero(tmin.querySelector("input").value) ?? ""));
     dados.append("t_max", String(lerNumero(tmax.querySelector("input").value) ?? ""));
     const texto = progresso.querySelector("b");

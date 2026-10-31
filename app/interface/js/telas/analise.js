@@ -1,12 +1,12 @@
 // Análise (Etapa 4, tela de referência): uma inspeção aberta. Cabeçalho, barra de ferramentas, termograma
-// com escala, faixa de regiões e painel de detalhe. Rota: #inspecoes/<id>.
+// com escala e painel de detalhe (a lista de regiões fica no Resumo). Rota: #inspecoes/<id>.
 import { TEXTOS as T } from "../../textos.js";
 import { el, api } from "../base.js";
 import { estadoVazio } from "../componentes.js";
 import { endereco } from "../rotas.js";
 import { criarContexto } from "../analise/contexto.js";
 import { montarPalco } from "../analise/palco.js";
-import { montarFaixa, regioesOrdenadas, apagarRegiao } from "../analise/faixa.js";
+import { regioesOrdenadas, apagarRegiao } from "../analise/faixa.js";
 import { montarPainel } from "../analise/painel.js";
 import { montarCabecalho } from "../analise/cabecalho.js";
 
@@ -22,28 +22,26 @@ export async function montar(pagina, rota) {
     pagina.append(estadoVazio({ ilustracao: "busca", titulo: A.naoEncontrada, texto: A.naoEncontradaTexto, acoes: [el("a", { class: "btn primario", href: endereco("inspecoes") }, A.verInspecoes)] }));
     return null;
   }
-  const [paletas, modelos, config, vizinhas, equipamentos] = await Promise.all([
+  const [paletas, config, vizinhas, equipamentos] = await Promise.all([
     api("/api/paletas"),
-    api("/api/modelos").then((r) => r.modelos),
     api("/api/configuracoes"),
     api(`/api/analises/${analise.id}/vizinhas`).catch(() => ({})),
     api("/api/equipamentos").catch(() => []),
   ]);
 
-  const ctx = criarContexto({ analise, paletas, modelos, config, vizinhas });
+  const ctx = criarContexto({ analise, paletas, config, vizinhas });
   const palco = montarPalco(ctx);
-  const faixa = montarFaixa(ctx, { realcar: palco.realcar });
-  const painel = montarPainel(ctx, { equipamentos });
+  const painel = montarPainel(ctx, { equipamentos, realcar: palco.realcar });
   const cab = montarCabecalho(ctx);
 
   pagina.classList.add("cheia");
   pagina.append(el("div", { class: "tela-analise" },
     cab.cabecalho,
     el("div", { class: "corpo-analise" },
-      el("div", { class: "coluna-imagem" }, palco.barra, palco.palco, faixa.faixa),
+      el("div", { class: "coluna-imagem" }, palco.barra, palco.palco),
       painel.painel)));
 
-  // setas percorrem as regiões e Delete apaga a selecionada (fora de campos e da faixa, que cuida do próprio teclado)
+  // setas percorrem as regiões e Delete apaga a selecionada (fora de campos e da lista, que cuida do próprio teclado)
   function teclado(ev) {
     if (ev.target.closest("input, textarea, select, .lista-regioes, [role='tablist'], [role='toolbar']") || document.querySelector("dialog[open]")) return;
     if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
@@ -64,7 +62,6 @@ export async function montar(pagina, rota) {
   return () => {
     document.removeEventListener("keydown", teclado);
     palco.encerrar();
-    faixa.encerrar();
     painel.encerrar();
     cab.encerrar();
     ctx.encerrar();

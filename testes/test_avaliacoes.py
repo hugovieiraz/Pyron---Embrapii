@@ -204,14 +204,14 @@ def test_pacote_do_colab_instala_o_modelo_e_ele_analisa(cliente, sessao_falsa) -
 
     assert cliente.put("/api/modelos/ativo", json={"id": cartao["id"]}).status_code == 200
     a = cliente.post("/api/analises", files={"arquivo": ("teste.jpg", _termograma_flir(), "image/jpeg")}).json()
-    assert a["modelo"]["id"] == cartao["id"]
-    assert [x["classe"] for x in a["regioes"]] == ["aletas_isoladoras"]
+    assert a["modelo"]["id"] == f"{cartao['id']}+pontos-quentes"  # o treinado sempre vai junto com os pontos quentes
+    assert [x["classe"] for x in a["regioes"] if x["classe"] != "ponto_quente"] == ["aletas_isoladoras"]
     assert a["regioes"][0]["caixa"] == pytest.approx([64, 36, 96, 84], abs=0.01)
     assert sessao_falsa.entrada.shape == (1, 3, 64, 64)  # veio da imagem colorida, não da matriz
 
     r = cliente.post(f"/api/analises/{a['id']}/detectar", json={})  # redetecção reabre o JPEG original
     assert r.status_code == 200, r.text
-    assert [x["classe"] for x in r.json()["regioes"]] == ["aletas_isoladoras"]
+    assert [x["classe"] for x in r.json()["regioes"] if x["classe"] != "ponto_quente"] == ["aletas_isoladoras"]
 
     # instalar o mesmo pacote de novo: a avaliação entra, o modelo repetido vira aviso
     r = cliente.post("/api/avaliacoes", files={"arquivo": ("pyron_modelo.zip", _zip(pacote), "application/zip")})

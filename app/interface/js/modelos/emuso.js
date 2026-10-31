@@ -1,7 +1,9 @@
-// Modelos › Em uso: a lista dos detectores com o recomendado marcado e, ao lado, o detalhe do escolhido com
-// "Usar este modelo". A versão rápida (INT8) não tem linha própria: é uma opção no detalhe do original.
+// Modelos › Em uso: o modelo térmico (para-raios + pontos quentes) e, ao lado, o detalhe dele. Só aparecem os que
+// o servidor marca como principais (`principal`): a regra sozinha, o SAM 2 e o modelo treinado sem os pontos
+// quentes saíram da escolha em 31/10/2026. A versão rápida (INT8) é uma opção no detalhe do original.
 import { TEXTOS as T } from "../../textos.js";
 import { el, icone, api, json, fmt } from "../base.js";
+import { endereco } from "../rotas.js";
 import { botao, tabela, secao, avisar, ocupado, estadoVazio } from "../componentes.js";
 import { nomeClasse } from "../situacao.js";
 
@@ -41,7 +43,8 @@ export async function montar(no) {
     if (dados.placa?.onde !== "carregando") return;
     try { dados = await api("/api/modelos"); desenharOnde(); } catch { /* a faixa de conexão avisa */ }
   }, 5000);
-  no.append(el("div", { class: "barra-lista" }, el("div", {}, el("p", { class: "nota" }, M.notaLista), onde), el("span", { class: "empurrar" }),
+  no.append(el("div", { class: "barra-lista" }, el("div", {}, el("p", { class: "nota" }, M.notaLista), onde,
+    el("p", { class: "nota" }, M.notaMedicao, " ", el("a", { href: endereco("medicao", ["modelos"]) }, M.irMedicao))), el("span", { class: "empurrar" }),
     botao({ texto: M.instalar, icone: "importar", title: M.instalarDica, onclick: () => instalar.click() }), instalar), corpo);
   corpo.append(area, lado);
   desenhar();
@@ -49,7 +52,7 @@ export async function montar(no) {
   function desenhar() {
     const rapidas = mapaRapidas(dados.modelos);
     const ehRapida = (m) => [...rapidas.values()].some((r) => r.id === m.id);
-    const lista = dados.modelos.filter((m) => !ehRapida(m));
+    const lista = dados.modelos.filter((m) => m.principal && !ehRapida(m));
     const recomendado = recomendadoDe(lista);
     // o em uso conta para o original quando a versão rápida está ativa
     const emUso = (m) => m.id === dados.ativo || rapidas.get(m.id)?.id === dados.ativo;

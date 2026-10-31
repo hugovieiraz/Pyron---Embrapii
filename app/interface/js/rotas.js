@@ -8,14 +8,20 @@ export const ROTAS = {
   equipamentos: { titulo: T.telas.equipamentos, modulo: "equipamentos", atalho: "3", icone: "equipamentos", detalhe: "equipamento", esqueleto: "lista" },
   pendencias: { titulo: T.telas.pendencias, modulo: "pendencias", atalho: "4", icone: "pendencias", esqueleto: "lista" },
   captura: { titulo: T.telas.captura, modulo: "captura", detalhe: "captura", atalho: "5", icone: "captura" },
-  modelos: { titulo: T.telas.modelos, modulo: "modelos", atalho: "6", icone: "modelos" },
+  medicao: { titulo: T.telas.medicao, modulo: "medicao", atalho: "6", icone: "regua" },
+  modelos: { titulo: T.telas.modelos, modulo: "modelos", atalho: "7", icone: "modelos" },
   configuracoes: { titulo: T.telas.configuracoes, modulo: "configuracoes", atalho: "0", icone: "config", exige: "administracao" },
 };
+
+// Endereços de antes da Medição virar tela de topo: #captura/medir[/código] e #modelos/medicao viram #medicao/...
+const ANTIGOS = { captura: { medir: ["medicao", "medir"] }, modelos: { medicao: ["medicao", "modelos"] } };
 
 /** "#inspecoes/abc?sev=critico" vira { tela: "inspecoes", partes: ["abc"], params: URLSearchParams }. */
 export function lerRota(hash = location.hash) {
   const [caminho, busca = ""] = hash.replace(/^#/, "").split("?");
-  const [tela, ...partes] = caminho.split("/").filter(Boolean).map(decodeURIComponent);
+  let [tela, ...partes] = caminho.split("/").filter(Boolean).map(decodeURIComponent);
+  const novo = ANTIGOS[tela]?.[partes[0]];
+  if (novo) [tela, ...partes] = [novo[0], novo[1], ...partes.slice(1)];
   return { tela: ROTAS[tela] ? tela : tela ? null : "painel", nome: tela || "painel", partes, params: new URLSearchParams(busca) };
 }
 

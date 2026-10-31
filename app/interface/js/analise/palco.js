@@ -62,7 +62,8 @@ export function montarPalco(ctx) {
     { separador: true },
     { texto: `${A.isoterma} (I)`, marcado: false, executar: () => alternarIsoterma() },
   ]);
-  const itensCamadas = [["regioes", A.camRegioes], ["rotulos", A.camRotulos], ["pontos", A.camPontos], ["contornos", A.camContornos]];
+  // Para-raios, Pontos quentes e Medição ligam e desligam pelas chaves do cabeçalho; aqui ficam os detalhes do desenho
+  const itensCamadas = [["rotulos", A.camRotulos], ["contornos", A.camContornos]];
   const menuCamadas = menu(ferramenta("camadas"), [
     ...itensCamadas.map(([k, t]) => ({ texto: t, marcado: false, executar: () => { ctx.camadas[k] = !ctx.camadas[k]; ctx.guardarCamadas(); ctx.mudou("exibicao"); } })),
     { separador: true },
@@ -188,8 +189,8 @@ export function montarPalco(ctx) {
       }
     }
     const pq = a.resumo?.ponto_mais_quente;
-    if (pq && !a.sem_temperatura) caixas.append(el("span", { class: "alvo-quente", style: { left: pct(pq.x + 0.5, W), top: pct(pq.y + 0.5, H) }, title: A.maisQuente(temperatura(pq.t_max)) }));
-    for (const med of a.medicoes || []) {
+    if (pq && !a.sem_temperatura && ctx.camadas.pontos) caixas.append(el("span", { class: "alvo-quente", style: { left: pct(pq.x + 0.5, W), top: pct(pq.y + 0.5, H) }, title: A.maisQuente(temperatura(pq.t_max)) }));
+    for (const med of ctx.camadas.medicoes ? a.medicoes || [] : []) {
       const v = med.valor || {};
       if (med.tipo === "ponto") {
         caixas.append(el("span", { class: "mira-ponto", style: { left: pct(med.x + 0.5, W), top: pct(med.y + 0.5, H) } }, el("span", { class: "etq" }, `${med.nome || ""} ${temperatura(v.t)}`.trim())));
@@ -404,6 +405,7 @@ export function montarPalco(ctx) {
       const n = ctx.a.regioes.filter((r) => r.origem === "manual").length + 1;
       const id = Math.random().toString(16).slice(2, 10);
       const nova = { id, nome: `${A.regiaoNova} ${n}`, classe: "componente", caixa: [x0, y0, x1, y1].map((v) => Math.round(v * 100) / 100), origem: "manual" };
+      ligarCamada("regioes");
       ctx.salvarRegioes([...ctx.a.regioes, nova]).then(() => { ctx.ferramenta = "selecionar"; vista.dataset.ferramenta = "selecionar"; ctx.selecionar(id); }).catch((e) => avisar(e.message, { erro: true }));
     } else if (g.tipo === "linha") {
       if (Math.hypot(g.p1.x - g.p0.x, g.p1.y - g.p0.y) < 2) return;
@@ -435,7 +437,15 @@ export function montarPalco(ctx) {
     }
   }
 
+  /** O que se acabou de desenhar aparece mesmo com a chave desligada (a chave do cabeçalho acompanha). */
+  function ligarCamada(chave) {
+    if (ctx.camadas[chave]) return;
+    ctx.camadas[chave] = true;
+    ctx.guardarCamadas();
+    ctx.mudou("exibicao");
+  }
   function adicionarMedicao(m) {
+    ligarCamada("medicoes");
     ctx.salvarMedicoes([...(ctx.a.medicoes || []), { id: Math.random().toString(16).slice(2, 10), ...m }]).catch((e) => avisar(e.message, { erro: true }));
   }
 

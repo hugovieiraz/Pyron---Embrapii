@@ -89,6 +89,20 @@ export function segmentado({ rotulo, opcoes, valor, aoMudar }) {
   return g;
 }
 
+/** Chaves liga/desliga independentes (o que aparece na imagem): botões com aria-pressed e um trilho de chave. */
+export function chaves({ rotulo, opcoes, aoMudar }) {
+  const g = el("div", { class: "chaves", role: "group", "aria-label": rotulo });
+  for (const o of opcoes) {
+    const b = el("button", { type: "button", dataset: { chave: o.chave }, "aria-pressed": String(Boolean(o.ligado)), title: o.dica || null, onclick: () => {
+      const ligado = b.getAttribute("aria-pressed") !== "true";
+      b.setAttribute("aria-pressed", String(ligado));
+      aoMudar?.(o.chave, ligado);
+    } }, el("span", { class: "trilho", "aria-hidden": "true" }), o.texto);
+    g.append(b);
+  }
+  return g;
+}
+
 /**
  * Abas com teclado: setas mudam de aba, Home e End vão às pontas (padrão WAI-ARIA).
  * vertical: true vira o trilho de ícones do painel de detalhe (cada item com icone; o texto vai para o nome acessível).
