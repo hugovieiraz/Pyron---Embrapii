@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="pt-BR" data-tema="claro" class="janela-propria">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pyron</title>
+<!-- tokens, estilos, ícones e textos da interface: copiados por desktop/src-tauri/build.rs para gerado/ -->
+<link rel="stylesheet" href="gerado/tokens.css">
+<link rel="stylesheet" href="gerado/base.css">
+<link rel="stylesheet" href="gerado/componentes.css">
+<link rel="stylesheet" href="abertura.css">
+<script type="module" src="abertura.js"></script>
+</head>
+<body>
+<header class="topo topo-abertura" id="topo">
+  <div class="controles-janela" role="group" id="controles"></div>
+</header>
+<main class="abertura" aria-live="polite">
+  <img class="abertura-logo" src="gerado/logo-cor.svg" alt="Pyron" width="192" height="64">
+  <p class="abertura-giro" id="giro" aria-hidden="true"></p>
+  <p class="abertura-texto" id="texto"></p>
+  <p class="abertura-detalhe mono" id="detalhe" hidden></p>
+  <p class="abertura-detalhe" id="registro" hidden></p>
+  <button class="btn primario" type="button" id="reiniciar" hidden></button>
+</main>
+</body>
+</html>

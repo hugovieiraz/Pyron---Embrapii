@@ -1,0 +1,17 @@
+/* Abertura do Pyron desktop: só tokens de app/interface/tokens.css. */
+html, body { height: 100%; }
+body { display: flex; flex-direction: column; background: var(--fundo); color: var(--texto); font-family: var(--fonte); margin: 0; }
+.topo-abertura { justify-content: flex-end; padding: 0; background: var(--fundo); border-bottom-color: transparent; }
+.abertura {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--e-4);
+  padding: var(--e-6); text-align: center;
+}
+.abertura-logo { height: var(--e-16); width: auto; margin-bottom: var(--e-4); }
+.abertura-giro {
+  width: var(--ic); height: var(--ic); margin: 0; border-radius: 50%;
+  border: var(--borda-sel) solid var(--texto-3); border-right-color: transparent; animation: girar var(--dur-giro) linear infinite;
+}
+.abertura-giro[hidden] { display: none; }
+.abertura-texto { margin: 0; font-size: var(--t-3); color: var(--texto); max-width: var(--medida); text-wrap: balance; }
+.abertura-detalhe { margin: 0; color: var(--texto-2); max-width: var(--medida); overflow-wrap: anywhere; }
+.abertura .btn { margin-top: var(--e-2); }

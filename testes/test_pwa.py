@@ -119,7 +119,7 @@ def test_casca_e_manifest_publicos_no_modo_servidor(cliente_servidor) -> None:
     c = TestClient(cliente_servidor.app, base_url="https://pyron.teste", client=("10.0.0.7", 5000))
     r = c.get("/manifest.webmanifest")
     assert r.status_code == 200 and r.headers["content-type"].startswith("application/manifest+json")
-    r = c.get("/sw.js?v=0.8.0")
+    r = c.get(f"/sw.js?v={cliente_servidor.VERSAO}")
     assert r.status_code == 200 and "javascript" in r.headers["content-type"]
     assert r.headers["cache-control"] == "no-cache"  # versão nova do sw.js entra sem esperar cache
     assert c.get("/marca/icone-app-mascara-512.png").status_code == 200

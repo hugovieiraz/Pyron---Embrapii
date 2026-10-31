@@ -3,6 +3,9 @@
 Data: 30/10/2026. Sem commit (pedido do usuário); mesmo branch `v09-f1-servidor`. Máquina: a da F0 (Acer Nitro
 AN515-55, i5-10300H, Windows 11, SAC desligado). Fonte escolhida pelo usuário: Noto Sans.
 
+> **Atualização de 30/10/2026:** visual aprovado pelo usuário; o padrão agora é `laudo.motor = "typst"`
+> (`app/servidor.py`, `CONFIG_PADRAO`). Typst indisponível continua caindo no reportlab.
+
 ## Resumo em 3 linhas
 
 1. Feito: `app/laudo_typst.py` com as mesmas assinaturas do laudo atual, modelo em `app/laudo/` (sem pacotes do

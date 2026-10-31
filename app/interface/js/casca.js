@@ -7,6 +7,7 @@ import { instalarIcones } from "./icones.js";
 import { ilustracao } from "./ilustracoes.js";
 import { ROTAS, lerRota, endereco } from "./rotas.js";
 import { abrirBusca } from "./busca.js";
+import { hospedeiroJanela, arrastaJanela, alertasNovos } from "./janela.js";
 import { importar, escolherArquivos, arquivosEscolhidos } from "./importar.js";
 
 // ---------------------------------------------------------------- roteamento
@@ -286,30 +287,66 @@ async function atualizarContadores() {
     $("#contador-alertas").textContent = alertas > 99 ? "99+" : String(alertas);
     sino.setAttribute("aria-label", T.casca.alertas(alertas));
     sino.title = T.casca.alertas(alertas);
+    avisarHospedeiro(status, alertas);
   } catch { /* a faixa de conexão já avisa */ }
 }
 
-// ---------------------------------------------------------------- janela própria (Pyron.exe com WebView2)
-// Sem a barra de título do Windows: o topo arrasta a janela (CSS app-region) e estes botões pedem ao Pyron.exe
-// minimizar, maximizar ou fechar. Fora dela (navegador, janela do Edge) nada muda.
+// ---------------------------------------------------------------- Pyron desktop: aviso do Windows e bandeja
+const hospedeiro = hospedeiroJanela();
+let alertasAntes = null;
+
+/** Alerta novo vira aviso do Windows (a janela pode estar minimizada) e a bandeja acompanha o monitoramento. */
+function avisarHospedeiro(status, alertas) {
+  if (!hospedeiro?.notificar) return;
+  const novos = alertasNovos(alertasAntes, alertas);
+  alertasAntes = alertas;
+  if (novos) hospedeiro.notificar(T.desktop.alertas(novos), T.desktop.alertasTexto).catch(() => {});
+  hospedeiro.contar("pyron:monitoramento", Boolean(status.monitoramento?.ativo)).catch(() => {});
+}
+
+/** "Monitoramento" da bandeja: liga ou desliga pela API, com a sessão e as permissões de quem está na janela. */
+function ligarBandeja() {
+  hospedeiro.ouvir("bandeja:monitoramento", async () => {
+    try {
+      const atual = await api("/api/monitoramento");
+      const r = await api("/api/monitoramento", json("PUT", { ativo: !atual.config.ativo }));
+      avisar(r.config.ativo ? T.desktop.monitorLigado : T.desktop.monitorDesligado);
+      hospedeiro.contar("pyron:monitoramento", Boolean(r.config.ativo)).catch(() => {});
+    } catch (e) {
+      // sem pasta escolhida ou sem permissão: o motivo aparece e a tela da pasta monitorada abre
+      avisar(`${T.desktop.monitorFalhou} ${e.message}`, { erro: true });
+      if (pode("administracao")) location.hash = endereco("captura", ["pasta"]);
+      atualizarContadores();
+    }
+  });
+}
+
+// ---------------------------------------------------------------- janela própria (Pyron desktop ou Pyron.exe)
+// Sem a barra de título do Windows: o topo arrasta a janela e estes botões pedem ao hospedeiro (js/janela.js)
+// minimizar, maximizar ou fechar. Fora dela (navegador, janela do Edge, tablet) nada muda.
 function ligarJanela() {
-  const hospede = window.chrome && window.chrome.webview;
-  if (!hospede) return;
+  if (!hospedeiro) return;
   document.documentElement.classList.add("janela-propria");
   const J = T.casca.janela;
   const botao = (acao, ic, rotulo, classe = null) => el("button", { type: "button", class: classe, "aria-label": rotulo, title: rotulo,
-    onclick: () => hospede.postMessage(`janela:${acao}`) }, icone(ic));
+    onclick: () => hospedeiro.pedir(acao) }, icone(ic));
   const maximizar = botao("maximizar", "restaurar", J.restaurar);
   $(".topo").append(el("div", { class: "controles-janela", role: "group", "aria-label": J.grupo },
     botao("minimizar", "minimizar", J.minimizar), maximizar, botao("fechar", "x", J.fechar, "fechar")));
-  hospede.addEventListener("message", (ev) => {
-    if (ev.data !== "janela:maximizada" && ev.data !== "janela:normal") return;
-    const max = ev.data === "janela:maximizada";
+  hospedeiro.aoMudar((max) => {
     maximizar.replaceChildren(icone(max ? "restaurar" : "maximizar"));
     maximizar.setAttribute("aria-label", max ? J.restaurar : J.maximizar);
     maximizar.title = max ? J.restaurar : J.maximizar;
   });
-  hospede.postMessage("janela:estado");
+  if (hospedeiro.arrastar) {
+    // dois cliques no topo maximizam ou restauram, como na barra de título do Windows
+    $(".topo").addEventListener("mousedown", (ev) => {
+      if (ev.button !== 0 || !arrastaJanela(ev.target)) return;
+      if (ev.detail === 2) hospedeiro.pedir("maximizar");
+      else hospedeiro.arrastar();
+    });
+  }
+  if (hospedeiro.ouvir) ligarBandeja();
   // Ao abrir, a janela entrega o foco à página como se fosse pelo teclado, e o link "Pular para o conteúdo"
   // aparecia sobre a logo. Ele só fica quando o foco chega por uma tecla de verdade.
   let teclou = false;

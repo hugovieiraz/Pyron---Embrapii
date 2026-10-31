@@ -187,7 +187,8 @@ def test_janela_propria_sem_barra_do_windows():
     janela = (raiz / "lancador" / "Janela.cs").read_text(encoding="utf-8")
     assert "IsNonClientRegionSupportEnabled = true" in janela and "0x0083" in janela  # app-region e WM_NCCALCSIZE
     casca = (PASTA / "js" / "casca.js").read_text(encoding="utf-8")
-    assert "window.chrome && window.chrome.webview" in casca
+    # o hospedeiro (Pyron.exe ou Pyron desktop) vem do adaptador js/janela.js (testes/test_janela.py)
+    assert "w.chrome && w.chrome.webview" in (PASTA / "js" / "janela.js").read_text(encoding="utf-8")
     for acao in ("minimizar", "maximizar", "fechar"):
         assert f'botao("{acao}"' in casca, acao
     css = (PASTA / "base.css").read_text(encoding="utf-8")

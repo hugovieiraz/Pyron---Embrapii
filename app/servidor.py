@@ -42,7 +42,7 @@ from app.armazenamento import Armazenamento, _destaque
 from nucleo import analise, barra, detectores, enquadrar, entrada, referencias, render, video
 from nucleo.detectores import placa, provedores
 
-VERSAO = "0.8.0"
+VERSAO = "0.9.0"
 # o tipo do manifest do aplicativo instalado (PWA) não depende do registro do Windows nem do Linux
 mimetypes.add_type("application/manifest+json", ".webmanifest")
 RAIZ = Path(__file__).resolve().parents[1]
@@ -116,8 +116,8 @@ CONFIG_PADRAO = {
     "criterios": None,  # None: critério padrão (modelo brasileiro, NBR 15866)
     "componentes": {},  # trocas do usuário na biblioteca de componentes (MTA por classe)
     "monitoramento": dict(monitoramento.PADRAO),
-    # motor do laudo em PDF: "reportlab" (padrão até o visual do Typst ser aprovado) ou "typst" (app/laudo_typst.py)
-    "laudo": {"motor": "reportlab"},
+    # motor do laudo em PDF: "typst" (padrão desde a aprovação de 30/10/2026, app/laudo_typst.py) ou "reportlab"
+    "laudo": {"motor": "typst"},
 }
 MOTORES_LAUDO = ("reportlab", "typst")
 
@@ -1375,7 +1375,7 @@ def _motor_laudo(pedido: str | None = None):
 
     Typst escolhido mas indisponível (pacote ausente, DLL barrada pelo Windows): o laudo sai pelo reportlab.
     """
-    motor = pedido if pedido in MOTORES_LAUDO else (_config().get("laudo") or {}).get("motor", "reportlab")
+    motor = pedido if pedido in MOTORES_LAUDO else (_config().get("laudo") or {}).get("motor", "typst")
     if motor == "typst":
         from app import laudo_typst
 
@@ -1679,7 +1679,7 @@ def configuracoes(request: Request = None) -> dict:
         "tem_logo": (PASTA_DADOS / "logo.png").exists(),
         "modo": acesso.modo(),
         "limite_time": acesso.LIMITE_TIME,
-        "laudo": cfg.get("laudo") or {"motor": "reportlab"},
+        "laudo": cfg.get("laudo") or {"motor": "typst"},
     }
 
 

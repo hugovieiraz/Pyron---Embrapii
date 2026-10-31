@@ -7,7 +7,7 @@
 const $ = (s, raiz = document) => raiz.querySelector(s);
 const $$ = (s, raiz = document) => [...raiz.querySelectorAll(s)];
 const T = TEXTOS;
-const VERSAO_INTERFACE = "0.8.0"; // igual a VERSAO em app/servidor.py
+const VERSAO_INTERFACE = "0.9.0"; // igual a VERSAO em app/servidor.py
 
 function el(tag, props = {}, ...filhos) {
   const n = document.createElement(tag);
