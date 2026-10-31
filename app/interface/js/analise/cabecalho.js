@@ -86,7 +86,7 @@ export function montarCabecalho(ctx) {
     salvo.textContent = s.estado === "salvando" ? A.salvando : s.estado === "erro" ? A.erroSalvar : s.em ? A.salvoEm(s.em.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })) : "";
   }
 
-  const marcarChaves = () => mostrar.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(Boolean(ctx.camadas[b.dataset.chave]))));
+  const marcarChaves = () => mostrar.querySelectorAll("button").forEach((b) => b.setAttribute("aria-checked", String(Boolean(ctx.camadas[b.dataset.chave]))));
   const parar = ctx.ouvir((parte) => {
     if (["tudo", "dados"].includes(parte)) desenhar();
     if (parte === "salvo") desenharSalvo();

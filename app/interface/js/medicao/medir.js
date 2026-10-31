@@ -1,23 +1,22 @@
 // Medição › Medir: medir um objeto qualquer numa foto comum (docs/07_roteiro_medicao_geral.md, fase 5).
-// Abrir a foto, clicar no objeto (ou arrastar uma caixa, ou marcar duas pontas) e ver altura, largura, comprimento e
-// espessura com a margem de erro; uma referência de tamanho conhecido (o post-it rosa, achado sozinho pela cor) corrige a escala.
-// Cada marca mede UMA vez e mostra UM resultado, que a marca seguinte substitui: nada de medida guardada. O servidor mede
+// Abrir a foto e clicar nas duas pontas do que se quer medir: o resultado é UMA distância entre elas, em cm, com a margem
+// de erro. Quem decide o que é altura, largura ou comprimento é o usuário, ao escolher as pontas; o seletor "Medindo" só
+// dá o nome ao resultado na tela. Uma referência de tamanho conhecido (o post-it rosa, achado sozinho pela cor) corrige a escala.
+// Cada par de pontas mede UMA vez e mostra UM resultado, que o par seguinte substitui: nada de medida guardada. O servidor mede
 // com o modelo padrão (POST /api/medicao/comparar com `modelo`, sem `registrar`, então nada vai para o registro): com a
-// referência quando ela vale, senão pela escala do próprio modelo. Contorno do SAM 2.1 e geometria em 3D.
+// referência quando ela vale, senão pela escala do próprio modelo. Geometria em 3D, sem contorno do objeto.
 // A foto aberta só fica na faixa de fotos (POST /api/medicao/fotos) para passar de uma para outra; as do celular chegam por ali.
 // Sem modelo nenhum (ou sem os pesos instalados), o modo "Retângulo de referência" mede no plano de uma folha
 // A4 ou de um cartão: 4 cantos e 2 pontas, por homografia (POST /api/medicao/plano).
 import { TEXTOS as T } from "../../textos.js";
 import { el, api, fmt, json, lerNumero } from "../base.js";
-import { botao, avisar, barraFerramentas, campo, esqueleto, estadoVazio, ocupado, secao } from "../componentes.js";
+import { botao, avisar, barraFerramentas, campo, esqueleto, estadoVazio, ocupado, secao, segmentado } from "../componentes.js";
 import { endereco } from "../rotas.js";
 
 const M = T.medir;
 const SVG = "http://www.w3.org/2000/svg";
-const ORDEM = ["altura", "comprimento", "largura", "espessura", "distancia"];
 const QUADROS_VIDEO = 4;  // quadros nítidos medidos por vídeo
 const PASSO_TECLADO = 0.01; // mira do teclado: 1 % da foto por seta (Shift: 5 %)
-const CAIXA_MINIMA = 0.01;  // arrasto menor que 1 % da foto vale como clique
 
 function svg(tag, attrs = {}) {
   const n = document.createElementNS(SVG, tag);
@@ -31,21 +30,19 @@ export async function montar(no, ctx = {}) {
   const nomeModelo = M.colunas[modeloPadrao] || modeloPadrao;
 
   let foto = null;           // { arquivo, url, largura, altura, codigo }
-  let modo = estado.pronto ? "ponto" : "plano"; // ponto | caixa | pontos (com os modelos) | plano (sem modelo)
+  let modo = estado.pronto ? "pontos" : "plano"; // pontos (duas pontas, com os modelos) | plano (sem modelo)
+  let grandeza = "distancia"; // só o nome do resultado na tela: altura | largura | comprimento | distancia
   let cantos = [];           // modo plano: cantos do retângulo de referência
   let pontoPlano = null;     // modo plano: a primeira ponta da medida
   let medidaPlano = null;    // modo plano: a medida mostrada, { pontos, r }
   let alvo = "objeto";       // objeto | referencia: o que a próxima marca na foto define
-  let medida = null;         // a medida mostrada: { pista, r (resposta do servidor; null enquanto mede), video (nº de quadros), comReferencia, seq }
-  let pistaRef = null;       // pista da referência
+  let medida = null;         // a medida mostrada: { pista: { pontos }, r (resposta do servidor; null enquanto mede), video (nº de quadros), comReferencia, seq }
+  let pistaRef = null;       // pista da referência marcada à mão: { ponto }
   let primeiroPonto = null;  // modo "pontos": a primeira ponta
   let medindo = false;
   let sequencia = 0;         // cada pedido de medida leva um número; só o mais novo mostra o resultado
-  let biblioteca = [];
-  let ultimaPista = null;
   let geracao = 0;
   let mira = { x: 0.5, y: 0.5 };
-  let cotaDestacada = null;
 
   // ---------------------------------------------------------------- ferramentas e palco
   const entrada = el("input", { type: "file", accept: "image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif", hidden: true, onchange: () => { if (entrada.files[0]) abrir(entrada.files[0]); entrada.value = ""; } });
@@ -55,7 +52,8 @@ export async function montar(no, ctx = {}) {
   const barra = el("div");
   const imagem = el("img", { class: "foto-medir", alt: "", draggable: "false" });
   const camada = svg("svg", { class: "camada-medir", "aria-hidden": "true", preserveAspectRatio: "none" });
-  const quadro = el("div", { class: "quadro-medir" }, imagem, camada);
+  const valorNaFoto = el("span", { class: "rotulo-medida num", hidden: true });  // o valor, em HTML para ficar com o tamanho do texto da tela
+  const quadro = el("div", { class: "quadro-medir" }, imagem, camada, valorNaFoto);
   const hud = el("p", { class: "hud-medir", role: "status" });
   // zoom: a foto cresce dentro de uma janela que rola por dentro; os cliques usam o retângulo da imagem, então
   // continuam no ponto certo. Ctrl + roda (e a pinça do touchpad) aproxima onde está o cursor; botão do meio ou
@@ -145,25 +143,16 @@ export async function montar(no, ctx = {}) {
   const secaoPlano = secao({ titulo: M.planoTitulo, conteudo: [corpoPlano] });
   const avisoModelos = estado.pronto ? null : el("div", { class: "aviso-modelos" }, el("p", { class: "nota" }, M.semModelosNota), el("code", { class: "mono comando-medir" }, M.comandoInstalar),
     el("a", { class: "btn compacto", href: endereco("medicao", ["modelos"]) }, M.abrirModelos));
-  const secaoResultado = el("section", {}, el("div", { class: "titulo-bloco" }, el("h2", {}, M.resultado)), caixaResultado);
-
-  // biblioteca de pesos (contexto do vídeo)
-  const campoContexto = campo({ rotulo: M.contextoObjeto, valor: "auto", opcoes: [{ valor: "auto", texto: M.contextoAuto }] });
-  const btnMedirContexto = botao({ texto: M.medirComContexto, icone: "modelos", variante: "primario", onclick: () => ocupado(btnMedirContexto, medirComContexto) });
-  const caixaResultadoContexto = el("div", { class: "resultado-contexto-caixa", "aria-live": "polite" });
-  const listaItensContexto = el("div", { class: "lista-biblioteca-contexto" });
-  const corpoContexto = el("div", { class: "grupo-campos" },
-    el("p", { class: "nota" }, M.contextoTexto),
-    campoContexto,
-    el("div", { class: "grupo-btn" }, btnMedirContexto),
-    caixaResultadoContexto,
-    listaItensContexto);
-  const secaoContexto = secao({ titulo: M.contextoTitulo, conteudo: [corpoContexto] });
+  // o nome só muda o texto do resultado: nada é medido de novo nem guardado
+  const seletorGrandeza = segmentado({ rotulo: M.medindo, valor: grandeza, opcoes: Object.entries(M.nomes).map(([valor, texto]) => ({ valor, texto })),
+    aoMudar: (v) => { grandeza = v; desenharResultado(); } });
+  const secaoResultado = el("section", {}, el("div", { class: "titulo-bloco" }, el("h2", {}, M.resultado)),
+    el("div", { class: "grupo-campos" }, el("span", { class: "nota" }, M.medindo), seletorGrandeza), caixaResultado);
 
   const caixaCelular = el("div", { class: "celular-medir" });
   const secaoCelular = secao({ titulo: M.celularTitulo, conteudo: [el("p", { class: "nota" }, M.celularTexto), caixaCelular] });
   const painel = el("aside", { class: "painel-medir", "aria-label": M.resultado },
-    secaoResultado, secaoContexto, secaoPlano, secaoRef, secaoCelular,
+    secaoResultado, secaoPlano, secaoRef, secaoCelular,
     secao({ titulo: M.detalhes, aberta: false, conteudo: [caixaDetalhes] }),
     avisoModelos);
 
@@ -191,12 +180,12 @@ export async function montar(no, ctx = {}) {
   // ---------------------------------------------------------------- desenho
   function desenharBarra() {
     const ferramenta = (id, icone) => ({ texto: M[id], icone, pressionado: modo === id, onclick: () => escolherModo(id),
-      indisponivel: !estado.pronto && id !== "plano" ? M.semModelosCurto : foto ? null : M.dicaModo.ponto });
+      indisponivel: !estado.pronto && id !== "plano" ? M.semModelosCurto : foto ? null : M.abraFoto });
     barra.replaceChildren(barraFerramentas({
       rotulo: M.ferramentas,
       grupos: [[{ texto: foto ? M.trocar : M.abrir, icone: "foto", onclick: () => entrada.click() }, { texto: M.abrirVideo, icone: "video", onclick: () => entradaVideo.click() }],
-        [ferramenta("ponto", "ponto"), ferramenta("caixa", "regiao"), ferramenta("pontos", "linha")], [ferramenta("plano", "escala")]],
-      direita: [{ texto: M.limpar, icone: "x", indisponivel: foto ? null : M.dicaModo.ponto, onclick: () => limpar() }],
+        [ferramenta("pontos", "linha"), ferramenta("plano", "escala")]],
+      direita: [{ texto: M.limpar, icone: "x", indisponivel: foto ? null : M.abraFoto, onclick: () => limpar() }],
     }));
   }
 
@@ -210,11 +199,11 @@ export async function montar(no, ctx = {}) {
   function dica() {
     const s = Math.round((Date.now() - inicioMedida) / 1000);
     if (medindo) return [el("b", {}, video ? M.medindoVideo(s) : M.medindoTempo(s)), " ", el("span", {}, M.medindoNota)];
-    if (video && modo !== "plano") return video.atual === 0 ? M.videoDica : M.videoSoPrimeiro;
+    if (video && video.atual !== 0) return M.videoSoPrimeiro;
     if (modo === "plano") return cantos.length < 4 ? M.dicaModo.cantos(cantos.length + 1) : pontoPlano ? M.dicaModo.pontosSegundo : M.dicaModo.plano;
     if (alvo === "referencia") return M.dicaModo.referencia;
-    if (modo === "pontos" && primeiroPonto) return M.dicaModo.pontosSegundo;
-    return M.dicaModo[modo];
+    if (primeiroPonto) return M.dicaModo.pontosSegundo;
+    return video ? M.videoDica : M.dicaModo.pontos;
   }
   const atualizarHud = () => {
     quadro.classList.toggle("medindo", medindo);  // faixa de luz varrendo a foto (telas.css)
@@ -226,145 +215,74 @@ export async function montar(no, ctx = {}) {
 
   /** O que vale numa medida: com a referência quando ela foi usada, senão a escala do próprio modelo. */
   function valorDe(r) {
-    const res = r.resultados?.[modeloPadrao] || r.resultados?.contexto || Object.values(r.resultados || {})[0] || {};
+    const res = r.resultados?.[modeloPadrao] || Object.values(r.resultados || {})[0] || {};
     const usada = Boolean(res.com_referencia) && !res.com_referencia.referencia_ignorada;
     return { res, v: (usada ? res.com_referencia : res.sem_referencia) || {}, usada };
   }
 
-  function desenharCamada(rascunho = null) {
+  function desenharCamada() {
     if (!foto) return;
     const { largura: W, altura: H } = foto;
     camada.setAttribute("viewBox", `0 0 ${W} ${H}`);
     const filhos = [];
+    const raio = Math.max(W, H) * 0.006;
     const poligonos = (lista, classe) => lista.forEach((p) => {
       const pts = p.map((q) => q.join(",")).join(" ");
       filhos.push(svg("polygon", { points: pts, class: `${classe} sombra` }), svg("polygon", { points: pts, class: classe }));
     });
-    function desenharCota(tipo, pts, valorTexto = "", destaque = false) {
-      if (!pts || pts.length < 2) return;
-      const [[x1, y1], [x2, y2]] = pts;
-      const dx = x2 - x1, dy = y2 - y1;
-      const len = Math.hypot(dx, dy);
-      if (len < 2) return;
-      const nx = -dy / len, ny = dx / len;
-      const tamTerm = Math.max(W, H) * 0.014;
-      const classe = `cota-${tipo}${destaque ? " cota-destaque" : ""}`;
+    const ponta = ([cx, cy], classe) => filhos.push(svg("circle", { cx, cy, r: raio, class: classe }));
+    const noPrimeiroQuadro = !video || video.atual === 0;
+    let pontas = null, texto = "";  // a medida mostrada: as duas pontas e o valor
 
-      filhos.push(svg("line", { x1, y1, x2, y2, class: `cota-linha sombra ${classe}` }));
-      filhos.push(svg("line", { x1, y1, x2, y2, class: `cota-linha ${classe}` }));
-
-      filhos.push(svg("line", { x1: x1 - nx * tamTerm, y1: y1 - ny * tamTerm, x2: x1 + nx * tamTerm, y2: y1 + ny * tamTerm, class: `cota-terminador sombra ${classe}` }));
-      filhos.push(svg("line", { x1: x1 - nx * tamTerm, y1: y1 - ny * tamTerm, x2: x1 + nx * tamTerm, y2: y1 + ny * tamTerm, class: `cota-terminador ${classe}` }));
-
-      filhos.push(svg("line", { x1: x2 - nx * tamTerm, y1: y2 - ny * tamTerm, x2: x2 + nx * tamTerm, y2: y2 + ny * tamTerm, class: `cota-terminador sombra ${classe}` }));
-      filhos.push(svg("line", { x1: x2 - nx * tamTerm, y1: y2 - ny * tamTerm, x2: x2 + nx * tamTerm, y2: y2 + ny * tamTerm, class: `cota-terminador ${classe}` }));
-
-      if (valorTexto) {
-        const mx = (x1 + x2) / 2 + nx * (tamTerm * 1.6);
-        const my = (y1 + y2) / 2 + ny * (tamTerm * 1.6);
-        const bw = valorTexto.length * Math.max(W, H) * 0.0075 + 14;
-        const bh = Math.max(W, H) * 0.024;
-        filhos.push(svg("rect", { x: mx - bw / 2, y: my - bh / 2, width: bw, height: bh, class: "cota-badge-fundo" }));
-        const txt = svg("text", { x: mx, y: my, class: "cota-badge-texto" });
-        txt.textContent = valorTexto;
-        filhos.push(txt);
-      }
-    }
-
-    const ultima = medida?.r ? medida : null;
-    const doQuadro = (m) => (video && m.r?.quadrosVideo ? m.r.quadrosVideo[video.atual] || {} : null);  // vídeo: o que vale no quadro mostrado
-    if (ultima && (modo !== "plano" || ultima.r?.resultados?.contexto)) {
-      poligonos(doQuadro(ultima) ? [] : ultima.r.contorno_referencia || [], "contorno-ref");
-      poligonos(doQuadro(ultima)?.contorno || ultima.r.contorno || [], "contorno-obj");
-
-      const cotas = doQuadro(ultima) ? (video.atual === 0 ? ultima.r.cotas || {} : {}) : ultima.r.cotas || {};
-      const { v: v0 } = valorDe(ultima.r);
-
-      if (cotas.apoio && (!cotaDestacada || cotaDestacada === "altura")) {
-        const [[ax1, ay1], [ax2, ay2]] = cotas.apoio;
-        filhos.push(svg("line", { x1: ax1, y1: ay1, x2: ax2, y2: ay2, class: "cota-apoio sombra" }));
-        filhos.push(svg("line", { x1: ax1, y1: ay1, x2: ax2, y2: ay2, class: "cota-apoio" }));
-        const txt = svg("text", { x: (ax1 + ax2) / 2, y: ay1 + Math.max(W, H) * 0.02, class: "cota-badge-texto" });
-        txt.textContent = "Apoio (base)";
-        filhos.push(txt);
-      }
-
-      if (cotas.altura && (!cotaDestacada || cotaDestacada === "altura")) {
-        const altTxt = v0.altura_cm != null ? `↕ ${fmt(v0.altura_cm, 1)} cm` : "Altura";
-        desenharCota("altura", cotas.altura, altTxt, cotaDestacada === "altura");
-      }
-
-      if (cotas.comprimento && (!cotaDestacada || cotaDestacada === "comprimento")) {
-        const compTxt = v0.comprimento_cm != null ? `↔ ${fmt(v0.comprimento_cm, 1)} cm` : "Comprimento";
-        desenharCota("comprimento", cotas.comprimento, compTxt, cotaDestacada === "comprimento");
-      }
-
-      if (cotas.largura && (!cotaDestacada || cotaDestacada === "largura")) {
-        const largTxt = v0.largura_cm != null ? `⤢ ${fmt(v0.largura_cm, 1)} cm` : "Largura";
-        desenharCota("largura", cotas.largura, largTxt, cotaDestacada === "largura");
-      }
-
-      if (cotas.distancia && (!cotaDestacada || cotaDestacada === "distancia")) {
-        const distTxt = v0.distancia_cm != null ? `${fmt(v0.distancia_cm, 1)} cm` : "Distância";
-        desenharCota("distancia", cotas.distancia, distTxt, cotaDestacada === "distancia");
-      }
-
-      if (ultima.r.contorno_referencia?.length && (!cotaDestacada || cotaDestacada === "referencia")) {
-        const pRef = ultima.r.contorno_referencia[0];
-        if (pRef?.length) {
-          const rx = pRef.reduce((s, p) => s + p[0], 0) / pRef.length;
-          const ry = pRef.reduce((s, p) => s + p[1], 0) / pRef.length;
-          const txtRef = svg("text", { x: rx, y: ry, class: "cota-badge-texto" });
-          txtRef.textContent = "Ref. 8 cm";
-          filhos.push(txtRef);
-        }
-      }
-    }
-    const marca = (p, classe) => {
-      if (!p) return;
-      if (p.ponto) filhos.push(svg("circle", { cx: p.ponto[0], cy: p.ponto[1], r: Math.max(W, H) * 0.008, class: classe }));
-      if (p.caixa) { const [x0, y0, x1, y1] = p.caixa; filhos.push(svg("rect", { x: x0, y: y0, width: x1 - x0, height: y1 - y0, class: `${classe} caixa-marca` })); }
-      if (p.pontos) {
-        const [[x1, y1], [x2, y2]] = p.pontos;
-        filhos.push(svg("line", { x1, y1, x2, y2, class: `${classe} sombra` }), svg("line", { x1, y1, x2, y2, class: classe }));
-        p.pontos.forEach(([cx, cy]) => filhos.push(svg("circle", { cx, cy, r: Math.max(W, H) * 0.006, class: classe })));
-      }
-    };
     if (modo === "plano") {
       if (cantos.length >= 2) {
         const pts = cantos.map((q) => q.join(",")).join(" ");
         const tag = cantos.length === 4 ? "polygon" : "polyline";
         filhos.push(svg(tag, { points: pts, class: "marca-ref sombra" }), svg(tag, { points: pts, class: "marca-ref" }));
       }
-      cantos.forEach(([cx, cy]) => filhos.push(svg("circle", { cx, cy, r: Math.max(W, H) * 0.006, class: "marca-ref" })));
-      if (medidaPlano) marca({ pontos: medidaPlano.pontos }, "marca-obj");
-      if (pontoPlano) marca({ ponto: pontoPlano }, "marca-obj");
+      cantos.forEach((q) => ponta(q, "marca-ref"));
+      if (medidaPlano) { pontas = medidaPlano.pontos; if (medidaPlano.r) texto = M.valor(fmt(medidaPlano.r.distancia_cm, 1)); }
+      if (pontoPlano) ponta(pontoPlano, "marca-obj");
     } else {
-      marca(pistaRef, "marca-ref");
-      if (medida) marca(doQuadro(medida)?.pista || (!video || video.atual === 0 ? medida.pista : null), "marca-obj");
-      if (primeiroPonto) marca({ ponto: primeiroPonto }, "marca-obj");
+      if (medida?.r) poligonos(medida.r.contorno_referencia || [], "contorno-ref");  // onde o post-it foi achado
+      if (pistaRef) ponta(pistaRef.ponto, "marca-ref");
+      if (medida) {
+        const doQuadro = video && medida.r?.quadrosVideo ? medida.r.quadrosVideo[video.atual] : null;  // vídeo: a pista seguida neste quadro
+        pontas = doQuadro ? doQuadro.pista?.pontos : noPrimeiroQuadro ? medida.pista.pontos : null;
+        const distancia = medida.r ? valorDe(medida.r).v.distancia_cm : null;
+        if (distancia != null) texto = M.valor(fmt(distancia, 1));
+      }
+      if (primeiroPonto && noPrimeiroQuadro) ponta(primeiroPonto, "marca-obj");
     }
-    if (rascunho) marca({ caixa: rascunho }, "marca-rascunho");
+    if (pontas) {
+      const [[x1, y1], [x2, y2]] = pontas;
+      filhos.push(svg("line", { x1, y1, x2, y2, class: "marca-obj sombra" }), svg("line", { x1, y1, x2, y2, class: "marca-obj" }));
+      pontas.forEach((q) => ponta(q, "marca-obj"));
+      valorNaFoto.style.left = `${((x1 + x2) / 2 / W) * 100}%`;
+      valorNaFoto.style.top = `${((y1 + y2) / 2 / H) * 100}%`;
+    }
+    valorNaFoto.textContent = texto;
+    valorNaFoto.hidden = !(pontas && texto);
     if (document.activeElement === palco) filhos.push(svg("circle", { cx: mira.x * W, cy: mira.y * H, r: Math.max(W, H) * 0.012, class: "mira" }));
     camada.replaceChildren(...filhos);
   }
 
-  /** Uma leitura do resultado: nome da grandeza, valor e a margem. */
-  function leitura(rotulo, valor, margem, principal = false, aoPassar = null) {
-    return el("div", { class: principal ? "leitura-medir principal" : "leitura-medir", onmouseenter: aoPassar && (() => aoPassar(true)), onmouseleave: aoPassar && (() => aoPassar(false)) },
-      el("span", { class: "rotulo" }, rotulo), el("b", { class: "num" }, M.valor(fmt(valor, 1))), el("span", { class: "num mais" }, M.mais(fmt(margem, 1))));
+  /** A leitura do resultado: nome da grandeza, valor e a margem. */
+  function leitura(rotulo, valor, margem) {
+    return el("div", { class: "leitura-medir principal" },
+      el("span", { class: "rotulo" }, rotulo), el("b", { class: "num" }, M.valor(fmt(valor, 1))),
+      margem != null ? el("span", { class: "num mais" }, M.mais(fmt(margem, 1))) : null);
   }
 
-  /** A medida da foto, uma só: altura, comprimento… com a margem, o aviso da referência e como foi medido. */
+  /** A medida da foto, uma só: a distância entre as pontas com a margem, o aviso da referência e como foi medido. */
   function desenharResultado() {
     caixaDetalhes.replaceChildren();
     if (modo === "plano") { desenharResultadoPlano(); return; }
     const r = medida?.r;
     if (medida && !r) { caixaResultado.replaceChildren(esqueleto.linhas(2)); return; }
-    if (!r || r.resultados?.contexto) { caixaResultado.replaceChildren(el("p", { class: "nota" }, M.semResultado)); return; }  // a do contexto tem o cartão dela
+    if (!r) { caixaResultado.replaceChildren(el("p", { class: "nota" }, M.semResultado)); return; }
     const { res, v, usada } = valorDe(r);
-    const medidas = ORDEM.filter((q) => v[`${q}_cm`] != null);
-    const destacar = (q) => (ligado) => { cotaDestacada = ligado ? q : null; desenharCamada(); };
+    if (v.distancia_cm == null) { caixaResultado.replaceChildren(el("p", { class: "nota aviso-escala" }, M.semDistancia(res.erro))); return; }
     const notas = [];
     if (usada) notas.push(el("p", { class: "nota" }, M.comReferencia));
     else if (medida.comReferencia) {
@@ -372,9 +290,7 @@ export async function montar(no, ctx = {}) {
       notas.push(el("p", { class: "nota aviso-escala" }, M.refNaoUsada(motivo)), el("p", { class: "nota" }, M.semReferencia));
     } else notas.push(el("p", { class: "nota" }, M.semReferencia));
     if (medida.video) notas.push(el("p", { class: "nota" }, M.notaVideo(medida.video)));
-    caixaResultado.replaceChildren(
-      el("div", { class: "leituras-medir" }, medidas.map((q) => leitura(M.nomes[q], v[`${q}_cm`], v.incerteza_cm?.[q], medidas.length === 1, destacar(q)))),
-      ...notas);
+    caixaResultado.replaceChildren(el("div", { class: "leituras-medir" }, leitura(M.nomes[grandeza], v.distancia_cm, v.incerteza_cm?.distancia)), ...notas);
     const detalhes = [];
     if (v.lente) detalhes.push(el("p", {}, M.lente[v.lente] || ""));
     const total = v.tempos_ms?.total;
@@ -387,198 +303,18 @@ export async function montar(no, ctx = {}) {
     if (medidaPlano && !r) { caixaResultado.replaceChildren(esqueleto.linhas(1)); return; }
     if (!r) { caixaResultado.replaceChildren(el("p", { class: "nota" }, M.semResultado)); return; }
     caixaResultado.replaceChildren(
-      el("div", { class: "leituras-medir" }, leitura(r.extrapolacao > 3 ? `${M.nomes.distancia}, ${M.longe}` : M.nomes.distancia, r.distancia_cm, r.incerteza_cm, true)),
+      el("div", { class: "leituras-medir" }, leitura(r.extrapolacao > 3 ? `${M.nomes[grandeza]}, ${M.longe}` : M.nomes[grandeza], r.distancia_cm, r.incerteza_cm)),
       el("p", { class: "nota" }, M.planoMetodo));
   }
 
   function atualizarTudo() {
     acharPostit.disabled = !foto;
-    btnMedirContexto.disabled = !foto;
     desenharBarra();
     desenharResultado();
     atualizarHud();
     desenharCamada();
     secaoPlano.hidden = modo !== "plano";
     secaoRef.hidden = modo === "plano";
-  }
-
-  // ---------------------------------------------------------------- biblioteca de pesos (contexto do vídeo)
-  async function carregarBiblioteca() {
-    try {
-      const bib = await api("/api/medicao/biblioteca").catch(() => ({ itens: [] }));
-      biblioteca = bib.itens || [];
-    } catch {
-      biblioteca = [];
-    }
-    atualizarOpcoesContexto();
-    desenharResumoContexto();
-  }
-
-  function atualizarOpcoesContexto() {
-    const select = campoContexto.querySelector("select");
-    if (!select) return;
-    const atual = select.value;
-    const opcoes = [
-      { valor: "auto", texto: M.contextoAuto },
-      ...biblioteca.map((i) => ({
-        valor: String(i.id),
-        texto: `${i.nome} (${fmt(i.dimensoes_cm?.altura, 1)} cm)`,
-      })),
-    ];
-    select.replaceChildren(...opcoes.map((o) => new Option(o.texto, o.valor)));
-    if (opcoes.some((o) => o.valor === atual)) select.value = atual;
-    else select.value = "auto";
-  }
-
-  function desenharResumoContexto() {
-    btnMedirContexto.disabled = !foto;
-    if (!biblioteca.length) {
-      listaItensContexto.replaceChildren(el("p", { class: "nota" }, M.semBiblioteca));
-      return;
-    }
-    listaItensContexto.replaceChildren(
-      el("p", { class: "nota" }, M.bibliotecaItens(biblioteca.length)),
-      el("ul", { class: "itens-contexto" }, biblioteca.map((item) => {
-        const h = item.dimensoes_cm?.altura;
-        const w = item.dimensoes_cm?.largura;
-        const dimTxt = h != null && w != null ? `${fmt(h, 1)} × ${fmt(w, 1)} cm` : h != null ? `${fmt(h, 1)} cm` : "";
-        const btnApagar = botao({
-          texto: M.apagarContexto(item.nome),
-          icone: "lixo",
-          soIcone: true,
-          compacto: true,
-          variante: "fantasma",
-          onclick: async () => {
-            try {
-              await api(`/api/medicao/biblioteca/${item.id}`, { method: "DELETE" });
-              avisar(M.contextoApagado);
-              await carregarBiblioteca();
-            } catch (e) {
-              avisar(e.message, { erro: true });
-            }
-          },
-        });
-        return el("li", { class: "item-contexto-linha" },
-          el("div", { class: "info" },
-            el("b", { class: "corta" }, item.nome),
-            el("span", { class: "sub" }, [item.classe, dimTxt].filter(Boolean).join(" · "))
-          ),
-          btnApagar
-        );
-      }))
-    );
-  }
-
-  async function medirComContexto() {
-    if (!foto) {
-      entrada.click();
-      return;
-    }
-    const idContexto = campoContexto.querySelector("select")?.value;
-    const pista = ultimaPista || { ponto: [Math.round(mira.x * foto.largura), Math.round(mira.y * foto.altura)] };
-    const dados = new FormData();
-    dados.append("arquivo", foto.arquivo);
-    dados.append("pista", JSON.stringify(pista));
-    if (idContexto && idContexto !== "auto") {
-      dados.append("id_contexto", idContexto);
-    }
-
-    medindo = true;
-    inicioMedida = Date.now();
-    atualizarHud();
-    try {
-      const res = await api("/api/medicao/contexto-2d", { method: "POST", body: dados });
-      processarResultadoContexto(res, pista);
-    } catch (e) {
-      avisar(`${M.erroMedir} ${e.message}`, { erro: true });
-    } finally {
-      medindo = false;
-      atualizarTudo();
-    }
-  }
-
-  function processarResultadoContexto(res, pista) {
-    const extrairValor = (v) => (typeof v === "object" && v !== null ? v.valor ?? v.altura_cm ?? v.largura_cm ?? v.comprimento_cm ?? null : typeof v === "number" ? v : null);
-    const extrairIncerteza = (v) => (typeof v === "object" && v !== null ? v.incerteza ?? null : null);
-
-    const altVal = extrairValor(res.altura);
-    const largVal = extrairValor(res.largura);
-    const compVal = extrairValor(res.comprimento);
-    const altInc = extrairIncerteza(res.altura) ?? (altVal ? altVal * 0.05 : null);
-    const largInc = extrairIncerteza(res.largura) ?? (largVal ? largVal * 0.05 : null);
-    const compInc = extrairIncerteza(res.comprimento) ?? (compVal ? compVal * 0.05 : null);
-
-    sequencia++;  // a medida em andamento, se houver, não aparece mais
-    medida = {
-      pista,
-      video: 0,
-      r: {
-        resultados: {
-          contexto: {
-            sem_referencia: {
-              altura_cm: altVal,
-              largura_cm: largVal,
-              comprimento_cm: compVal,
-              incerteza_cm: {
-                altura: altInc,
-                largura: largInc,
-                comprimento: compInc,
-              },
-              lente: "estimada",
-            },
-          },
-        },
-        contorno: res.contorno || [],
-        contorno_referencia: [],
-        cotas: res.cotas || {},
-      },
-    };
-    desenharResultadoContextoDestaque(res, altVal, largVal, compVal, altInc, largInc, compInc);
-  }
-
-  function desenharResultadoContextoDestaque(res, altVal, largVal, compVal, altInc, largInc, compInc) {
-    const ctx = res.contexto || {};
-    const conf = ctx.confianca != null ? Math.round(ctx.confianca * 100) : null;
-    const nome = ctx.nome || ctx.classe || M.resultado;
-
-    const itensMedida = [];
-    if (altVal != null) {
-      itensMedida.push(el("div", { class: "item-medida" },
-        el("span", { class: "rotulo" }, M.nomes.altura),
-        el("b", { class: "valor" }, `${fmt(altVal, 1)} cm`),
-        altInc != null ? el("span", { class: "nota mais" }, M.mais(fmt(altInc, 1))) : null
-      ));
-    }
-    if (largVal != null) {
-      itensMedida.push(el("div", { class: "item-medida" },
-        el("span", { class: "rotulo" }, M.nomes.largura),
-        el("b", { class: "valor" }, `${fmt(largVal, 1)} cm`),
-        largInc != null ? el("span", { class: "nota mais" }, M.mais(fmt(largInc, 1))) : null
-      ));
-    }
-    if (compVal != null) {
-      itensMedida.push(el("div", { class: "item-medida" },
-        el("span", { class: "rotulo" }, M.nomes.comprimento),
-        el("b", { class: "valor" }, `${fmt(compVal, 1)} cm`),
-        compInc != null ? el("span", { class: "nota mais" }, M.mais(fmt(compInc, 1))) : null
-      ));
-    }
-
-    const metas = [];
-    if (res.escala_cm_px != null) metas.push(el("span", {}, M.escalaContexto(fmt(res.escala_cm_px, 4))));
-    if (res.angulo_inclinacao_graus != null) metas.push(el("span", {}, M.inclinacaoCompensada(fmt(res.angulo_inclinacao_graus, 1))));
-    if (res.area_cm2 != null) metas.push(el("span", {}, M.areaCm2(fmt(res.area_cm2, 1))));
-
-    caixaResultadoContexto.replaceChildren(
-      el("div", { class: "resultado-contexto-card" },
-        el("div", { class: "topo-res" },
-          el("b", { class: "corta" }, conf != null ? M.objetoReconhecido(nome, conf) : nome),
-          el("span", { class: "selo normal" }, M.contextoTitulo)
-        ),
-        el("div", { class: "medidas-grade" }, itensMedida),
-        metas.length ? el("div", { class: "metas-contexto" }, metas) : null
-      )
-    );
   }
 
   function tamanhoPlano() {
@@ -677,8 +413,6 @@ export async function montar(no, ctx = {}) {
       pistaRef = primeiroPonto = pontoPlano = null;
       cantos = []; medidaPlano = null; medida = null;
       alvo = "objeto";
-      ultimaPista = null;
-      caixaResultadoContexto.replaceChildren();
       geracao++; medindo = false;  // a medida da foto anterior não aparece nesta
       imagem.src = url;
       zoom = 1; quadro.style.width = ""; janela.style.height = ""; janela.classList.remove("ampliada"); rotuloZoom.textContent = M.zoomPct(100);
@@ -713,8 +447,6 @@ export async function montar(no, ctx = {}) {
     pistaRef = primeiroPonto = pontoPlano = null;
     cantos = []; medidaPlano = null; medida = null;
     alvo = "objeto";
-    ultimaPista = null;
-    caixaResultadoContexto.replaceChildren();
     geracao++;
     medindo = false;
     desenharReferencia(); atualizarTudo();
@@ -727,26 +459,24 @@ export async function montar(no, ctx = {}) {
     palco.focus({ preventScroll: true });
   }
 
-  /** Uma marca na foto (coordenadas da imagem): vira a pista do objeto ou da referência. */
-  function marcar(p) {
-    if (alvo !== "referencia") ultimaPista = p;
-    if (alvo === "referencia") {
-      pistaRef = p;
-      alvo = "objeto";
-      desenharReferencia();
-      atualizarHud();
-      if (!referencia()) { avisar(M.semTamanho, { erro: true }); return; }
-      remedir();
-      return;
-    }
-    if (video && video.atual !== 0) { avisar(M.videoSoPrimeiro); mostrarQuadro(0); return; }
-    caixaResultadoContexto.replaceChildren();
-    medida = { pista: p, r: null, video: video ? video.quadros.length : 0, comReferencia: false, seq: 0 };
+  /** A referência marcada à mão (um clique no objeto de referência, quando o post-it não é achado sozinho). */
+  function marcarReferencia(p) {
+    pistaRef = { ponto: p };
+    alvo = "objeto";
+    desenharReferencia();
+    atualizarHud();
+    if (!referencia()) { avisar(M.semTamanho, { erro: true }); return; }
+    remedir();
+  }
+
+  /** As duas pontas marcadas: a medida nova substitui a anterior. */
+  function medirPontas(pontas) {
+    medida = { pista: { pontos: pontas }, r: null, video: video ? video.quadros.length : 0, comReferencia: false, seq: 0 };
     medir(medida);
   }
 
   /** A referência mudou: a medida da foto sai de novo (e continua uma só). */
-  function remedir() { if (medida?.seq) { medida.r = null; medir(medida); } }  // a do contexto não tem `seq`: não depende da referência
+  function remedir() { if (medida) { medida.r = null; medir(medida); } }
 
   // um pedido por vez no servidor; se outra marca chega antes, o pedido velho nem sai
   let fila = Promise.resolve();
@@ -788,40 +518,32 @@ export async function montar(no, ctx = {}) {
     const fy = Math.min(1, Math.max(0, (ev.clientY - b.top) / b.height));
     return { fx, fy, x: fx * foto.largura, y: fy * foto.altura };
   };
-  let arrasto = null;
+  let apertado = false;
   quadro.addEventListener("pointerdown", (ev) => {
     if (!foto || ev.button !== 0 || espaco) return;
     ev.preventDefault();
-    arrasto = { inicio: naImagem(ev), id: ev.pointerId };
+    apertado = true;
     quadro.setPointerCapture(ev.pointerId);
   });
-  quadro.addEventListener("pointermove", (ev) => {
-    if (!arrasto || modo !== "caixa") return;
-    const a = arrasto.inicio, b = naImagem(ev);
-    desenharCamada([Math.min(a.x, b.x), Math.min(a.y, b.y), Math.max(a.x, b.x), Math.max(a.y, b.y)]);
-  });
   quadro.addEventListener("pointerup", (ev) => {
-    if (!arrasto) return;
-    const a = arrasto.inicio, b = naImagem(ev);
-    arrasto = null;
+    if (!apertado) return;
+    apertado = false;
+    const b = naImagem(ev);
     mira = { x: b.fx, y: b.fy };
-    if (modo === "caixa" && Math.abs(b.fx - a.fx) > CAIXA_MINIMA && Math.abs(b.fy - a.fy) > CAIXA_MINIMA) {
-      marcar({ caixa: [Math.min(a.x, b.x), Math.min(a.y, b.y), Math.max(a.x, b.x), Math.max(a.y, b.y)].map(Math.round) });
-    } else clicar(b.x, b.y);
+    clicar(b.x, b.y);
   });
-  quadro.addEventListener("pointercancel", () => { arrasto = null; desenharCamada(); });
+  quadro.addEventListener("pointercancel", () => { apertado = false; });
 
+  /** Uma marca na foto: canto do retângulo ou ponta do plano, a referência à mão ou uma das duas pontas da medida. */
   function clicar(x, y) {
     const p = [Math.round(x), Math.round(y)];
+    if (video && video.atual !== 0) { avisar(M.videoSoPrimeiro); mostrarQuadro(0); return; }
     if (modo === "plano") { clicarPlano(p); return; }
-    if (modo === "pontos" && alvo === "objeto") {
-      if (!primeiroPonto) { primeiroPonto = p; atualizarHud(); desenharCamada(); return; }
-      const par = [primeiroPonto, p];
-      primeiroPonto = null;
-      marcar({ pontos: par });
-      return;
-    }
-    marcar({ ponto: p });
+    if (alvo === "referencia") { marcarReferencia(p); return; }
+    if (!primeiroPonto) { primeiroPonto = p; atualizarHud(); desenharCamada(); return; }
+    const par = [primeiroPonto, p];
+    primeiroPonto = null;
+    medirPontas(par);
   }
 
   palco.addEventListener("keydown", (ev) => {
@@ -899,7 +621,6 @@ export async function montar(no, ctx = {}) {
   const relogioCelular = setInterval(vigiarCelular, 2000);
 
   desenharReferencia();
-  carregarBiblioteca();
   atualizarTudo();
   desenharVazio();
   vigiarCelular();
@@ -1013,7 +734,8 @@ export async function montar(no, ctx = {}) {
       el("span", { class: "nota num" }, M.posicaoFaixa(atual + 1, quadros.length)));
   }
 
-  /** A resposta do vídeo no formato da foto: a mediana de cada modelo e modo, o ± é o desvio entre os quadros. */
+  /** A resposta do vídeo no formato da foto: a mediana de cada modelo e modo, o ± é o desvio entre os quadros. As duas pontas
+   * seguem de quadro em quadro (fluxo óptico), então cada quadro traz a sua pista. */
   function deVideo(r) {
     const q0 = r.quadros.find((q) => q.resultados) || {};
     const resultados = {};
@@ -1028,9 +750,7 @@ export async function montar(no, ctx = {}) {
         resultados[modelo][modoR] = v;
       }
     }
-    const cotas = Object.values(q0.resultados || {}).find((x) => x?.sem_referencia)?.sem_referencia?.cotas || {};
-    return { ...r, resultados, cotas, contorno: q0.contorno || [], contorno_referencia: [],
-      quadrosVideo: r.quadros.map((q) => ({ pista: q.pista, contorno: q.contorno || [] })) };
+    return { ...r, resultados, contorno_referencia: [], quadrosVideo: r.quadros.map((q) => ({ pista: q.pista })) };
   }
 
   carregarFaixa();

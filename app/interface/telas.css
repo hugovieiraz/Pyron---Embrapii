@@ -539,9 +539,7 @@ body:has(.painel-lateral) .avisos { right: calc(var(--detalhe) + var(--e-6) * 2)
 .medir-grade { display: grid; grid-template-columns: minmax(0, 1fr) var(--detalhe); gap: var(--e-6); align-items: start; margin-top: var(--e-4); }
 .coluna-medir { display: grid; min-width: 0; }
 .palco-medir { display: grid; justify-items: center; gap: var(--e-2); padding: var(--e-3) var(--e-4) var(--e-4); border-radius: var(--r-g); background: var(--palco); }
-.vazio-medir { display: grid; gap: var(--e-3); }
 .comando-medir { justify-self: center; padding: var(--e-2) var(--e-3); border: 1px solid var(--borda); border-radius: var(--r-m); background: var(--superficie-2); font-size: var(--t-1); line-height: var(--a-1); }
-.vazio-medir > .nota { text-align: center; }
 .hud-medir { justify-self: start; min-height: var(--a-1); color: var(--palco-texto); font-size: var(--t-1); line-height: var(--a-1); }
 .hud-medir span { color: var(--palco-texto-2); }
 .quadro-medir { position: relative; width: min(100%, calc((100vh - var(--e-24) * 3 - var(--e-12)) * var(--proporcao, 1.333))); cursor: crosshair; touch-action: none; user-select: none; }
@@ -549,18 +547,10 @@ body:has(.painel-lateral) .avisos { right: calc(var(--detalhe) + var(--e-6) * 2)
 .camada-medir { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
 .camada-medir * { fill: none; stroke: var(--marca-imagem); stroke-width: var(--borda-sel); vector-effect: non-scaling-stroke; }
 .camada-medir .sombra { stroke: var(--contorno-imagem); stroke-width: calc(var(--borda-sel) * 2.5); }
-.camada-medir .contorno-obj:not(.sombra) { fill: var(--palco-hover); }
-.camada-medir .contorno-ref:not(.sombra), .camada-medir .marca-ref:not(.sombra), .camada-medir .marca-rascunho { stroke-dasharray: var(--e-2) var(--e-1); }
+.camada-medir .contorno-ref:not(.sombra), .camada-medir .marca-ref:not(.sombra) { stroke-dasharray: var(--e-2) var(--e-1); }
 .camada-medir circle.marca-obj, .camada-medir circle.marca-ref { fill: var(--marca-imagem); stroke: var(--contorno-imagem); stroke-width: 1; }
 .camada-medir .mira { stroke: var(--foco); }
-.camada-medir .cota-linha { stroke: var(--marca-imagem); stroke-width: var(--borda-sel); stroke-linecap: round; }
-.camada-medir .cota-linha.sombra { stroke: var(--contorno-imagem); stroke-width: calc(var(--borda-sel) * 2.5); }
-.camada-medir .cota-terminador { stroke: var(--marca-imagem); stroke-width: var(--borda-sel); }
-.camada-medir .cota-terminador.sombra { stroke: var(--contorno-imagem); stroke-width: calc(var(--borda-sel) * 2.5); }
-.camada-medir .cota-apoio { stroke: var(--atencao); stroke-width: var(--borda-sel); stroke-dasharray: var(--e-2) var(--e-1); }
-.camada-medir .cota-badge-fundo { fill: var(--rotulo-imagem); rx: var(--r-p); stroke: var(--contorno-imagem); stroke-width: 1px; }
-.camada-medir .cota-badge-texto { fill: var(--branco); font-family: var(--fonte-num); font-size: var(--t-1); font-weight: var(--p-medio); text-anchor: middle; dominant-baseline: middle; stroke: none; }
-.camada-medir .cota-destaque .cota-linha, .camada-medir .cota-destaque .cota-terminador { stroke: var(--foco); }
+.rotulo-medida { position: absolute; transform: translate(-50%, calc(-100% - var(--e-2))); pointer-events: none; padding: 0 var(--e-2); border-radius: var(--r-p); background: var(--rotulo-imagem); color: var(--marca-imagem); font: var(--p-medio) var(--t-1) / var(--a-1) var(--fonte-num); white-space: nowrap; } /* o valor sobre a linha entre as pontas, no tamanho do texto da tela */
 .painel-medir { display: grid; gap: var(--e-6); min-width: 0; }
 .painel-medir .secao { border: 1px solid var(--borda); border-radius: var(--r-g); overflow: hidden; background: var(--superficie); }
 .resultado-medir { display: grid; gap: var(--e-2); padding-top: var(--e-3); }
@@ -632,21 +622,6 @@ body:has(.painel-lateral) .avisos { right: calc(var(--detalhe) + var(--e-6) * 2)
 .resumo-biblioteca-video { display: grid; gap: var(--e-2); margin-top: var(--e-3); padding-top: var(--e-2); border-top: 1px solid var(--borda); }
 .lista-itens-biblioteca { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-1); font-size: var(--t-1); line-height: var(--a-1); }
 .lista-itens-biblioteca li { display: flex; justify-content: space-between; gap: var(--e-2); color: var(--texto-2); }
-
-.lista-biblioteca-contexto { display: grid; gap: var(--e-2); margin-top: var(--e-3); padding-top: var(--e-2); border-top: 1px solid var(--borda); }
-.itens-contexto { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--e-2); }
-.item-contexto-linha { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); padding: var(--e-1) var(--e-2); border-radius: var(--r-p); background: var(--superficie-2); }
-.item-contexto-linha .info { display: grid; min-width: 0; }
-.item-contexto-linha .info b { font-size: var(--t-1); line-height: var(--a-1); color: var(--texto); }
-.item-contexto-linha .info .sub { font-size: var(--t-1); line-height: var(--a-1); color: var(--texto-3); }
-.resultado-contexto-card { display: grid; gap: var(--e-2); padding: var(--e-3); border: 1px solid var(--borda-forte); border-radius: var(--r-m); background: var(--superficie-2); margin-top: var(--e-2); }
-.resultado-contexto-card .topo-res { display: flex; align-items: center; justify-content: space-between; gap: var(--e-2); }
-.resultado-contexto-card .medidas-grade { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--e-2); margin-top: var(--e-1); }
-.resultado-contexto-card .item-medida { display: grid; }
-.resultado-contexto-card .item-medida .rotulo { font-size: var(--t-1); line-height: var(--a-1); color: var(--texto-3); }
-.resultado-contexto-card .item-medida .valor { font: var(--p-forte) var(--t-2) / var(--a-2) var(--fonte-num); color: var(--texto); }
-.resultado-contexto-card .metas-contexto { display: flex; flex-wrap: wrap; gap: var(--e-2); font-size: var(--t-1); line-height: var(--a-1); color: var(--texto-2); padding-top: var(--e-1); border-top: 1px solid var(--borda); }
-
 
 /* ---------------------------------------------------------------- acesso ao servidor (0.9; app/acesso.py) */
 /* entrada: só a marca no topo enquanto ninguém entrou (js/telas/entrar.js) */

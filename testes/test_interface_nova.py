@@ -181,8 +181,11 @@ def test_medicao_e_tela_de_topo_e_nao_guarda_medidas():
     assert 'const ABAS = ["medir", "modelos"]' in (PASTA / "js" / "telas" / "medicao.js").read_text(encoding="utf-8")
     codigo = [l for l in (PASTA / "js" / "medicao" / "medir.js").read_text(encoding="utf-8").splitlines() if not l.strip().startswith("//")]
     medir = "\n".join(codigo)
-    for proibido in ("/api/medicao/registro", "trazerMedidasDoCelular", "registrar", "campoReal", "campoNome"):
+    # só as duas pontas (e o retângulo sem modelo): sem clique no objeto, sem caixa, sem a biblioteca de pesos
+    for proibido in ("/api/medicao/registro", "trazerMedidasDoCelular", "registrar", "campoReal", "campoNome",
+                     "/api/medicao/contexto-2d", "/api/medicao/biblioteca", "caixa:", "contorno-obj"):
         assert proibido not in medir, proibido
+    assert "segmentado(" in medir and "pontos: " in medir
     assert 'dados.append("modelo", modeloPadrao)' in medir
     modelos = (PASTA / "js" / "medicao" / "modelos.js").read_text(encoding="utf-8")
     assert "/api/medicao/registro" not in modelos and "registro.csv" not in modelos

@@ -89,13 +89,13 @@ export function segmentado({ rotulo, opcoes, valor, aoMudar }) {
   return g;
 }
 
-/** Chaves liga/desliga independentes (o que aparece na imagem): botões com aria-pressed e um trilho de chave. */
+/** Chaves liga/desliga independentes (o que aparece na imagem): botões com role="switch" e um trilho de chave. */
 export function chaves({ rotulo, opcoes, aoMudar }) {
   const g = el("div", { class: "chaves", role: "group", "aria-label": rotulo });
   for (const o of opcoes) {
-    const b = el("button", { type: "button", dataset: { chave: o.chave }, "aria-pressed": String(Boolean(o.ligado)), title: o.dica || null, onclick: () => {
-      const ligado = b.getAttribute("aria-pressed") !== "true";
-      b.setAttribute("aria-pressed", String(ligado));
+    const b = el("button", { type: "button", role: "switch", dataset: { chave: o.chave }, "aria-checked": String(Boolean(o.ligado)), title: o.dica || null, onclick: () => {
+      const ligado = b.getAttribute("aria-checked") !== "true";
+      b.setAttribute("aria-checked", String(ligado));
       aoMudar?.(o.chave, ligado);
     } }, el("span", { class: "trilho", "aria-hidden": "true" }), o.texto);
     g.append(b);
