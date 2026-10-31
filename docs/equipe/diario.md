@@ -13,6 +13,15 @@ Modelo de entrada (curta; o detalhe fica no commit):
 - Pendente: o que ficou para depois ou espera decisão.
 ```
 
+## 31/10/2026 · Hugo (2)
+
+- Feito: a regra do diário também vale no Antigravity. Bloco novo "Diário da equipe" no começo de
+  `.agents/agents/orchestrator.md` (o resto do arquivo ficou igual) e regra em `.agents/rules/diario-equipe.md`.
+- Para o outro: Gabriel, confira se o seu Antigravity lê `.agents/rules/`; se o caminho for outro, mova o arquivo.
+  O bloco no `orchestrator.md` vale de qualquer jeito.
+- Pendente (Hugo): gancho SessionStart em `.claude/settings.json`, que roda o script sozinho ao abrir o Claude Code.
+  O modo automático não deixa o assistente criar esse arquivo; o Hugo cria à mão.
+
 ## 31/10/2026 · Hugo
 
 - Feito: integrei a 0.9 inteira do branch `v09-f1-servidor` no `main` (merge `f566928`), sem conflito; suíte
