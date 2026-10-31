@@ -20,7 +20,6 @@ DIARIO = "docs/equipe/diario.md"
 MARCA = RAIZ / ".git" / "pyron-ultima-visita"
 MAX_COMMITS = 25
 MAX_LINHAS_DIARIO = 80
-VAZIO = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"  # árvore vazia do git: compara com "nada"
 
 
 def git(*args: str, tempo: int = 20) -> str:
@@ -51,10 +50,12 @@ def main() -> None:
                  "--format=%h%x09%ad%x09%an%x09%ae%x09%s", "--date=format:%d/%m %H:%M")
     outros = [l.split("\t") for l in linhas.splitlines() if l and l.split("\t")[3].lower() != eu][:MAX_COMMITS]
 
-    # base do diário: a última visita; sem ela, o main de 7 dias atrás (ou o arquivo inteiro, se for mais novo)
-    base = marca or git("rev-list", "-1", "--before=7.days", "origin/main") or VAZIO
-    diario = git("diff", "--unified=0", base, "origin/main", "--", DIARIO)
-    novas = [l[1:] for l in diario.splitlines() if l.startswith("+") and not l.startswith("+++")][:MAX_LINHAS_DIARIO]
+    # entradas do diário escritas pelos outros: as linhas que os commits deles acrescentaram, do mais antigo ao mais novo
+    novas = []
+    for h, *_ in reversed(outros):
+        diff = git("show", "--unified=0", "--format=", h, "--", DIARIO)
+        novas += [l[1:] for l in diff.splitlines() if l.startswith("+") and not l.startswith("+++")]
+    novas = novas[:MAX_LINHAS_DIARIO]
 
     atras = int(git("rev-list", "--count", "HEAD..origin/main") or 0)
     saida = ["# Novidades da equipe no GitHub (gancho de início de sessão)"]

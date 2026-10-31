@@ -19,8 +19,10 @@ Modelo de entrada (curta; o detalhe fica no commit):
   `.agents/agents/orchestrator.md` (o resto do arquivo ficou igual) e regra em `.agents/rules/diario-equipe.md`.
 - Para o outro: Gabriel, confira se o seu Antigravity lê `.agents/rules/`; se o caminho for outro, mova o arquivo.
   O bloco no `orchestrator.md` vale de qualquer jeito.
-- Pendente (Hugo): gancho SessionStart em `.claude/settings.json`, que roda o script sozinho ao abrir o Claude Code.
-  O modo automático não deixa o assistente criar esse arquivo; o Hugo cria à mão.
+- Feito: gancho SessionStart em `.claude/settings.json` (criado pelo Hugo; o modo automático não deixa o assistente
+  criar esse arquivo). Ao abrir o Claude Code no projeto, roda `ferramentas/novidades_equipe.py` sozinho.
+- Feito: o script agora mostra do diário só o que a outra pessoa escreveu (antes mostrava também as suas entradas).
+- Para o outro: Gabriel, no primeiro `git pull` o seu Claude Code pode pedir para confiar no gancho novo; é este script.
 
 ## 31/10/2026 · Hugo
 
