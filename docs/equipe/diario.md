@@ -13,6 +13,12 @@ Modelo de entrada (curta; o detalhe fica no commit):
 - Pendente: o que ficou para depois ou espera decisão.
 ```
 
+## 31/10/2026 · Codex · Upload de imagem
+
+- Feito: leitura do fluxo de imagem em `app/interface/js/medicao/medir.js` e `app/servidor.py`. Medição aceita JPEG, PNG, WebP e HEIC/HEIF pelo seletor, arrastar/soltar ou colar. A foto aparece localmente antes de ser guardada; falha no POST da galeria é capturada sem aviso, e o servidor rejeita fotos acima de 40 MB.
+- Para o outro: se a foto abre no palco mas não fica na faixa, conferir `/api/medicao/fotos`; para HEIC, a prévia depende de `/api/medicao/previa` e `pillow-heif`. A janela do Pyron não estava disponível para observar a tentativa ao vivo.
+- Pendente: confirmar se o upload que falha é no Pyron ou no ChatGPT e em qual etapa, para reproduzir o erro certo.
+
 ## 31/10/2026 · Codex
 
 - Feito: análise de leitura do Pyron, sem mudanças no código. Os commits `fc28080`, `7f67f51` e `477394d` separaram Medição da Análise, simplificaram a medição para duas pontas ou retângulo de referência e fazem a tela pedir um único modelo de profundidade. A arquitetura liga `app/interface/` → FastAPI em `app/servidor.py` → regras/modelos em `nucleo/`; o servidor tem 3.433 linhas e reúne rotas de vários domínios.
